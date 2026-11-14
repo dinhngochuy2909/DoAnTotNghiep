@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sơ đồ Use Case - Ứng dụng Quản lý và Đặt sân Thể thao</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap');
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Noto Sans', 'Inter', sans-serif;
+      background: #ffffff;
+      color: #1a1a2e;
+      min-height: 100vh;
+    }
+
+    .page-header {
+      text-align: center;
+      padding: 30px 20px 10px;
+      background: #fff;
+    }
+
+    .page-header h1 {
+      font-size: 1.3rem;
+      font-weight: 700;
+      color: #1a1a2e;
+      margin-bottom: 4px;
+    }
+
+    .page-header .subtitle {
+      font-size: 0.85rem;
+      color: #666;
+      font-style: italic;
+    }
+
+    /* ============ DIAGRAM CONTAINER ============ */
+    .diagram-wrapper {
+      padding: 10px 20px 40px;
+      display: flex;
+      justify-content: center;
+    }
+
+    svg.usecase-diagram {
+      max-width: 100%;
+      height: auto;
+    }
+
+    /* Actor stick figure */
+    .actor-group text {
+      font-family: 'Noto Sans', sans-serif;
+      font-size: 12px;
+      font-weight: 600;
+      fill: #1a1a2e;
+      text-anchor: middle;
+    }
+
+    .actor-group line, .actor-group circle {
+      stroke: #1a1a2e;
+      stroke-width: 2;
+      fill: none;
+    }
+
+    /* Use case ellipses */
+    .usecase ellipse {
+      fill: #f0f4ff;
+      stroke: #3b5998;
+      stroke-width: 1.5;
+    }
+
+    .usecase text {
+      font-family: 'Noto Sans', sans-serif;
+      font-size: 10.5px;
+      fill: #1a1a2e;
+      text-anchor: middle;
+      dominant-baseline: central;
+    }
+
+    /* System boundary */
+    .system-boundary rect {
+      fill: none;
+      stroke: #1a1a2e;
+      stroke-width: 2;
+      rx: 8;
+      ry: 8;
+    }
+
+    .system-boundary text {
+      font-family: 'Noto Sans', sans-serif;
+      font-size: 14px;
+      font-weight: 700;
+      fill: #1a1a2e;
+    }
+
+    /* Association lines */
+    .assoc-line {
+      stroke: #555;
+      stroke-width: 1.2;
+      fill: none;
+    }
+
+    /* Include/Extend dashed lines */
+    .include-line {
+      stroke: #888;
+      stroke-width: 1;
+      stroke-dasharray: 6,3;
+      fill: none;
+    }
+
+    .include-label {
+      font-family: 'Noto Sans', sans-serif;
+      font-size: 9px;
+      fill: #888;
+      font-style: italic;
+    }
+
+    /* Module sub-boundaries */
+    .module-boundary rect {
+      fill: rgba(240, 244, 255, 0.3);
+      stroke: #aab;
+      stroke-width: 1;
+      stroke-dasharray: 5,3;
+      rx: 6;
+      ry: 6;
+    }
+
+    .module-boundary text {
+      font-family: 'Noto Sans', sans-serif;
+      font-size: 11px;
+      font-weight: 600;
+      fill: #3b5998;
+    }
+
+    /* Color coding for different modules */
+    .mod-court ellipse { fill: #e8f5e9; stroke: #2e7d32; }
+    .mod-booking ellipse { fill: #e3f2fd; stroke: #1565c0; }
+    .mod-customer ellipse { fill: #fce4ec; stroke: #c62828; }
+    .mod-payment ellipse { fill: #fff3e0; stroke: #e65100; }
+    .mod-admin ellipse { fill: #f3e5f5; stroke: #6a1b9a; }
+    .mod-ai ellipse { fill: #e0f7fa; stroke: #00695c; }
+
+    /* Legend */
+    .legend {
+      display: flex;
+      justify-content: center;
+      gap: 18px;
+      flex-wrap: wrap;
+      padding: 8px 20px 20px;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.75rem;
+      color: #555;
+    }
+
+    .legend-color {
+      width: 14px;
+      height: 14px;
+      border-radius: 3px;
+      border: 1.5px solid;
+    }
+
+    /* Print-friendly */
+    @media print {
+      body { background: #fff; }
+      .page-header { padding-top: 10px; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="page-header">
+  <h1>Sơ đồ Use Case tổng quát</h1>
+  <p class="subtitle">Hệ thống Quản lý và Đặt sân Thể thao tích hợp AI</p>
+</div>
+
+<div class="legend">
+  <div class="legend-item"><div class="legend-color" style="background:#e8f5e9; border-color:#2e7d32;"></div>Quản lý sân</div>
+  <div class="legend-item"><div class="legend-color" style="background:#e3f2fd; border-color:#1565c0;"></div>Đặt sân</div>
+  <div class="legend-item"><div class="legend-color" style="background:#fce4ec; border-color:#c62828;"></div>Khách hàng</div>
+  <div class="legend-item"><div class="legend-color" style="background:#fff3e0; border-color:#e65100;"></div>Thanh toán</div>
+  <div class="legend-item"><div class="legend-color" style="background:#f3e5f5; border-color:#6a1b9a;"></div>Quản trị & Thống kê</div>
+  <div class="legend-item"><div class="legend-color" style="background:#e0f7fa; border-color:#00695c;"></div>AI & Dự báo</div>
+</div>
+
+<div class="diagram-wrapper">
+<svg class="usecase-diagram" viewBox="0 0 1200 1020" xmlns="http://www.w3.org/2000/svg">
+
+  <!-- ==================== SYSTEM BOUNDARY ==================== -->
+  <g class="system-boundary">
+    <rect x="200" y="20" width="800" height="980" />
+    <text x="600" y="48" text-anchor="middle">Hệ thống Quản lý và Đặt sân Thể thao</text>
+  </g>
+
+  <!-- ==================== ACTORS ==================== -->
+  <!-- KHÁCH HÀNG (left) -->
+  <g class="actor-group" transform="translate(80, 400)">
+    <circle cx="0" cy="0" r="14" />
+    <line x1="0" y1="14" x2="0" y2="46" />
+    <line x1="-18" y1="28" x2="18" y2="28" />
+    <line x1="0" y1="46" x2="-14" y2="68" />
+    <line x1="0" y1="46" x2="14" y2="68" />
+    <text x="0" y="86">Khách hàng</text>
+  </g>
+
+  <!-- NHÂN VIÊN QUẢN LÝ SÂN (right top) -->
+  <g class="actor-group" transform="translate(1120, 260)">
+    <circle cx="0" cy="0" r="14" />
+    <line x1="0" y1="14" x2="0" y2="46" />
+    <line x1="-18" y1="28" x2="18" y2="28" />
+    <line x1="0" y1="46" x2="-14" y2="68" />
+    <line x1="0" y1="46" x2="14" y2="68" />
+    <text x="0" y="86">Nhân viên</text>
+    <text x="0" y="100">quản lý sân</text>
+  </g>
+
+  <!-- QUẢN TRỊ VIÊN (right bottom) -->
+  <g class="actor-group" transform="translate(1120, 700)">
+    <circle cx="0" cy="0" r="14" />
+    <line x1="0" y1="14" x2="0" y2="46" />
+    <line x1="-18" y1="28" x2="18" y2="28" />
+    <line x1="0" y1="46" x2="-14" y2="68" />
+    <line x1="0" y1="46" x2="14" y2="68" />
+    <text x="0" y="86">Quản trị viên</text>
+  </g>
+
+  <!-- ==================== MODULE 1: QUẢN LÝ KHÁCH HÀNG (pink) ==================== -->
+  <g class="module-boundary">
+    <rect x="220" y="60" width="350" height="200" />
+    <text x="395" y="80">Module Khách hàng</text>
+  </g>
+
+  <g class="usecase mod-customer" transform="translate(320, 115)">
+    <ellipse cx="0" cy="0" rx="80" ry="22" />
+    <text x="0" y="0">Đăng ký tài khoản</text>
+  </g>
+  <g class="usecase mod-customer" transform="translate(480, 115)">
+    <ellipse cx="0" cy="0" rx="68" ry="22" />
+    <text x="0" y="0">Đăng nhập</text>
+  </g>
+  <g class="usecase mod-customer" transform="translate(320, 170)">
+    <ellipse cx="0" cy="0" rx="85" ry="22" />
+    <text x="0" y="0">Cập nhật thông tin</text>
+    <!-- <text x="0" y="12">cá nhân</text> -->
+  </g>
+  <g class="usecase mod-customer" transform="translate(490, 170)">
+    <ellipse cx="0" cy="0" rx="55" ry="22" />
+    <text x="0" y="0">Đăng xuất</text>
+  </g>
+  <g class="usecase mod-customer" transform="translate(395, 230)">
+    <ellipse cx="0" cy="0" rx="92" ry="22" />
+    <text x="0" y="0">Xem lịch sử đặt sân</text>
+  </g>
+
+  <!-- Association: Khách hàng → Module Khách hàng -->
+  <line class="assoc-line" x1="100" y1="390" x2="245" y2="115" />
+  <line class="assoc-line" x1="100" y1="390" x2="415" y2="115" />
+  <line class="assoc-line" x1="100" y1="390" x2="245" y2="170" />
+  <line class="assoc-line" x1="100" y1="390" x2="395" y2="230" />
+
+  <!-- ==================== MODULE 2: ĐẶT SÂN (blue) ==================== -->
+  <g class="module-boundary">
+    <rect x="220" y="280" width="350" height="310" />
+    <text x="395" y="300">Module Đặt sân</text>
+  </g>
+
+  <g class="usecase mod-booking" transform="translate(340, 335)">
+    <ellipse cx="0" cy="0" rx="75" ry="22" />
+    <text x="0" y="0">Tìm kiếm sân</text>
+  </g>
+  <g class="usecase mod-booking" transform="translate(500, 335)">
+    <ellipse cx="0" cy="0" rx="55" ry="22" />
+    <text x="0" y="0">Xem lịch sân</text>
+  </g>
+  <g class="usecase mod-booking" transform="translate(395, 390)">
+    <ellipse cx="0" cy="0" rx="88" ry="22" />
+    <text x="0" y="0">Kiểm tra sân còn trống</text>
+  </g>
+  <g class="usecase mod-booking" transform="translate(340, 445)">
+    <ellipse cx="0" cy="0" rx="58" ry="22" />
+    <text x="0" y="0">Đặt sân</text>
+  </g>
+  <g class="usecase mod-booking" transform="translate(500, 445)">
+    <ellipse cx="0" cy="0" rx="62" ry="22" />
+    <text x="0" y="0">Hủy đặt sân</text>
+  </g>
+  <g class="usecase mod-booking" transform="translate(340, 500)">
+    <ellipse cx="0" cy="0" rx="92" ry="22" />
+    <text x="0" y="-5">Theo dõi trạng thái</text>
+    <text x="0" y="9">đặt sân</text>
+  </g>
+  <g class="usecase mod-booking" transform="translate(500, 500)">
+    <ellipse cx="0" cy="0" rx="88" ry="22" />
+    <text x="0" y="0">Chọn ngày/khung giờ</text>
+  </g>
+  <g class="usecase mod-booking" transform="translate(420, 555)">
+    <ellipse cx="0" cy="0" rx="82" ry="22" />
+    <text x="0" y="0">Nhận AI gợi ý sân</text>
+  </g>
+
+  <!-- Association: Khách hàng → Module Đặt sân -->
+  <line class="assoc-line" x1="100" y1="410" x2="268" y2="335" />
+  <line class="assoc-line" x1="100" y1="415" x2="448" y2="335" />
+  <line class="assoc-line" x1="100" y1="420" x2="310" y2="390" />
+  <line class="assoc-line" x1="100" y1="425" x2="285" y2="445" />
+  <line class="assoc-line" x1="100" y1="425" x2="440" y2="445" />
+  <line class="assoc-line" x1="100" y1="430" x2="252" y2="500" />
+  <line class="assoc-line" x1="100" y1="420" x2="415" y2="500" />
+  <line class="assoc-line" x1="100" y1="435" x2="340" y2="555" />
+
+  <!-- Include: Đặt sân <<include>> Kiểm tra sân còn trống -->
+  <line class="include-line" x1="340" y1="423" x2="370" y2="395" />
+  <text class="include-label" x="330" y="404" text-anchor="middle">«include»</text>
+
+  <!-- Include: Đặt sân <<include>> Chọn ngày/khung giờ -->
+  <line class="include-line" x1="395" y1="445" x2="460" y2="490" />
+  <text class="include-label" x="445" y="465" text-anchor="middle">«include»</text>
+
+
+  <!-- ==================== MODULE 3: THANH TOÁN (orange) ==================== -->
+  <g class="module-boundary">
+    <rect x="220" y="610" width="350" height="195" />
+    <text x="395" y="630">Module Thanh toán</text>
+  </g>
+
+  <g class="usecase mod-payment" transform="translate(330, 660)">
+    <ellipse cx="0" cy="0" rx="82" ry="22" />
+    <text x="0" y="0">Thanh toán trực tiếp</text>
+  </g>
+  <g class="usecase mod-payment" transform="translate(510, 660)">
+    <ellipse cx="0" cy="0" rx="55" ry="22" />
+    <text x="0" y="0">Thanh toán QR</text>
+  </g>
+  <g class="usecase mod-payment" transform="translate(330, 720)">
+    <ellipse cx="0" cy="0" rx="92" ry="22" />
+    <text x="0" y="-5">Quản lý trạng thái</text>
+    <text x="0" y="9">thanh toán</text>
+  </g>
+  <g class="usecase mod-payment" transform="translate(510, 720)">
+    <ellipse cx="0" cy="0" rx="70" ry="22" />
+    <text x="0" y="0">Xác nhận giao dịch</text>
+  </g>
+  <g class="usecase mod-payment" transform="translate(420, 775)">
+    <ellipse cx="0" cy="0" rx="78" ry="22" />
+    <text x="0" y="0">Xem hóa đơn</text>
+  </g>
+
+  <!-- Association: Khách hàng → Thanh toán -->
+  <line class="assoc-line" x1="100" y1="445" x2="250" y2="660" />
+  <line class="assoc-line" x1="100" y1="445" x2="458" y2="660" />
+  <line class="assoc-line" x1="100" y1="450" x2="345" y2="775" />
+
+  <!-- Association: Quản trị viên → Thanh toán -->
+  <line class="assoc-line" x1="1100" y1="700" x2="420" y2="720" />
+  <line class="assoc-line" x1="1100" y1="710" x2="578" y2="720" />
+
+  <!-- ==================== MODULE 4: QUẢN LÝ SÂN (green) ==================== -->
+  <g class="module-boundary">
+    <rect x="620" y="60" width="360" height="270" />
+    <text x="800" y="80">Module Quản lý sân</text>
+  </g>
+
+  <g class="usecase mod-court" transform="translate(720, 115)">
+    <ellipse cx="0" cy="0" rx="72" ry="22" />
+    <text x="0" y="0">Thêm/Sửa/Xóa sân</text>
+  </g>
+  <g class="usecase mod-court" transform="translate(900, 115)">
+    <ellipse cx="0" cy="0" rx="65" ry="22" />
+    <text x="0" y="0">Quản lý loại sân</text>
+  </g>
+  <g class="usecase mod-court" transform="translate(720, 170)">
+    <ellipse cx="0" cy="0" rx="82" ry="22" />
+    <text x="0" y="0">Quản lý trạng thái sân</text>
+  </g>
+  <g class="usecase mod-court" transform="translate(900, 170)">
+    <ellipse cx="0" cy="0" rx="68" ry="22" />
+    <text x="0" y="0">Quản lý giá sân</text>
+  </g>
+  <g class="usecase mod-court" transform="translate(800, 230)">
+    <ellipse cx="0" cy="0" rx="90" ry="22" />
+    <text x="0" y="0">Quản lý khung giờ</text>
+  </g>
+  <g class="usecase mod-court" transform="translate(800, 290)">
+    <ellipse cx="0" cy="0" rx="80" ry="22" />
+    <text x="0" y="0">Xem báo cáo sân</text>
+  </g>
+
+  <!-- Association: Nhân viên → Module Quản lý sân -->
+  <line class="assoc-line" x1="1100" y1="260" x2="790" y2="115" />
+  <line class="assoc-line" x1="1100" y1="260" x2="963" y2="115" />
+  <line class="assoc-line" x1="1100" y1="260" x2="800" y2="170" />
+  <line class="assoc-line" x1="1100" y1="265" x2="966" y2="170" />
+  <line class="assoc-line" x1="1100" y1="270" x2="888" y2="230" />
+  <line class="assoc-line" x1="1100" y1="275" x2="878" y2="290" />
+
+
+  <!-- ==================== MODULE 5: QUẢN TRỊ & THỐNG KÊ (purple) ==================== -->
+  <g class="module-boundary">
+    <rect x="620" y="350" width="360" height="310" />
+    <text x="800" y="370">Module Quản trị & Thống kê</text>
+  </g>
+
+  <g class="usecase mod-admin" transform="translate(730, 405)">
+    <ellipse cx="0" cy="0" rx="80" ry="22" />
+    <text x="0" y="0">Quản lý người dùng</text>
+  </g>
+  <g class="usecase mod-admin" transform="translate(910, 405)">
+    <ellipse cx="0" cy="0" rx="60" ry="22" />
+    <text x="0" y="0">Phân quyền</text>
+  </g>
+  <g class="usecase mod-admin" transform="translate(730, 460)">
+    <ellipse cx="0" cy="0" rx="82" ry="22" />
+    <text x="0" y="0">Quản lý đơn đặt sân</text>
+  </g>
+  <g class="usecase mod-admin" transform="translate(910, 460)">
+    <ellipse cx="0" cy="0" rx="78" ry="22" />
+    <text x="0" y="0">Quản lý thanh toán</text>
+  </g>
+  <g class="usecase mod-admin" transform="translate(730, 520)">
+    <ellipse cx="0" cy="0" rx="72" ry="22" />
+    <text x="0" y="0">Thống kê doanh thu</text>
+  </g>
+  <g class="usecase mod-admin" transform="translate(910, 520)">
+    <ellipse cx="0" cy="0" rx="80" ry="22" />
+    <text x="0" y="-5">Thống kê lượt</text>
+    <text x="0" y="9">đặt sân</text>
+  </g>
+  <g class="usecase mod-admin" transform="translate(800, 580)">
+    <ellipse cx="0" cy="0" rx="92" ry="22" />
+    <text x="0" y="-5">Thống kê hiệu suất</text>
+    <text x="0" y="9">sử dụng sân</text>
+  </g>
+  <g class="usecase mod-admin" transform="translate(800, 635)">
+    <ellipse cx="0" cy="0" rx="88" ry="22" />
+    <text x="0" y="-5">Xác định khung giờ</text>
+    <text x="0" y="9">cao/thấp điểm</text>
+  </g>
+
+  <!-- Association: Quản trị viên → Module Quản trị -->
+  <line class="assoc-line" x1="1100" y1="690" x2="808" y2="405" />
+  <line class="assoc-line" x1="1100" y1="690" x2="968" y2="405" />
+  <line class="assoc-line" x1="1100" y1="695" x2="810" y2="460" />
+  <line class="assoc-line" x1="1100" y1="695" x2="986" y2="460" />
+  <line class="assoc-line" x1="1100" y1="700" x2="800" y2="520" />
+  <line class="assoc-line" x1="1100" y1="700" x2="988" y2="520" />
+  <line class="assoc-line" x1="1100" y1="710" x2="890" y2="580" />
+  <line class="assoc-line" x1="1100" y1="715" x2="886" y2="635" />
+
+  <!-- Association: Nhân viên → Quản lý đơn đặt sân -->
+  <line class="assoc-line" x1="1100" y1="290" x2="810" y2="460" />
+
+  <!-- ==================== MODULE 6: AI & DỰ BÁO (teal) ==================== -->
+  <g class="module-boundary">
+    <rect x="620" y="680" width="360" height="300" />
+    <text x="800" y="700">Module AI & Dự báo</text>
+  </g>
+
+  <g class="usecase mod-ai" transform="translate(730, 740)">
+    <ellipse cx="0" cy="0" rx="88" ry="22" />
+    <text x="0" y="-5">Dự báo nhu cầu</text>
+    <text x="0" y="9">sử dụng sân</text>
+  </g>
+  <g class="usecase mod-ai" transform="translate(910, 740)">
+    <ellipse cx="0" cy="0" rx="58" ry="22" />
+    <text x="0" y="-5">Gợi ý sân</text>
+    <text x="0" y="9">thông minh</text>
+  </g>
+  <g class="usecase mod-ai" transform="translate(730, 800)">
+    <ellipse cx="0" cy="0" rx="88" ry="22" />
+    <text x="0" y="-5">Gợi ý khung giờ</text>
+    <text x="0" y="9">phù hợp</text>
+  </g>
+  <g class="usecase mod-ai" transform="translate(910, 800)">
+    <ellipse cx="0" cy="0" rx="58" ry="22" />
+    <text x="0" y="-5">Phân tích</text>
+    <text x="0" y="9">thời tiết</text>
+  </g>
+  <g class="usecase mod-ai" transform="translate(800, 860)">
+    <ellipse cx="0" cy="0" rx="95" ry="22" />
+    <text x="0" y="-5">Dashboard dự báo</text>
+    <text x="0" y="9">& trực quan hóa</text>
+  </g>
+  <g class="usecase mod-ai" transform="translate(800, 920)">
+    <ellipse cx="0" cy="0" rx="95" ry="22" />
+    <text x="0" y="-5">Huấn luyện & đánh giá</text>
+    <text x="0" y="9">mô hình ML</text>
+  </g>
+  <g class="usecase mod-ai" transform="translate(800, 955)">
+    <ellipse cx="0" cy="0" rx="92" ry="22" />
+    <text x="0" y="-5">Hỗ trợ xây dựng</text>
+    <text x="0" y="9">khuyến mãi</text>
+  </g>
+
+  <!-- Association: Quản trị viên → AI -->
+  <line class="assoc-line" x1="1100" y1="720" x2="816" y2="740" />
+  <line class="assoc-line" x1="1100" y1="725" x2="893" y2="860" />
+  <line class="assoc-line" x1="1100" y1="730" x2="893" y2="920" />
+  <line class="assoc-line" x1="1100" y1="735" x2="890" y2="955" />
+
+  <!-- Association: Khách hàng → AI gợi ý -->
+  <line class="assoc-line" x1="100" y1="455" x2="855" y2="740" />
+  <line class="assoc-line" x1="100" y1="460" x2="645" y2="800" />
+
+  <!-- Include: Gợi ý sân <<include>> Phân tích thời tiết -->
+  <line class="include-line" x1="910" y1="760" x2="910" y2="780" />
+  <text class="include-label" x="940" y="772" text-anchor="start">«include»</text>
+
+  <!-- Include: Dự báo nhu cầu <<include>> Dashboard -->
+  <line class="include-line" x1="760" y1="760" x2="780" y2="840" />
+  <text class="include-label" x="750" y="808" text-anchor="middle">«include»</text>
+
+  <!-- Extend: Gợi ý khung giờ <<extend>> Đặt sân -->
+  <!-- Already connected through nhận AI gợi ý -->
+
+</svg>
+</div>
+
+</body>
+</html>

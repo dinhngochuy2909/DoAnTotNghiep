@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <!--
+    If you are serving your web app in a path other than the root, change the
+    href value below to reflect the base path you are serving from.
+
+    The path provided below has to start and end with a slash "/" in order for
+    it to work correctly.
+
+    For more details:
+    * https://developer.mozilla.org/en-US/docs/Web/HTML/Element/base
+
+    This is a placeholder for base href that will be replaced by the value of
+    the `--base-href` argument provided to `flutter build`.
+  -->
+  <base href="$FLUTTER_BASE_HREF">
+
+  <meta charset="UTF-8">
+  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+  <meta name="description" content="A new Flutter project.">
+
+  <!-- iOS meta tags & icons -->
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="alobooking">
+  <link rel="apple-touch-icon" href="icons/Icon-192.png">
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" href="favicon.png"/>
+
+  <title>Alobooking - Đặt Sân Thể Thao Thông Minh</title>
+  <link rel="manifest" href="manifest.json">
+
+  <!-- Google Fonts: Be Vietnam Pro for Vietnamese Typography -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400;1,600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- Google Maps JavaScript API (Key from datlich.alobo.vn) -->
+  <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAVQaPl9AQLUrqb8OryDjJqXGUjakkdaT8&libraries=places,drawing,geometry" async defer></script>
+</head>
+<body>
+  <!-- Loading Screen -->
+  <div id="loading-screen" style="
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background: linear-gradient(135deg, #1a73e8 0%, #0d47a1 100%);
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    z-index: 9999; font-family: 'Be Vietnam Pro', sans-serif;
+  ">
+    <div style="text-align: center; color: white;">
+      <!-- Logo / Icon -->
+      <div style="
+        width: 90px; height: 90px; background: white; border-radius: 20px;
+        display: flex; align-items: center; justify-content: center;
+        margin: 0 auto 24px; box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+      ">
+        <svg width="56" height="56" viewBox="0 0 56 56" fill="none">
+          <circle cx="28" cy="28" r="20" stroke="#1a73e8" stroke-width="3" fill="none"/>
+          <circle cx="28" cy="28" r="12" fill="#1a73e8" opacity="0.2"/>
+          <path d="M20 28 L28 20 L36 28 L28 36 Z" fill="#1a73e8"/>
+          <circle cx="28" cy="28" r="4" fill="#1a73e8"/>
+        </svg>
+      </div>
+      <div style="font-size: 28px; font-weight: 800; letter-spacing: 1px; margin-bottom: 6px;">AloBooking</div>
+      <div style="font-size: 14px; opacity: 0.85; margin-bottom: 36px;">Đặt Sân Thể Thao Thông Minh</div>
+      <!-- Spinner -->
+      <div style="
+        width: 40px; height: 40px; border: 3px solid rgba(255,255,255,0.3);
+        border-top-color: white; border-radius: 50%;
+        animation: spin 0.9s linear infinite; margin: 0 auto 16px;
+      "></div>
+      <div style="font-size: 13px; opacity: 0.7;">Đang khởi động ứng dụng...</div>
+    </div>
+  </div>
+  <style>
+    @keyframes spin { to { transform: rotate(360deg); } }
+    body { margin: 0; padding: 0; background: #1a73e8; }
+  </style>
+  <script>
+    // Hide loading screen once Flutter renders
+    window.addEventListener('flutter-first-frame', function() {
+      var el = document.getElementById('loading-screen');
+      if (el) {
+        el.style.transition = 'opacity 0.5s';
+        el.style.opacity = '0';
+        setTimeout(function() { el.remove(); }, 600);
+      }
+    });
+  </script>
+  <script src="flutter_bootstrap.js" async></script>
+</body>
+</html>

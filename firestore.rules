@@ -1,0 +1,26 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 1. Cho phép đọc/ghi toàn bộ tài liệu cho ứng dụng Alobooking trong giai đoạn phát triển đồ án
+    match /{document=**} {
+      allow read, write: if true;
+    }
+
+    // 2. Cấu hình phân quyền chi tiết theo từng collection:
+    // - Danh sách sân thể thao (venues): Khách hàng đọc thông tin, Admin thêm/sửa/xóa
+    match /venues/{venueId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // - Đơn đặt sân (bookings): Khách hàng tạo đơn đặt sân, Admin duyệt/hủy
+    match /bookings/{bookingId} {
+      allow read, write: if true;
+    }
+
+    // - Tài khoản người dùng (users): Quản lý hồ sơ cá nhân
+    match /users/{userId} {
+      allow read, write: if true;
+    }
+  }
+}
