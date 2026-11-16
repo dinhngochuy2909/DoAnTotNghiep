@@ -1,18 +1,25 @@
 import 'package:flutter/material.dart';
+import '../models/venue.dart';
+import '../widgets/venue_image_view.dart';
 import '../services/gemini_service.dart';
+import '../services/rag_service.dart';
 import '../services/weather_service.dart';
 import '../services/firestore_service.dart';
+import 'visual_booking_screen.dart';
+import 'venue_detail_screen.dart';
 
 // ─── MODEL TIN NHẮN ───
 class ChatMessage {
   final String text;
   final bool isUser;
   final DateTime time;
+  final List<Venue> matchedVenues;
 
   ChatMessage({
     required this.text,
     required this.isUser,
     DateTime? time,
+    this.matchedVenues = const [],
   }) : time = time ?? DateTime.now();
 }
 
@@ -40,11 +47,15 @@ class _ChatbotScreenState extends State<ChatbotScreen> with TickerProviderStateM
   static const Color _aiBubbleColor = Color(0xFF1E8449);
 
   final List<Map<String, String>> _quickReplies = [
-    {'emoji': '📊', 'text': 'Phân tích hôm nay'},
-    {'emoji': '🌤️', 'text': 'Dự báo cuối tuần'},
-    {'emoji': '📈', 'text': 'Sân nào đang hot?'},
-    {'emoji': '💡', 'text': 'Giờ nào nên khuyến mãi?'},
-    {'emoji': '📅', 'text': 'Dự báo 7 ngày tới'},
+    {'emoji': '❓', 'text': 'Chính sách hủy sân & dời lịch'},
+    {'emoji': '📞', 'text': 'Đặt lịch cố định tháng giảm bao nhiêu?'},
+    {'emoji': '🏓', 'text': 'Sân Pickleball nào có máy bắn bóng?'},
+    {'emoji': '🏸', 'text': 'Sân Cầu Lông Đống Đa giá rẻ nhất'},
+    {'emoji': '⚽', 'text': 'Sân Bóng Đá có đèn đêm Hà Đông'},
+    {'emoji': '🎾', 'text': 'Sân Tennis mở cửa muộn Ba Đình'},
+    {'emoji': '🌧️', 'text': 'Trời mưa thì nên chọn sân nào?'},
+    {'emoji': '📅', 'text': 'Sân Pickleball nào còn trống tối nay?'},
+    {'emoji': '💳', 'text': 'Thanh toán và đặt cọc thế nào?'},
   ];
 
   @override
@@ -72,6 +83,7 @@ class _ChatbotScreenState extends State<ChatbotScreen> with TickerProviderStateM
       final results = await Future.wait([
         FirestoreService.getBookings(),
         WeatherService.getCurrentWeather(),
+        RagService.ensureLoaded(force: true),
       ]);
 
       final bookings = results[0] as List<BookingItem>;
@@ -227,18 +239,20 @@ class _ChatbotScreenState extends State<ChatbotScreen> with TickerProviderStateM
 
     final greeting = _buildGreeting(now.hour);
 
-    final welcomeMsg = '''$greeting 👋 Tôi là **AI Dự Báo AloBooking**!
+    final venueCount = RagService.venueCount;
+    final welcomeMsg = '''$greeting 👋 Mình là **trợ lý đặt sân AloBooking**.
 
 📍 **Hôm nay:** $weekday, ${now.day}/${now.month}/${now.year}
 $weatherEmoji **Thời tiết HN:** $temp | $weatherDesc
-📋 **Đặt sân hôm nay:** **$todayBookings đơn**${isWeekend ? '\n🎉 Cuối tuần! Dự kiến nhu cầu tăng cao.' : ''}
+📋 **Đặt sân hôm nay:** **$todayBookings đơn**${isWeekend ? '\n🎉 Cuối tuần, sân thường kín nhanh — nên đặt sớm!' : ''}
 
-Tôi có thể giúp bạn:
-• 📊 Phân tích xu hướng đặt sân
-• 🔮 Dự báo nhu cầu theo ngày/giờ
-• 💡 Đề xuất chiến lược khuyến mãi
+Mình đọc trực tiếp dữ liệu hệ thống${venueCount > 0 ? ' (**$venueCount sân** đang hoạt động)' : ''} để trả lời về:
+• 🔎 Tìm sân theo môn, quận, giá, giờ mở cửa, tiện ích
+• 📅 Lịch đã đặt của từng sân
+• 💳 Thanh toán, đặt cọc, khuyến mãi
+• 📋 Hủy/dời lịch, đặt cố định theo tháng
 
-Bạn muốn phân tích điều gì hôm nay?''';
+Bạn cần tìm sân nào?''';
 
     _addAIMessage(welcomeMsg);
   }
@@ -277,23 +291,51 @@ Bạn muốn phân tích điều gì hôm nay?''';
     final userMsg = text.trim();
     _textController.clear();
 
+    // Lịch sử hội thoại (trước tin nhắn hiện tại), bỏ lời chào đầu tiên
+    final turns = _messages
+        .skip(1)
+        .map((m) => ChatTurn(m.isUser, m.text))
+        .toList();
+    final userHistory = turns.where((t) => t.isUser).map((t) => t.text).toList();
+
     setState(() {
       _messages.add(ChatMessage(text: userMsg, isUser: true));
       _isLoading = true;
     });
     _scrollToBottom();
 
-    // Load context nếu chưa có
     if (!_contextLoaded) {
       await _loadContext();
     }
 
-    final aiResponse = await GeminiService.analyzeAndPredict(userMsg, _cachedContext);
+    String aiResponse;
+    List<Venue> matchedVenues = const [];
+    try {
+      // Truy xuất từ dữ liệu thật (sân đã duyệt + lịch đặt trên Firestore)
+      final rag = await RagService.retrieve(userMsg, history: userHistory);
+      matchedVenues = rag.matchedVenues;
+      aiResponse = await GeminiService.answer(
+        userMsg,
+        rag: rag,
+        history: turns,
+        liveContext: {
+          'thoi_gian': _cachedContext['thoi_gian_hien_tai'],
+          'thoi_tiet_ha_noi': _cachedContext['thoi_tiet_ha_noi'],
+        },
+      );
+    } catch (_) {
+      aiResponse =
+          'Xin lỗi, mình chưa tải được dữ liệu lúc này. Bạn thử lại sau hoặc gọi Hotline/Zalo **0364059999** nhé.';
+    }
 
     if (mounted) {
       setState(() {
         _isLoading = false;
-        _messages.add(ChatMessage(text: aiResponse, isUser: false));
+        _messages.add(ChatMessage(
+          text: aiResponse,
+          isUser: false,
+          matchedVenues: matchedVenues,
+        ));
       });
       _scrollToBottom();
     }
@@ -337,7 +379,7 @@ Bạn muốn phân tích điều gì hôm nay?''';
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  'AI Dự Báo Nhu Cầu Sân 🤖',
+                  'Trợ Lý Đặt Sân 🤖',
                   style: TextStyle(
                     color: Colors.white,
                     fontSize: 15,
@@ -345,7 +387,7 @@ Bạn muốn phân tích điều gì hôm nay?''';
                   ),
                 ),
                 Text(
-                  'AloBooking Analytics · Hà Nội',
+                  'AloBooking · Hà Nội',
                   style: TextStyle(
                     color: Colors.white70,
                     fontSize: 11,
@@ -495,6 +537,10 @@ Bạn muốn phân tích điều gì hôm nay?''';
                   ),
                   child: _buildMessageText(message.text, isUser),
                 ),
+                if (!isUser && message.matchedVenues.isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  _buildMatchedVenuesCarousel(message.matchedVenues),
+                ],
                 Padding(
                   padding: const EdgeInsets.only(top: 3, left: 2, right: 2),
                   child: Text(
@@ -522,6 +568,279 @@ Bạn muốn phân tích điều gì hôm nay?''';
               ),
             ),
           ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMatchedVenuesCarousel(List<Venue> venues) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final carouselWidth = screenWidth > 640 ? 580.0 : (screenWidth - 70).clamp(260.0, 580.0);
+
+    return Container(
+      width: carouselWidth,
+      height: 242,
+      margin: const EdgeInsets.only(top: 4, bottom: 4),
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        physics: const BouncingScrollPhysics(),
+        itemCount: venues.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 10),
+        itemBuilder: (context, index) => _buildVenueCard(venues[index]),
+      ),
+    );
+  }
+
+  Widget _buildVenueCard(Venue venue) {
+    String sportName = 'Thể thao';
+    IconData sportIcon = Icons.sports;
+    Color sportColor = const Color(0xFF1E8449);
+    switch (venue.type.toLowerCase()) {
+      case 'pickleball':
+        sportName = 'Pickleball';
+        sportIcon = Icons.sports_tennis;
+        sportColor = const Color(0xFFD97706);
+        break;
+      case 'badminton':
+        sportName = 'Cầu lông';
+        sportIcon = Icons.sports_tennis_rounded;
+        sportColor = const Color(0xFF2563EB);
+        break;
+      case 'football':
+        sportName = 'Bóng đá';
+        sportIcon = Icons.sports_soccer;
+        sportColor = const Color(0xFF059669);
+        break;
+      case 'tennis':
+        sportName = 'Tennis';
+        sportIcon = Icons.sports_baseball;
+        sportColor = const Color(0xFF7C3AED);
+        break;
+    }
+
+    return Container(
+      width: 236,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.06),
+            blurRadius: 8,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Ảnh sân + Nhãn môn thể thao + Điểm đánh giá
+          ClipRRect(
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(13)),
+            child: Stack(
+              children: [
+                SizedBox(
+                  height: 100,
+                  width: 236,
+                  child: VenueImageView(
+                    imageUrl: venue.image,
+                    fit: BoxFit.cover,
+                    width: 236,
+                    height: 100,
+                  ),
+                ),
+                Positioned.fill(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.black.withOpacity(0.35),
+                          Colors.transparent,
+                          Colors.black.withOpacity(0.4),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                Positioned(
+                  top: 7,
+                  left: 7,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                    decoration: BoxDecoration(
+                      color: sportColor.withOpacity(0.92),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(sportIcon, color: Colors.white, size: 11),
+                        const SizedBox(width: 3),
+                        Text(
+                          sportName,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                Positioned(
+                  top: 7,
+                  right: 7,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.72),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.star, color: Colors.amber, size: 11),
+                        const SizedBox(width: 2.5),
+                        Text(
+                          venue.rating.toString(),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // Thông tin sân
+          Padding(
+            padding: const EdgeInsets.fromLTRB(9, 7, 9, 4),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  venue.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12,
+                    color: Color(0xFF1E293B),
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Row(
+                  children: [
+                    const Icon(Icons.location_on_outlined, size: 11, color: Color(0xFF64748B)),
+                    const SizedBox(width: 2),
+                    Expanded(
+                      child: Text(
+                        '${venue.district} • ${venue.distance}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 10.5,
+                          color: Color(0xFF64748B),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  venue.price,
+                  style: const TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF005A36),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          const Spacer(),
+
+          // 2 nút thao tác trực tiếp: ĐẶT SÂN & CHI TIẾT
+          Padding(
+            padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+            child: Row(
+              children: [
+                Expanded(
+                  flex: 3,
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => VisualBookingScreen(venue: venue),
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.calendar_month, size: 12, color: Colors.white),
+                    label: const Text(
+                      'ĐẶT SÂN',
+                      style: TextStyle(
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF0D6A38),
+                      padding: const EdgeInsets.symmetric(vertical: 7, horizontal: 4),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(7),
+                      ),
+                      elevation: 1,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 5),
+                Expanded(
+                  flex: 2,
+                  child: OutlinedButton(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => VenueDetailScreen(venue: venue),
+                        ),
+                      );
+                    },
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 7, horizontal: 2),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      side: const BorderSide(color: Color(0xFF0D6A38), width: 1),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(7),
+                      ),
+                    ),
+                    child: const Text(
+                      'Chi tiết',
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: Color(0xFF0D6A38),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -618,7 +937,7 @@ Bạn muốn phân tích điều gì hôm nay?''';
                 _buildDot(300),
                 const SizedBox(width: 8),
                 Text(
-                  'AI đang phân tích...',
+                  'Đang tra cứu dữ liệu...',
                   style: TextStyle(
                     color: Colors.grey[600],
                     fontSize: 12,
@@ -682,7 +1001,7 @@ Bạn muốn phân tích điều gì hôm nay?''';
                 onSubmitted: _sendMessage,
                 style: const TextStyle(fontSize: 14, color: Color(0xFF1E293B)),
                 decoration: InputDecoration(
-                  hintText: 'Hỏi AI về nhu cầu đặt sân...',
+                  hintText: 'Hỏi về sân, giá, lịch đặt, chính sách...',
                   hintStyle: TextStyle(color: Colors.grey[400], fontSize: 13.5),
                   border: InputBorder.none,
                   contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
