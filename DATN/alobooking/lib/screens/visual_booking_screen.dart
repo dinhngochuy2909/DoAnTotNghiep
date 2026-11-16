@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../models/venue.dart';
 import '../services/auth_service.dart';
 import '../services/firestore_service.dart';
+import '../services/booking_slots.dart';
 import '../widgets/booking_bottom_sheet.dart';
 import 'booked_screen.dart';
 import 'home_screen.dart';
@@ -32,7 +33,7 @@ class _VisualBookingScreenState extends State<VisualBookingScreen> {
   late final List<String> _subCourts;
 
   // Set lưu các slot đang được chọn: mặc định chọn sẵn ca 18h - 20h ở Sân 1 giống hệt ảnh của bạn
-  final Set<String> _selectedSlots = {'0-18', '0-19'};
+  final Set<String> _selectedSlots = {};
 
   // Map lưu các slot đã đặt từ trước (server / mẫu)
   final Map<String, String> _slotStatusMap = {};
@@ -75,51 +76,33 @@ class _VisualBookingScreenState extends State<VisualBookingScreen> {
   }
 
   Future<void> _loadExistingBookings() async {
-    final dateKey = _formatDateKey(_selectedDate);
+    final date = _selectedDate;
+    final dateKey = _formatDateKey(date);
     _slotStatusMap.clear();
 
-    // Các ca đã đặt sẵn (Màu đỏ cam) khớp chuẩn 100% ảnh mẫu:
-    // Sân 1 và Sân 2: 14:00 đến 17:00 (các ca 14-15, 15-16, 16-17)
-    _slotStatusMap['$dateKey-0-14'] = 'booked';
-    _slotStatusMap['$dateKey-0-15'] = 'booked';
-    _slotStatusMap['$dateKey-0-16'] = 'booked';
-
-    _slotStatusMap['$dateKey-1-14'] = 'booked';
-    _slotStatusMap['$dateKey-1-15'] = 'booked';
-    _slotStatusMap['$dateKey-1-16'] = 'booked';
-
-    // Tải thêm các booking thực tế từ Firestore alobooking-b2484
+    // Đọc các ca đã đặt thật từ Firestore (bỏ đơn đã hủy), nhận cả hai định dạng ngày
     try {
-      final bookings = await FirestoreService.getBookings();
-      for (final b in bookings) {
-        if (b.venueName.toLowerCase() == widget.venue.name.toLowerCase() &&
-            b.date == dateKey) {
-          final parts = b.time.split('-');
-          if (parts.isNotEmpty) {
-            final startPart = parts[0].trim().split(':')[0];
-            final startH = int.tryParse(startPart);
-            if (startH != null && startH >= _startHour && startH < _endHour) {
-              int courtIdx = 0;
-              for (int i = 0; i < _subCourts.length; i++) {
-                if (b.field.contains(_subCourts[i]) || b.field.contains('${i + 1}')) {
-                  courtIdx = i;
-                  break;
-                }
-              }
-              _slotStatusMap['$dateKey-$courtIdx-$startH'] = 'booked';
-            }
-          }
-        }
+      final booked = await BookingSlots.bookedSlots(widget.venue, date, _subCourts.length);
+      // Người dùng đã đổi sang ngày khác trong lúc đang tải -> bỏ kết quả cũ
+      if (!mounted || _formatDateKey(_selectedDate) != dateKey) return;
+      for (final k in booked) {
+        _slotStatusMap['$dateKey-$k'] = 'booked';
       }
+      // Bỏ chọn các ô vừa bị người khác đặt
+      _selectedSlots.removeWhere((s) => booked.contains(s));
     } catch (_) {}
 
     if (mounted) setState(() {});
   }
 
-  // Giá cho 1 giờ đặt sân: 230.000đ/giờ (2 giờ = 460.000đ chuẩn xác theo ảnh mẫu)
-  int _getPricePerHour() {
-    return 230000;
-  }
+  /// Giá một giờ theo khoảng giá của sân: khung thường = giá thấp, từ 17h = giá cao.
+  int _priceForHour(int hour) => BookingSlots.priceForHour(widget.venue, hour);
+
+  int _totalPrice(Iterable<int> hours) => hours.fold(0, (sum, h) => sum + _priceForHour(h));
+
+  /// Các giờ đang chọn (bỏ trùng sân).
+  List<int> _selectedHours() =>
+      _selectedSlots.map((s) => int.parse(s.split('-')[1])).toList();
 
   String _formatCurrency(int amount) {
     return '${amount.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.')} đ';
@@ -199,7 +182,7 @@ class _VisualBookingScreenState extends State<VisualBookingScreen> {
   }
 
   void _showPriceInfoDialog() {
-    final pricePerH = _getPricePerHour();
+    final v = widget.venue;
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -221,18 +204,19 @@ class _VisualBookingScreenState extends State<VisualBookingScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              _buildPriceRow('Khung giờ tiêu chuẩn (05:00 - 16:00)', _formatCurrency(pricePerH)),
+              _buildPriceRow('Khung giờ thường (trước 17:00)', _formatCurrency(_priceForHour(10))),
               const SizedBox(height: 6),
-              _buildPriceRow('Khung giờ vàng (17:00 - 24:00)', _formatCurrency((pricePerH * 1.2).round())),
+              _buildPriceRow('Khung giờ vàng (từ 17:00)', _formatCurrency(_priceForHour(18))),
               const Divider(height: 20),
-              const Text(
-                '🎁 Ưu đãi đi kèm:',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-              ),
+              Text('⏰ Giờ mở cửa: ${v.hours}', style: const TextStyle(fontSize: 13)),
               const SizedBox(height: 4),
-              const Text('• Vé bao gồm: Sân thi đấu + bóng + nước suối miễn phí.'),
-              const Text('• Miễn phí máy bắn bóng tự động trong khung giờ 05:00 - 16:00.'),
-              const Text('• Bãi đỗ xe ô tô và xe máy rộng rãi, an ninh 24/7.'),
+              Text('📍 ${v.address}', style: const TextStyle(fontSize: 13)),
+              if (v.tags.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                const Text('✨ Tiện ích:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                const SizedBox(height: 4),
+                for (final t in v.tags) Text('• $t'),
+              ],
             ],
           ),
         ),
@@ -291,8 +275,7 @@ class _VisualBookingScreenState extends State<VisualBookingScreen> {
     });
 
     final totalHours = parsedSlots.length;
-    final pricePerH = _getPricePerHour();
-    final totalPrice = totalHours * pricePerH;
+    final totalPrice = _totalPrice(parsedSlots.map((s) => s['hour'] as int));
     final dateStr = _formatDateKey(_selectedDate);
 
     showModalBottomSheet(
@@ -508,18 +491,60 @@ class _VisualBookingScreenState extends State<VisualBookingScreen> {
                             final courtSummary = parsedSlots.map((s) => s['courtName']).toSet().join(', ');
                             final timeSummary = parsedSlots.map((s) => s['timeStr']).join(', ');
 
-                            await FirestoreService.createBooking(
-                              customer: nameCtrl.text.trim(),
-                              phone: phoneCtrl.text.trim(),
-                              venueName: widget.venue.name,
-                              field: courtSummary,
-                              time: timeSummary,
-                              date: dateStr,
-                              amount: _formatCurrency(totalPrice),
-                              paymentMethod: paymentMethod,
-                            );
+                            // Kiểm tra lại ngay trước khi lưu: có ai vừa đặt trùng giờ không
+                            final latest = await BookingSlots.bookedSlots(
+                                widget.venue, _selectedDate, _subCourts.length);
+                            final clash = _selectedSlots.where(latest.contains).toList();
+                            if (clash.isNotEmpty) {
+                              await _loadExistingBookings();
+                              if (!mounted) return;
+                              setState(() => _isLoading = false);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  backgroundColor: Color(0xFFDC2626),
+                                  content: Text('⚠️ Có khung giờ vừa được người khác đặt. Vui lòng chọn lại giờ trống.'),
+                                ),
+                              );
+                              return;
+                            }
 
+                            // Mỗi sân con một đơn để lịch đọc lại chính xác
+                            final bookingDate = BookingSlots.formatDate(_selectedDate);
+                            final byCourt = <int, List<int>>{};
+                            for (final s in parsedSlots) {
+                              byCourt.putIfAbsent(s['courtIndex'] as int, () => []).add(s['hour'] as int);
+                            }
+                            var allSaved = true;
+                            for (final e in byCourt.entries) {
+                              final ok = await FirestoreService.createBooking(
+                                customer: nameCtrl.text.trim(),
+                                phone: phoneCtrl.text.trim(),
+                                venueName: widget.venue.name,
+                                field: _subCourts[e.key],
+                                time: BookingSlots.mergeHours(e.value).join(', '),
+                                date: bookingDate,
+                                amount: _formatCurrency(_totalPrice(e.value)),
+                                paymentMethod: paymentMethod,
+                              );
+                              if (!ok) allSaved = false;
+                            }
+
+                            if (!mounted) return;
                             setState(() => _isLoading = false);
+
+                            if (!allSaved) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  backgroundColor: Color(0xFFDC2626),
+                                  content: Text('Không lưu được đơn đặt sân. Vui lòng kiểm tra mạng và thử lại.'),
+                                ),
+                              );
+                              await _loadExistingBookings();
+                              return;
+                            }
+
+                            _selectedSlots.clear();
+                            await _loadExistingBookings();
 
                             if (mounted) {
                               _showSuccessBookingDialog(
@@ -868,7 +893,10 @@ class _VisualBookingScreenState extends State<VisualBookingScreen> {
                           ? [BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 4, offset: const Offset(0, 2))]
                           : null,
                     ),
-                    child: Column(
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Column(
+                      mainAxisSize: MainAxisSize.min,
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Text(
@@ -889,6 +917,7 @@ class _VisualBookingScreenState extends State<VisualBookingScreen> {
                           ),
                         ),
                       ],
+                    ),
                     ),
                   ),
                 );
@@ -1070,14 +1099,19 @@ class _VisualBookingScreenState extends State<VisualBookingScreen> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    '${_startHour + idx}:00',
-                    style: const TextStyle(
-                      fontSize: 10.5,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF0369A1),
+                  Flexible(
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        '${_startHour + idx}:00',
+                        style: const TextStyle(
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF0369A1),
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
                     ),
-                    textAlign: TextAlign.center,
                   ),
                   // Vạch cam nhỏ tại chính xác điểm mốc giờ như ảnh mẫu
                   Container(
@@ -1255,8 +1289,7 @@ class _VisualBookingScreenState extends State<VisualBookingScreen> {
   // ─── 6. BOTTOM GREEN BAR (TỔNG GIỜ & NÚT TIẾP THEO) ────────
   Widget _buildEmeraldBottomBar(bool isMobile) {
     final selectedCount = _selectedSlots.length;
-    final pricePerH = _getPricePerHour();
-    final totalPrice = selectedCount * pricePerH;
+    final totalPrice = _totalPrice(_selectedHours());
 
     return Container(
       color: const Color(0xFF0D6A38),

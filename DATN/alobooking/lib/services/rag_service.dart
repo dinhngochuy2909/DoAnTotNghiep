@@ -40,6 +40,7 @@ class RagIntent {
   bool nearest = false;
   final Set<String> amenities = {}; // den_dem, gui_xe, may_ban_bong, mai_che
   Venue? namedVenue;
+  String? unknownArea; // địa điểm khách hỏi nhưng hệ thống không có sân
   final Set<String> topics = {}; // cancel, fixed, payment, promo, guide, weather, contact
 
   RagIntent(this.date);
@@ -48,6 +49,7 @@ class RagIntent {
       sport != null ||
       district != null ||
       namedVenue != null ||
+      unknownArea != null ||
       maxPricePerHour != null ||
       cheapest ||
       topRated ||
@@ -132,6 +134,24 @@ class RagService {
     'tay ho', 'nam tu liem', 'bac tu liem', 'ha dong', 'hoang mai', 'long bien',
     'gia lam', 'dong anh', 'thanh tri', 'hoai duc',
   ];
+
+  static const _otherProvinces = [
+    'hung yen', 'hai phong', 'hai duong', 'bac ninh', 'bac giang', 'vinh phuc', 'phu tho',
+    'thai nguyen', 'nam dinh', 'thai binh', 'ha nam', 'ninh binh', 'quang ninh', 'hoa binh',
+    'thanh hoa', 'nghe an', 'ha tinh', 'hue', 'da nang', 'quang nam', 'khanh hoa', 'nha trang',
+    'da lat', 'lam dong', 'binh duong', 'dong nai', 'can tho', 'vung tau', 'sai gon',
+    'ho chi minh', 'tphcm', 'hcm', 'lao cai', 'son la', 'lang son', 'tuyen quang',
+  ];
+
+  /// Danh sách quận/huyện hiện có sân (kèm số sân).
+  static String coverageText() {
+    final m = <String, int>{};
+    for (final v in _venues) {
+      m[v.district] = (m[v.district] ?? 0) + 1;
+    }
+    final e = m.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
+    return e.map((x) => '${x.key} (${x.value})').join(', ');
+  }
 
   static int get venueCount => _venues.length;
 
@@ -308,11 +328,22 @@ Khung giờ vàng (từ 17:00) giá cao hơn khung tiêu chuẩn khoảng 20%.''
     }
 
     // Quận
-    for (final d in _districts) {
-      if (q.contains(d)) {
+    final known = {..._districts, ..._venues.map((v) => RagText.norm(v.district))};
+    for (final d in known) {
+      if (d.isNotEmpty && q.contains(d)) {
         it.district = d;
         break;
       }
+    }
+    // Địa điểm ngoài phạm vi dữ liệu (tỉnh/thành khác, quận/huyện lạ)
+    if (it.district == null) {
+      for (final prov in _otherProvinces) {
+        if (RegExp('\\b$prov\\b').hasMatch(q)) {
+          it.unknownArea = prov;
+          break;
+        }
+      }
+      it.unknownArea ??= RegExp(r'\b(?:quan|huyen|thi xa)\s+([a-z]+(?:\s[a-z]+)?)').firstMatch(q)?.group(1);
     }
     if (it.district != null) {
       final sample = _venues.where((v) => RagText.norm(v.district) == it.district);
@@ -418,7 +449,9 @@ Khung giờ vàng (từ 17:00) giá cao hơn khung tiêu chuẩn khoảng 20%.''
 
     // 1. Tìm sân bằng bộ lọc có cấu trúc
     List<Venue> venues = [];
-    if (intent.namedVenue != null) {
+    if (intent.unknownArea != null) {
+      venues = [];
+    } else if (intent.namedVenue != null) {
       venues = [intent.namedVenue!];
     } else if (intent.wantsVenues || _looksLikeVenueSearch(query)) {
       venues = _searchVenues(intent, topVenues);
@@ -475,6 +508,10 @@ Khung giờ vàng (từ 17:00) giá cao hơn khung tiêu chuẩn khoảng 20%.''
         b.writeln(availabilityText(venues[i], intent.date, hour: intent.hour));
         b.writeln();
       }
+    } else if (intent.unknownArea != null) {
+      b.writeln('\n## HỆ THỐNG KHÔNG CÓ SÂN tại "${intent.unknownArea}". AloBooking hiện chỉ có sân ở Hà Nội.');
+      b.writeln('Khu vực đang có sân (số sân): ${coverageText()}.');
+      b.writeln('Hãy nói rõ điều này, gợi ý khách chọn quận/huyện Hà Nội gần nhất (ví dụ khách ở Hưng Yên nên xem Gia Lâm, Long Biên, Thanh Trì, Hoàng Mai) và mời hỏi lại theo quận.');
     } else if (intent.wantsVenues) {
       b.writeln('\n## KHÔNG có sân nào trong hệ thống khớp đủ các tiêu chí của khách.');
     }

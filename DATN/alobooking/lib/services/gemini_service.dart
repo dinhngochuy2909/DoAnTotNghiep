@@ -113,6 +113,9 @@ CÂU HỎI CỦA KHÁCH: $userMessage''';
         b.writeln('  ${RagService.availabilityText(v, it.date, hour: it.hour)}\n');
       }
       b.writeln('👉 Bấm **"ĐẶT SÂN"** trên thẻ sân bên dưới để chọn giờ.');
+    } else if (it.unknownArea != null) {
+      b.writeln('😕 Hiện AloBooking **chưa có sân tại ${it.unknownArea}**. Hệ thống đang có sân ở **Hà Nội**: ${RagService.coverageText()}.');
+      b.writeln('\n👉 Bạn thử hỏi theo quận/huyện gần nhất, ví dụ "sân cầu lông Gia Lâm" hoặc "sân bóng đá Long Biên".');
     } else if (it.wantsVenues) {
       b.writeln('😕 Hiện hệ thống **chưa có sân khớp** với yêu cầu của bạn. Thử đổi quận, môn thể thao hoặc mức giá, hoặc gọi Hotline/Zalo **0364059999** để được hỗ trợ.');
     }

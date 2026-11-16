@@ -1,3 +1,4 @@
+import 'dart:ui' show PointerDeviceKind;
 import 'package:flutter/material.dart';
 import '../models/venue.dart';
 import '../widgets/venue_image_view.dart';
@@ -513,7 +514,7 @@ Bạn cần tìm sân nào?''';
               children: [
                 Container(
                   constraints: BoxConstraints(
-                    maxWidth: MediaQuery.of(context).size.width * 0.75,
+                    maxWidth: (MediaQuery.of(context).size.width * 0.75).clamp(240.0, 760.0),
                   ),
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                   decoration: BoxDecoration(
@@ -575,18 +576,24 @@ Bạn cần tìm sân nào?''';
 
   Widget _buildMatchedVenuesCarousel(List<Venue> venues) {
     final screenWidth = MediaQuery.of(context).size.width;
-    final carouselWidth = screenWidth > 640 ? 580.0 : (screenWidth - 70).clamp(260.0, 580.0);
+    final carouselWidth = (screenWidth - 70).clamp(260.0, 1000.0);
 
     return Container(
       width: carouselWidth,
       height: 242,
       margin: const EdgeInsets.only(top: 4, bottom: 4),
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        physics: const BouncingScrollPhysics(),
-        itemCount: venues.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 10),
-        itemBuilder: (context, index) => _buildVenueCard(venues[index]),
+      child: ScrollConfiguration(
+        // Cho phép kéo bằng chuột / cảm ứng trên web & desktop
+        behavior: ScrollConfiguration.of(context).copyWith(
+          dragDevices: {PointerDeviceKind.touch, PointerDeviceKind.mouse, PointerDeviceKind.trackpad},
+        ),
+        child: ListView.separated(
+          scrollDirection: Axis.horizontal,
+          physics: const BouncingScrollPhysics(),
+          itemCount: venues.length,
+          separatorBuilder: (_, __) => const SizedBox(width: 10),
+          itemBuilder: (context, index) => _buildVenueCard(venues[index]),
+        ),
       ),
     );
   }
@@ -847,49 +854,42 @@ Bạn cần tìm sân nào?''';
   }
 
   Widget _buildMessageText(String text, bool isUser) {
-    // Xử lý markdown đơn giản: **bold**
-    final spans = <TextSpan>[];
-    final regex = RegExp(r'\*\*(.*?)\*\*');
-    int lastIndex = 0;
+    final baseColor = isUser ? Colors.white : const Color(0xFF1E293B);
+    final boldColor = isUser ? Colors.white : const Color(0xFF0D6A38);
+    final base = TextStyle(color: baseColor, fontSize: 13.5, height: 1.5);
+    final bold = TextStyle(color: boldColor, fontSize: 13.5, fontWeight: FontWeight.bold, height: 1.5);
 
-    for (final match in regex.allMatches(text)) {
-      if (match.start > lastIndex) {
-        spans.add(TextSpan(
-          text: text.substring(lastIndex, match.start),
-          style: TextStyle(
-            color: isUser ? Colors.white : const Color(0xFF1E293B),
-            fontSize: 13.5,
-            height: 1.5,
-          ),
-        ));
+    final spans = <InlineSpan>[];
+    final boldRe = RegExp(r'\*\*(.+?)\*\*');
+    final lines = text.split('\n');
+
+    for (var i = 0; i < lines.length; i++) {
+      var line = lines[i];
+
+      // Gạch đầu dòng markdown (* / - / •), thụt lề theo cấp
+      final m = RegExp(r'^(\s*)([*\-•])\s+(.*)$').firstMatch(line);
+      if (m != null) {
+        final level = (m.group(1)!.length / 2).floor().clamp(0, 3);
+        final bullet = level == 0 ? '•' : '◦';
+        line = '${'    ' * level}$bullet ${m.group(3)}';
       }
-      spans.add(TextSpan(
-        text: match.group(1),
-        style: TextStyle(
-          color: isUser ? Colors.white : const Color(0xFF0D6A38),
-          fontSize: 13.5,
-          fontWeight: FontWeight.bold,
-          height: 1.5,
-        ),
-      ));
-      lastIndex = match.end;
+
+      var last = 0;
+      for (final bm in boldRe.allMatches(line)) {
+        if (bm.start > last) spans.add(TextSpan(text: _stripMd(line.substring(last, bm.start)), style: base));
+        spans.add(TextSpan(text: bm.group(1), style: bold));
+        last = bm.end;
+      }
+      if (last < line.length) spans.add(TextSpan(text: _stripMd(line.substring(last)), style: base));
+      if (i < lines.length - 1) spans.add(TextSpan(text: '\n', style: base));
     }
 
-    if (lastIndex < text.length) {
-      spans.add(TextSpan(
-        text: text.substring(lastIndex),
-        style: TextStyle(
-          color: isUser ? Colors.white : const Color(0xFF1E293B),
-          fontSize: 13.5,
-          height: 1.5,
-        ),
-      ));
-    }
-
-    return RichText(
-      text: TextSpan(children: spans),
-    );
+    return SelectableText.rich(TextSpan(children: spans));
   }
+
+  /// Bỏ các ký tự markdown còn sót (*, _, #) để không hiện dấu thô.
+  String _stripMd(String s) =>
+      s.replaceAll(RegExp(r'^#{1,6}\s*'), '').replaceAll('*', '').replaceAll('`', '');
 
   Widget _buildTypingIndicator() {
     return Padding(
