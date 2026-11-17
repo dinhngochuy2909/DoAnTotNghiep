@@ -1,4 +1,7 @@
 import 'dart:convert';
+import 'dart:math';
+import 'package:crypto/crypto.dart';
+import 'package:flutter/foundation.dart' show kDebugMode, visibleForTesting;
 import 'package:http/http.dart' as http;
 import '../models/user.dart';
 
@@ -24,47 +27,6 @@ class AuthService {
 
   /// Kiểm tra tài khoản có quyền đặt sân hay không (chỉ thành viên đã đăng nhập)
   static bool get canBook => isLoggedIn;
-
-  /// Chuyển đổi nhanh vai trò để test giao diện
-  static void switchToOwner() {
-    _currentUser = AppUser(
-      uid: 'owner_chuan_01',
-      fullName: 'Trần Văn Chủ Sân (Quản Lý Sân)',
-      email: 'chusan@alobooking.com',
-      phone: '0977112233',
-      role: 'owner',
-    );
-  }
-
-  static void switchToAdmin() {
-    _currentUser = AppUser(
-      uid: 'admin_super_01',
-      fullName: 'Đinh Ngọc Huy (Super Admin)',
-      email: 'admin@alobooking.com',
-      phone: '0988889999',
-      role: 'admin',
-    );
-  }
-
-  static void switchToCustomer() {
-    _currentUser = AppUser(
-      uid: 'user_khach_01',
-      fullName: 'Nguyễn Văn Khách Hàng',
-      email: 'user@alobooking.com',
-      phone: '0912345678',
-      role: 'customer',
-    );
-  }
-
-  static void switchToGuest() {
-    _currentUser = AppUser(
-      uid: 'guest_viewer_01',
-      fullName: 'Khách Xem Sân (Chỉ xem)',
-      email: 'guest@alobooking.com',
-      phone: '0900000000',
-      role: 'guest',
-    );
-  }
 
   /// ============================================================
   /// ĐĂNG KÝ - Tạo tài khoản mới lưu lên Firestore
@@ -96,6 +58,7 @@ class AuthService {
           'phone': {'stringValue': phone},
           'password': {'stringValue': hashedPassword},
           'avatarUrl': {'stringValue': ''},
+          'role': {'stringValue': 'customer'},
           'createdAt': {'stringValue': DateTime.now().toIso8601String()},
         }
       };
@@ -173,6 +136,8 @@ class AuthService {
     try {
       final trimmedEmail = email.trim().toLowerCase();
 
+      // Tài khoản demo chỉ hoạt động khi chạy debug (hoặc build với --dart-define=DEMO_ACCOUNTS=true)
+      if (_demoAccountsEnabled) {
       // 1. Phân quyền: Kiểm tra tài khoản Quản Trị Viên (Admin)
       if ((trimmedEmail == 'admin@alobooking.com' && password == 'admin123') ||
           (trimmedEmail == 'admin@sportai.com' && password == 'password123') ||
@@ -232,6 +197,7 @@ class AuthService {
         );
         return (success: true, message: 'Đăng nhập Khách Xem Sân (Chỉ xem) thành công!');
       }
+      }
 
       final docId = trimmedEmail.replaceAll('@', '_at_').replaceAll('.', '_dot_');
       final response = await http.get(Uri.parse('$baseUrl/users/$docId'));
@@ -246,9 +212,12 @@ class AuthService {
 
         // So sánh mật khẩu đã hash
         final storedPassword = fields['password']?['stringValue'] ?? '';
-        final hashedInput = _hashPassword(password);
 
-        if (storedPassword == hashedInput) {
+        if (_verifyPassword(password, storedPassword)) {
+          // Tài khoản cũ lưu mật khẩu dạng base64: nâng cấp lên băm có salt ngay lần đăng nhập này
+          if (!storedPassword.startsWith(_hashPrefix)) {
+            _upgradePasswordHash(docId, password);
+          }
           _currentUser = AppUser.fromFirestoreFields(docId, fields);
           return (success: true, message: 'Đăng nhập thành công!');
         } else {
@@ -286,15 +255,63 @@ class AuthService {
   }
 
   /// ============================================================
-  /// HELPER: Hash mật khẩu đơn giản (SHA-256 via dart:convert)
-  /// Trong production nên dùng package crypto hoặc bcrypt
+  /// BẢO MẬT
   /// ============================================================
+  static const bool _demoAccountsEnabled =
+      kDebugMode || bool.fromEnvironment('DEMO_ACCOUNTS', defaultValue: false);
+
+  static const String _hashPrefix = r'sha256$';
+
+  /// Băm mật khẩu: SHA-256 với salt ngẫu nhiên 16 byte, định dạng `sha256$salt$hash`.
   static String _hashPassword(String password) {
-    final bytes = utf8.encode(password);
-    // Simple hash — dùng base64 encode cho đơn giản
-    // Production: import 'package:crypto/crypto.dart'; sha256.convert(bytes)
-    final encoded = base64Encode(bytes);
-    // Double encode để tăng độ an toàn cơ bản
-    return base64Encode(utf8.encode(encoded));
+    final rnd = Random.secure();
+    final salt = base64UrlEncode(List<int>.generate(16, (_) => rnd.nextInt(256)));
+    return '$_hashPrefix$salt\$${_digest(salt, password)}';
+  }
+
+  @visibleForTesting
+  static void setCurrentUserForTest(AppUser? user) => _currentUser = user;
+
+  @visibleForTesting
+  static String hashPasswordForTest(String password) => _hashPassword(password);
+
+  @visibleForTesting
+  static bool verifyPasswordForTest(String password, String stored) => _verifyPassword(password, stored);
+
+  static String _digest(String salt, String password) =>
+      sha256.convert(utf8.encode('$salt:$password')).toString();
+
+  static bool _verifyPassword(String password, String stored) {
+    if (stored.startsWith(_hashPrefix)) {
+      final parts = stored.split(r'$');
+      if (parts.length != 3) return false;
+      return _constantTimeEquals(_digest(parts[1], password), parts[2]);
+    }
+    // Định dạng cũ (base64 hai lần)
+    final legacy = base64Encode(utf8.encode(base64Encode(utf8.encode(password))));
+    return _constantTimeEquals(legacy, stored);
+  }
+
+  static bool _constantTimeEquals(String a, String b) {
+    if (a.length != b.length) return false;
+    var diff = 0;
+    for (var i = 0; i < a.length; i++) {
+      diff |= a.codeUnitAt(i) ^ b.codeUnitAt(i);
+    }
+    return diff == 0;
+  }
+
+  static Future<void> _upgradePasswordHash(String docId, String password) async {
+    try {
+      await http.patch(
+        Uri.parse('$baseUrl/users/$docId?updateMask.fieldPaths=password'),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({
+          'fields': {
+            'password': {'stringValue': _hashPassword(password)},
+          }
+        }),
+      );
+    } catch (_) {}
   }
 }

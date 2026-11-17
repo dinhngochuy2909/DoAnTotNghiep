@@ -147,7 +147,7 @@ class AppFooter extends StatelessWidget {
                   ),
                 ),
                 Text(
-                  'Nền tảng đặt sân thể thao #1',
+                  'Nền tảng đặt sân thể thao',
                   style: TextStyle(
                     color: Colors.white.withOpacity(0.55),
                     fontSize: 10,
@@ -160,9 +160,8 @@ class AppFooter extends StatelessWidget {
         ),
         const SizedBox(height: 16),
         Text(
-          'AloBooking – Nền tảng đặt sân thể thao trực tuyến hàng đầu Việt Nam. '
-          'Kết nối người chơi với hàng nghìn sân cầu lông, pickleball, bóng đá, '
-          'tennis trên toàn quốc.',
+          'AloBooking – nền tảng đặt sân thể thao trực tuyến. '
+          'Kết nối người chơi với các sân cầu lông, pickleball, bóng đá, tennis, bóng rổ.',
           style: TextStyle(
             color: Colors.white.withOpacity(0.65),
             fontSize: 12.5,
@@ -228,7 +227,6 @@ class AppFooter extends StatelessWidget {
         _buildFooterLink('📅', 'Sân đã đặt'),
         _buildFooterLink('❤️', 'Sân yêu thích'),
         _buildFooterLink('👤', 'Tài khoản'),
-        _buildFooterLink('🎯', 'Sự kiện thể thao'),
       ],
     );
   }
@@ -244,7 +242,6 @@ class AppFooter extends StatelessWidget {
         _buildFooterLink('⚽', 'Bóng đá'),
         _buildFooterLink('🎾', 'Tennis'),
         _buildFooterLink('🏀', 'Bóng rổ'),
-        _buildFooterLink('🏐', 'Bóng chuyền'),
       ],
     );
   }
@@ -264,16 +261,6 @@ class AppFooter extends StatelessWidget {
         const SizedBox(height: 10),
         _buildContactItem(Icons.access_time_outlined, 'Giờ hỗ trợ',
             'Thứ 2 – Chủ nhật: 7:00 – 22:00'),
-        const SizedBox(height: 16),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [
-            _buildBadge('✓ Bộ Công Thương'),
-            _buildBadge('🔒 Bảo mật SSL'),
-            _buildBadge('🏆 Tin cậy 2024'),
-          ],
-        ),
       ],
     );
   }
@@ -308,21 +295,6 @@ class AppFooter extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
-
-  Widget _buildBadge(String label) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.08),
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: Colors.white.withOpacity(0.15)),
-      ),
-      child: Text(
-        label,
-        style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w500),
-      ),
     );
   }
 
@@ -375,7 +347,8 @@ class AppFooter extends StatelessWidget {
   Widget _buildCopyright() {
     return Text(
       '©  AloBooking. Bảo lưu mọi quyền. '
-      'Được phát triển bởi Đinh Ngọc Huy.',
+      'Được phát triển bởi Đinh Ngọc Huy. '
+      'Một phần dữ liệu vị trí sân: © OpenStreetMap contributors.',
       style: TextStyle(
         color: Colors.white.withOpacity(0.45),
         fontSize: 11,

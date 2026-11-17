@@ -56,7 +56,7 @@ class _ChatbotScreenState extends State<ChatbotScreen> with TickerProviderStateM
     {'emoji': '🎾', 'text': 'Sân Tennis mở cửa muộn Ba Đình'},
     {'emoji': '🌧️', 'text': 'Trời mưa thì nên chọn sân nào?'},
     {'emoji': '📅', 'text': 'Sân Pickleball nào còn trống tối nay?'},
-    {'emoji': '💳', 'text': 'Thanh toán và đặt cọc thế nào?'},
+    {'emoji': '💳', 'text': 'Thanh toán như thế nào?'},
   ];
 
   @override
@@ -250,7 +250,7 @@ $weatherEmoji **Thời tiết HN:** $temp | $weatherDesc
 Mình đọc trực tiếp dữ liệu hệ thống${venueCount > 0 ? ' (**$venueCount sân** đang hoạt động)' : ''} để trả lời về:
 • 🔎 Tìm sân theo môn, quận, giá, giờ mở cửa, tiện ích
 • 📅 Lịch đã đặt của từng sân
-• 💳 Thanh toán, đặt cọc, khuyến mãi
+• 💳 Thanh toán, khuyến mãi
 • 📋 Hủy/dời lịch, đặt cố định theo tháng
 
 Bạn cần tìm sân nào?''';
@@ -313,7 +313,9 @@ Bạn cần tìm sân nào?''';
     List<Venue> matchedVenues = const [];
     try {
       // Truy xuất từ dữ liệu thật (sân đã duyệt + lịch đặt trên Firestore)
-      final rag = await RagService.retrieve(userMsg, history: userHistory);
+      // Bước 1: LLM hiểu câu hỏi (có lịch sử) → bộ lọc; lỗi thì dùng luật cứng
+      final llmIntent = await GeminiService.understand(userMsg, history: turns);
+      final rag = await RagService.retrieve(userMsg, history: userHistory, llmIntent: llmIntent);
       matchedVenues = rag.matchedVenues;
       aiResponse = await GeminiService.answer(
         userMsg,
@@ -321,7 +323,8 @@ Bạn cần tìm sân nào?''';
         history: turns,
         liveContext: {
           'thoi_gian': _cachedContext['thoi_gian_hien_tai'],
-          'thoi_tiet_ha_noi': _cachedContext['thoi_tiet_ha_noi'],
+          // Thời tiết mới nhất (có cache 10 phút) kèm dự báo, để trả lời "chiều mai có mưa không"
+          'thoi_tiet_ha_noi': (await WeatherService.getCurrentWeather()).toMap(),
         },
       );
     } catch (_) {
@@ -713,7 +716,7 @@ Bạn cần tìm sân nào?''';
                         const Icon(Icons.star, color: Colors.amber, size: 11),
                         const SizedBox(width: 2.5),
                         Text(
-                          venue.rating.toString(),
+                          venue.ratingLabel,
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 10,
@@ -751,7 +754,7 @@ Bạn cần tìm sân nào?''';
                     const SizedBox(width: 2),
                     Expanded(
                       child: Text(
-                        '${venue.district} • ${venue.distance}',
+                        venue.distance.isEmpty ? venue.district : '${venue.district} • ${venue.distance}',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(

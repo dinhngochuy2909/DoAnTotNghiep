@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 import '../models/venue.dart';
 import '../services/auth_service.dart';
 import '../services/firestore_service.dart';
 import '../services/booking_slots.dart';
+import '../services/payment_config.dart';
 import '../widgets/booking_bottom_sheet.dart';
 import 'booked_screen.dart';
 import 'home_screen.dart';
@@ -29,10 +32,10 @@ class _VisualBookingScreenState extends State<VisualBookingScreen> {
   // Độ rộng mỗi ô giờ (mặc định 68px, có thể zoom qua slider)
   double _hourColumnWidth = 52.0;
 
-  // Danh sách các sân con: chuẩn xác 3 sân Pickleball như trong ảnh
+  // Các sân con của cụm (số sân và tên gọi lấy theo từng cụm sân, không cố định)
   late final List<String> _subCourts;
 
-  // Set lưu các slot đang được chọn: mặc định chọn sẵn ca 18h - 20h ở Sân 1 giống hệt ảnh của bạn
+  // Các ô đang chọn, khoá dạng "chỉ số sân-giờ"
   final Set<String> _selectedSlots = {};
 
   // Map lưu các slot đã đặt từ trước (server / mẫu)
@@ -67,8 +70,7 @@ class _VisualBookingScreenState extends State<VisualBookingScreen> {
   }
 
   void _initSubCourts() {
-    // Chuẩn xác 100% theo ảnh giao diện mẫu người dùng yêu cầu: 3 sân Pickleball
-    _subCourts = ['Pickleball 1', 'Pickleball 2', 'Pickleball 3'];
+    _subCourts = widget.venue.courtNames;
   }
 
   String _formatDateKey(DateTime dt) {
@@ -109,6 +111,15 @@ class _VisualBookingScreenState extends State<VisualBookingScreen> {
   }
 
   void _toggleSlot(int courtIndex, int hour) {
+    if (!widget.venue.hasListedPrice) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Cụm sân này chưa niêm yết giá trên AloBooking nên chưa đặt online được. Vui lòng liên hệ trực tiếp cơ sở.'),
+          duration: Duration(seconds: 3),
+        ),
+      );
+      return;
+    }
     final dateKey = _formatDateKey(_selectedDate);
     final slotKey = '$courtIndex-$hour';
     final fullKey = '$dateKey-$courtIndex-$hour';
@@ -204,10 +215,12 @@ class _VisualBookingScreenState extends State<VisualBookingScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              _buildPriceRow('Khung giờ thường (trước 17:00)', _formatCurrency(_priceForHour(10))),
+              _buildPriceRow('Khung giờ thường (trước 17:00)', v.hasListedPrice ? _formatCurrency(_priceForHour(10)) : 'Chưa niêm yết'),
               const SizedBox(height: 6),
-              _buildPriceRow('Khung giờ vàng (từ 17:00)', _formatCurrency(_priceForHour(18))),
+              _buildPriceRow('Khung giờ vàng (từ 17:00)', v.hasListedPrice ? _formatCurrency(_priceForHour(18)) : 'Chưa niêm yết'),
               const Divider(height: 20),
+              Text('🏟️ Số sân: ${_subCourts.length} sân (${_subCourts.first} … ${_subCourts.last})', style: const TextStyle(fontSize: 13)),
+              const SizedBox(height: 4),
               Text('⏰ Giờ mở cửa: ${v.hours}', style: const TextStyle(fontSize: 13)),
               const SizedBox(height: 4),
               Text('📍 ${v.address}', style: const TextStyle(fontSize: 13)),
@@ -253,7 +266,7 @@ class _VisualBookingScreenState extends State<VisualBookingScreen> {
     final nameCtrl = TextEditingController(text: user?.fullName ?? '');
     final phoneCtrl = TextEditingController(text: user?.phone ?? '');
     final noteCtrl = TextEditingController();
-    String paymentMethod = 'Chuyển khoản VietQR';
+    const paymentMethod = 'Chuyển khoản VietQR';
 
     final List<Map<String, dynamic>> parsedSlots = [];
     for (final s in _selectedSlots) {
@@ -283,7 +296,7 @@ class _VisualBookingScreenState extends State<VisualBookingScreen> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) => StatefulBuilder(
-        builder: (context, setModalState) => Container(
+        builder: (context, _) => Container(
           padding: EdgeInsets.only(
             top: 20,
             left: 20,
@@ -414,60 +427,31 @@ class _VisualBookingScreenState extends State<VisualBookingScreen> {
                 ),
                 const SizedBox(height: 14),
 
-                const Text('Phương thức thanh toán:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                const Text('Thanh toán:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                 const SizedBox(height: 6),
-                Row(
-                  children: [
-                    Expanded(
-                      child: InkWell(
-                        onTap: () => setModalState(() => paymentMethod = 'Chuyển khoản VietQR'),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
-                          decoration: BoxDecoration(
-                            color: paymentMethod == 'Chuyển khoản VietQR' ? const Color(0xFFDCFCE7) : Colors.white,
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(
-                              color: paymentMethod == 'Chuyển khoản VietQR' ? const Color(0xFF16A34A) : const Color(0xFFCBD5E1),
-                              width: paymentMethod == 'Chuyển khoản VietQR' ? 2 : 1,
-                            ),
-                          ),
-                          child: const Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(Icons.qr_code_2, size: 18, color: Color(0xFF15803D)),
-                              SizedBox(width: 4),
-                              Text('VietQR / Momo', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                            ],
-                          ),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF0FDF4),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: const Color(0xFF86EFAC)),
+                  ),
+                  child: const Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(Icons.qr_code_2, size: 22, color: Color(0xFF15803D)),
+                      SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'Chuyển khoản ngân hàng bằng mã VietQR, không nhận tiền mặt. '
+                          'Sau khi xác nhận, bạn sẽ nhận mã QR kèm nội dung chuyển khoản; '
+                          'đơn được xác nhận khi ban quản lý nhận được tiền.',
+                          style: TextStyle(fontSize: 12.5, height: 1.4, color: Color(0xFF14532D)),
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: InkWell(
-                        onTap: () => setModalState(() => paymentMethod = 'Tiền mặt tại sân'),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
-                          decoration: BoxDecoration(
-                            color: paymentMethod == 'Tiền mặt tại sân' ? const Color(0xFFDCFCE7) : Colors.white,
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(
-                              color: paymentMethod == 'Tiền mặt tại sân' ? const Color(0xFF16A34A) : const Color(0xFFCBD5E1),
-                              width: paymentMethod == 'Tiền mặt tại sân' ? 2 : 1,
-                            ),
-                          ),
-                          child: const Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(Icons.payments_outlined, size: 18, color: Color(0xFF15803D)),
-                              SizedBox(width: 4),
-                              Text('Tiền mặt tại sân', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
                 const SizedBox(height: 16),
 
@@ -499,7 +483,7 @@ class _VisualBookingScreenState extends State<VisualBookingScreen> {
                               await _loadExistingBookings();
                               if (!mounted) return;
                               setState(() => _isLoading = false);
-                              ScaffoldMessenger.of(context).showSnackBar(
+                              ScaffoldMessenger.of(this.context).showSnackBar(
                                 const SnackBar(
                                   backgroundColor: Color(0xFFDC2626),
                                   content: Text('⚠️ Có khung giờ vừa được người khác đặt. Vui lòng chọn lại giờ trống.'),
@@ -514,9 +498,14 @@ class _VisualBookingScreenState extends State<VisualBookingScreen> {
                             for (final s in parsedSlots) {
                               byCourt.putIfAbsent(s['courtIndex'] as int, () => []).add(s['hour'] as int);
                             }
+                            // Các đơn của cùng một lần thanh toán dùng chung một mã để khách chuyển khoản một lần
+                            final baseCode = 'BK-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
                             var allSaved = true;
+                            var seq = 0;
                             for (final e in byCourt.entries) {
+                              seq++;
                               final ok = await FirestoreService.createBooking(
+                                id: byCourt.length == 1 ? baseCode : '$baseCode-$seq',
                                 customer: nameCtrl.text.trim(),
                                 phone: phoneCtrl.text.trim(),
                                 venueName: widget.venue.name,
@@ -525,6 +514,8 @@ class _VisualBookingScreenState extends State<VisualBookingScreen> {
                                 date: bookingDate,
                                 amount: _formatCurrency(_totalPrice(e.value)),
                                 paymentMethod: paymentMethod,
+                                ownerId: widget.venue.ownerId,
+                                userId: AuthService.currentUser?.uid ?? '',
                               );
                               if (!ok) allSaved = false;
                             }
@@ -533,7 +524,7 @@ class _VisualBookingScreenState extends State<VisualBookingScreen> {
                             setState(() => _isLoading = false);
 
                             if (!allSaved) {
-                              ScaffoldMessenger.of(context).showSnackBar(
+                              ScaffoldMessenger.of(this.context).showSnackBar(
                                 const SnackBar(
                                   backgroundColor: Color(0xFFDC2626),
                                   content: Text('Không lưu được đơn đặt sân. Vui lòng kiểm tra mạng và thử lại.'),
@@ -547,12 +538,12 @@ class _VisualBookingScreenState extends State<VisualBookingScreen> {
                             await _loadExistingBookings();
 
                             if (mounted) {
-                              _showSuccessBookingDialog(
+                              _showPaymentDialog(
+                                code: baseCode,
                                 courtSummary: courtSummary,
                                 timeSummary: timeSummary,
                                 dateStr: dateStr,
-                                totalPrice: _formatCurrency(totalPrice),
-                                paymentMethod: paymentMethod,
+                                totalPrice: totalPrice,
                               );
                             }
                           },
@@ -565,7 +556,7 @@ class _VisualBookingScreenState extends State<VisualBookingScreen> {
                     child: _isLoading
                         ? const CircularProgressIndicator(color: Colors.white)
                         : const Text(
-                            'XÁC NHẬN ĐẶT SÂN NGAY',
+                            'XÁC NHẬN & THANH TOÁN',
                             style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15, letterSpacing: 0.5),
                           ),
                   ),
@@ -578,13 +569,41 @@ class _VisualBookingScreenState extends State<VisualBookingScreen> {
     );
   }
 
-  void _showSuccessBookingDialog({
+  Widget _copyRow(BuildContext ctx, String label, String value, {String? copyValue}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: Row(
+        children: [
+          SizedBox(width: 96, child: Text(label, style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)))),
+          Expanded(child: Text(value, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700))),
+          if (copyValue != null)
+            InkWell(
+              onTap: () {
+                Clipboard.setData(ClipboardData(text: copyValue));
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Đã sao chép $label'), duration: const Duration(seconds: 1)),
+                );
+              },
+              child: const Padding(
+                padding: EdgeInsets.all(4),
+                child: Icon(Icons.copy_rounded, size: 16, color: Color(0xFF15803D)),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  /// Sau khi giữ chỗ: hướng dẫn chuyển khoản (mã QR VietQR dựng sẵn đúng số tiền và nội dung).
+  void _showPaymentDialog({
+    required String code,
     required String courtSummary,
     required String timeSummary,
     required String dateStr,
-    required String totalPrice,
-    required String paymentMethod,
+    required int totalPrice,
   }) {
+    final content = PaymentConfig.transferContent(code);
+    final payload = PaymentConfig.qrPayload(amount: totalPrice, content: content);
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -592,46 +611,71 @@ class _VisualBookingScreenState extends State<VisualBookingScreen> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: const Column(
           children: [
-            Icon(Icons.check_circle, color: Color(0xFF16A34A), size: 54),
+            Icon(Icons.account_balance_outlined, color: Color(0xFF15803D), size: 44),
             SizedBox(height: 8),
             Text(
-              'ĐẶT SÂN THÀNH CÔNG! 🎉',
-              style: TextStyle(fontWeight: FontWeight.w900, color: Color(0xFF15803D), fontSize: 18),
+              'CHUYỂN KHOẢN ĐỂ GIỮ SÂN',
+              style: TextStyle(fontWeight: FontWeight.w900, color: Color(0xFF15803D), fontSize: 17),
               textAlign: TextAlign.center,
             ),
           ],
         ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Yêu cầu đặt sân của bạn đã được lưu lên máy chủ AloBooking và gửi tới ban quản lý sân.',
-              style: TextStyle(fontSize: 13),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF8FAFC),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: const Color(0xFFE2E8F0)),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('🏟️ Sân: ${widget.venue.name}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                  const SizedBox(height: 4),
-                  Text('📍 Khu vực: $courtSummary', style: const TextStyle(fontSize: 12)),
-                  Text('⏰ Ca giờ: $timeSummary', style: const TextStyle(fontSize: 12)),
-                  Text('📅 Ngày: $dateStr', style: const TextStyle(fontSize: 12)),
-                  Text('💰 Tổng tiền: $totalPrice', style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFFDC2626))),
-                  Text('💳 Hình thức: $paymentMethod', style: const TextStyle(fontSize: 12)),
+        content: SizedBox(
+          width: 380,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Đơn $code đã được ghi nhận ở trạng thái "Chờ xác nhận". '
+                  'Hãy chuyển khoản đúng số tiền và nội dung dưới đây; ban quản lý sẽ xác nhận khi nhận được tiền.',
+                  style: const TextStyle(fontSize: 12.5, height: 1.4),
+                ),
+                const SizedBox(height: 12),
+                if (payload != null)
+                  Center(
+                    child: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                      ),
+                      child: QrImageView(data: payload, size: 200, backgroundColor: Colors.white),
+                    ),
+                  )
+                else
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFFBEB),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: const Color(0xFFFCD34D)),
+                    ),
+                    child: Text(
+                      'Hệ thống chưa khai báo tài khoản nhận tiền nên chưa tạo được mã QR. '
+                      'Vui lòng liên hệ hotline 0364059999 để nhận thông tin chuyển khoản cho đơn $code.',
+                      style: const TextStyle(fontSize: 12.5, height: 1.4, color: Color(0xFF92400E)),
+                    ),
+                  ),
+                const SizedBox(height: 10),
+                if (payload != null) ...[
+                  _copyRow(ctx, 'Ngân hàng', PaymentConfig.bankName.isEmpty ? 'BIN ${PaymentConfig.bankBin}' : PaymentConfig.bankName),
+                  _copyRow(ctx, 'Số tài khoản', PaymentConfig.accountNo, copyValue: PaymentConfig.accountNo),
+                  if (PaymentConfig.accountName.isNotEmpty) _copyRow(ctx, 'Chủ tài khoản', PaymentConfig.accountName),
                 ],
-              ),
+                _copyRow(ctx, 'Số tiền', _formatCurrency(totalPrice), copyValue: totalPrice.toString()),
+                _copyRow(ctx, 'Nội dung', content, copyValue: content),
+                const Divider(height: 20),
+                Text('🏟️ ${widget.venue.name}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5)),
+                const SizedBox(height: 2),
+                Text('📍 $courtSummary', style: const TextStyle(fontSize: 12)),
+                Text('⏰ $timeSummary', style: const TextStyle(fontSize: 12)),
+                Text('📅 $dateStr', style: const TextStyle(fontSize: 12)),
+              ],
             ),
-          ],
+          ),
         ),
         actions: [
           TextButton(
@@ -642,18 +686,16 @@ class _VisualBookingScreenState extends State<VisualBookingScreen> {
                 MaterialPageRoute(builder: (_) => BookedScreen(allVenues: [widget.venue])),
               );
             },
-            child: const Text('Xem danh sách sân đã đặt', style: TextStyle(fontWeight: FontWeight.bold)),
+            child: const Text('Xem lịch đã đặt', style: TextStyle(fontWeight: FontWeight.bold)),
           ),
           ElevatedButton(
             onPressed: () {
               Navigator.pop(ctx);
-              setState(() {
-                _selectedSlots.clear();
-              });
+              setState(() => _selectedSlots.clear());
               _loadExistingBookings();
             },
             style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF15803D)),
-            child: const Text('Tiếp tục xem lịch', style: TextStyle(color: Colors.white)),
+            child: const Text('Tôi đã chuyển khoản', style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
@@ -1010,6 +1052,28 @@ class _VisualBookingScreenState extends State<VisualBookingScreen> {
       child: Center(
         child: Column(
           children: [
+            Text(
+              '${widget.venue.name} · ${_subCourts.length} sân',
+              style: const TextStyle(fontSize: 13, color: Color(0xFF0F172A), fontWeight: FontWeight.w800),
+              textAlign: TextAlign.center,
+            ),
+            if (widget.venue.fromOpenStreetMap && widget.venue.hasListedPrice) ...[
+              const SizedBox(height: 3),
+              const Text(
+                'Giá và giờ mở cửa là mức tham khảo, cơ sở chưa xác nhận trên AloBooking.',
+                style: TextStyle(fontSize: 12, color: Color(0xFFB45309), fontWeight: FontWeight.w700),
+                textAlign: TextAlign.center,
+              ),
+            ],
+            if (!widget.venue.hasListedPrice) ...[
+              const SizedBox(height: 3),
+              const Text(
+                'Cụm sân chưa niêm yết giá trên AloBooking: chưa đặt online được, vui lòng liên hệ trực tiếp cơ sở.',
+                style: TextStyle(fontSize: 12, color: Color(0xFFB45309), fontWeight: FontWeight.w700),
+                textAlign: TextAlign.center,
+              ),
+            ],
+            const SizedBox(height: 3),
             RichText(
               textAlign: TextAlign.center,
               text: const TextSpan(
@@ -1030,6 +1094,12 @@ class _VisualBookingScreenState extends State<VisualBookingScreen> {
             ),
             const SizedBox(height: 2),
             const Text(
+              'Thanh toán bằng chuyển khoản VietQR, không nhận tiền mặt',
+              style: TextStyle(fontSize: 12, color: Color(0xFF334155), fontWeight: FontWeight.w500),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 2),
+            const Text(
               'Lịch đã đặt KHÔNG hỗ trợ Huỷ',
               style: TextStyle(fontSize: 12, color: Color(0xFF334155), fontWeight: FontWeight.w500),
               textAlign: TextAlign.center,
@@ -1040,12 +1110,14 @@ class _VisualBookingScreenState extends State<VisualBookingScreen> {
     );
   }
 
-  // ─── 4. MA TRẬN ĐỒNG BỘ 100% GIỮA HEADER GIỜ VÀ CÁC Ô SÂN ──
+  // ─── 4. MA TRẬN GIỜ x SÂN (cột tên sân cố định, cuộn dọc khi cụm có nhiều sân) ──
+  static const double _courtColWidth = 96.0;
+  static const double _headerHeight = 32.0;
+  static const double _rowHeight = 44.0;
+
   Widget _buildSynchronizedTimelineMatrix(bool isMobile) {
-    const double courtColWidth = 72.0;
-    const double rowHeight = 44.0;
     final int totalSlots = _endHour - _startHour; // 19 ca giờ: 5:00 -> 24:00
-    final double totalWidth = courtColWidth + totalSlots * _hourColumnWidth + 30.0;
+    final double gridWidth = totalSlots * _hourColumnWidth + 30.0;
     final dateKey = _formatDateKey(_selectedDate);
 
     return Container(
@@ -1055,48 +1127,97 @@ class _VisualBookingScreenState extends State<VisualBookingScreen> {
         border: Border.all(color: const Color(0xFFCBD5E1), width: 1),
       ),
       child: SingleChildScrollView(
-        controller: _timelineScrollController,
-        scrollDirection: Axis.horizontal,
-        physics: const ClampingScrollPhysics(),
-        child: SizedBox(
-          width: totalWidth,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // HÀNG TIÊU ĐỀ THỜI GIAN (XANH CYAN NHẸ) CHUẨN XÁC 100% ẢNH MẪU
-              _buildTimeHeaderRow(totalSlots, courtColWidth, totalWidth),
-
-              // DANH SÁCH 3 HÀNG SÂN PICKLEBALL
-              for (int courtIdx = 0; courtIdx < _subCourts.length; courtIdx++)
-                _buildCourtRow(courtIdx, totalSlots, dateKey, courtColWidth, totalWidth, rowHeight),
-            ],
-          ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Cột tên sân: đứng yên khi cuộn ngang theo giờ
+            SizedBox(
+              width: _courtColWidth,
+              child: Column(
+                children: [
+                  Container(
+                    height: _headerHeight,
+                    alignment: Alignment.centerLeft,
+                    padding: const EdgeInsets.symmetric(horizontal: 6),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFBAE6FD),
+                      border: Border(
+                        bottom: const BorderSide(color: Color(0xFF94A3B8), width: 1),
+                        right: BorderSide(color: Colors.grey.shade400, width: 1),
+                      ),
+                    ),
+                    child: Text(
+                      '${_subCourts.length} sân',
+                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF0369A1)),
+                    ),
+                  ),
+                  for (int i = 0; i < _subCourts.length; i++)
+                    Container(
+                      height: _rowHeight,
+                      alignment: Alignment.centerLeft,
+                      padding: const EdgeInsets.symmetric(horizontal: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        border: Border(
+                          bottom: const BorderSide(color: Color(0xFFCBD5E1), width: 1),
+                          right: BorderSide(color: Colors.grey.shade400, width: 1),
+                        ),
+                      ),
+                      child: Text(
+                        _subCourts[i],
+                        style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: Color(0xFF15803D)),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            // Lưới giờ: cuộn ngang
+            Expanded(
+              child: SingleChildScrollView(
+                controller: _timelineScrollController,
+                scrollDirection: Axis.horizontal,
+                physics: const ClampingScrollPhysics(),
+                child: SizedBox(
+                  width: gridWidth,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildTimeHeaderRow(totalSlots, gridWidth),
+                      for (int courtIdx = 0; courtIdx < _subCourts.length; courtIdx++)
+                        _buildCourtRow(courtIdx, totalSlots, dateKey, gridWidth),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
 
-  /// Tiêu đề giờ: Khung xanh cyan, mốc 5:00 nằm CHÍNH XÁC trên vạch ngăn giữa Cột Sân và Ca 0
-  /// Mỗi mốc giờ tiếp theo 6:00, 7:00, ..., 24:00 nằm CHÍNH XÁC trên từng vạch ngăn cách ca giờ
-  Widget _buildTimeHeaderRow(int totalSlots, double courtColWidth, double totalWidth) {
+  /// Tiêu đề giờ: mốc 5:00, 6:00, ..., 24:00 nằm đúng trên vạch ngăn giữa các ca giờ.
+  Widget _buildTimeHeaderRow(int totalSlots, double gridWidth) {
     return Container(
-      width: totalWidth,
-      height: 32,
+      width: gridWidth,
+      height: _headerHeight,
       decoration: const BoxDecoration(
-        color: Color(0xFFBAE6FD), // Light cyan header
+        color: Color(0xFFBAE6FD),
         border: Border(bottom: BorderSide(color: Color(0xFF94A3B8), width: 1)),
       ),
       child: Stack(
         clipBehavior: Clip.none,
         children: [
-          // 20 mốc giờ: 5:00, 6:00, ..., 24:00
-          for (int idx = 0; idx <= totalSlots; idx++) ...[
+          for (int idx = 0; idx <= totalSlots; idx++)
             Positioned(
-              left: (courtColWidth + idx * _hourColumnWidth) - 25.0,
+              left: idx == 0 ? 2.0 : idx * _hourColumnWidth - 25.0,
               width: 50.0,
               top: 2,
               bottom: 0,
               child: Column(
+                crossAxisAlignment: idx == 0 ? CrossAxisAlignment.start : CrossAxisAlignment.center,
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Flexible(
@@ -1104,82 +1225,33 @@ class _VisualBookingScreenState extends State<VisualBookingScreen> {
                       fit: BoxFit.scaleDown,
                       child: Text(
                         '${_startHour + idx}:00',
-                        style: const TextStyle(
-                          fontSize: 10.5,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF0369A1),
-                        ),
-                        textAlign: TextAlign.center,
+                        style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: Color(0xFF0369A1)),
                       ),
                     ),
                   ),
-                  // Vạch cam nhỏ tại chính xác điểm mốc giờ như ảnh mẫu
-                  Container(
-                    width: 1.5,
-                    height: 4.5,
-                    color: const Color(0xFFF59E0B),
-                  ),
+                  Container(width: 1.5, height: 4.5, color: const Color(0xFFF59E0B)),
                 ],
               ),
             ),
-          ],
         ],
       ),
     );
   }
 
-  /// Hàng ca giờ của từng sân: Cột tên sân (Pickleball 1, 2, 3) + 19 ca giờ
-  Widget _buildCourtRow(
-    int courtIdx,
-    int totalSlots,
-    String dateKey,
-    double courtColWidth,
-    double totalWidth,
-    double rowHeight,
-  ) {
+  /// Hàng ca giờ của một sân con.
+  Widget _buildCourtRow(int courtIdx, int totalSlots, String dateKey, double gridWidth) {
     return Container(
-      width: totalWidth,
-      height: rowHeight,
+      width: gridWidth,
+      height: _rowHeight,
       decoration: const BoxDecoration(
         color: Colors.white,
         border: Border(bottom: BorderSide(color: Color(0xFFCBD5E1), width: 1)),
       ),
       child: Row(
         children: [
-          // 1. Ô TÊN SÂN CỐ ĐỊNH PHÍA BÊN TRÁI (Pickleball 1, Pickleball 2, Pickleball 3)
-          Container(
-            width: courtColWidth,
-            height: rowHeight,
-            padding: const EdgeInsets.symmetric(horizontal: 5),
-            alignment: Alignment.centerLeft,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              border: Border(
-                right: BorderSide(color: Colors.grey.shade400, width: 1), // Vạch dọc thẳng mốc 5:00
-              ),
-            ),
-            child: Text(
-              _subCourts[courtIdx],
-              style: const TextStyle(
-                fontSize: 10.5,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF15803D), // Màu xanh lá cây đậm chuẩn ảnh
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-
-          // 2. 19 CA GIỜ (TỪ 5:00 ĐẾN 24:00)
           for (int hourIdx = 0; hourIdx < totalSlots; hourIdx++)
-            _buildSlotCell(courtIdx, hourIdx, totalSlots, dateKey, rowHeight),
-
-          // 3. KHOẢNG ĐỆM CUỐI DÒNG
-          Container(
-            width: 30.0,
-            height: rowHeight,
-            color: Colors.white,
-          ),
+            _buildSlotCell(courtIdx, hourIdx, totalSlots, dateKey, _rowHeight),
+          const SizedBox(width: 30.0),
         ],
       ),
     );
@@ -1236,6 +1308,7 @@ class _VisualBookingScreenState extends State<VisualBookingScreen> {
     }
 
     return InkWell(
+      key: ValueKey('slot-$courtIdx-$h'),
       mouseCursor: SystemMouseCursors.click,
       onTap: () => _toggleSlot(courtIdx, h),
       child: Container(

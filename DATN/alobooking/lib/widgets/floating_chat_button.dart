@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../screens/chatbot_screen.dart';
+import '../services/navigator_key.dart';
 
 class FloatingChatButton extends StatefulWidget {
   const FloatingChatButton({super.key});
@@ -39,8 +40,9 @@ class _FloatingChatButtonState extends State<FloatingChatButton>
   void _openChatbot() {
     setState(() => _hasNew = false);
 
-    Navigator.push(
-      context,
+    final nav = rootNavigatorKey.currentState ?? Navigator.maybeOf(context);
+    if (nav == null) return;
+    nav.push(
       PageRouteBuilder(
         pageBuilder: (context, animation, secondaryAnimation) =>
             const ChatbotScreen(),
@@ -68,9 +70,9 @@ class _FloatingChatButtonState extends State<FloatingChatButton>
 
   @override
   Widget build(BuildContext context) {
-    return Positioned(
-      bottom: 80,
-      right: 16,
+    // Vị trí do widget cha (Positioned) quyết định
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
       child: GestureDetector(
         onTap: _openChatbot,
         child: ScaleTransition(

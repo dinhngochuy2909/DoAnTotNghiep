@@ -2,9 +2,10 @@ import 'package:flutter/material.dart';
 import '../models/venue.dart';
 import '../models/customer.dart';
 import '../models/payment.dart';
-import '../data/venues_data.dart';
 import '../services/firestore_service.dart';
 import '../services/auth_service.dart';
+import '../services/admin_stats.dart';
+import '../services/booking_slots.dart';
 import 'home_screen.dart';
 import 'login_screen.dart';
 import '../widgets/venue_image_view.dart';
@@ -39,50 +40,43 @@ class _OwnerScreenState extends State<OwnerScreen> with SingleTickerProviderStat
   String _searchCustomerQuery = '';
 
   // Chủ sân hiện tại
-  String get _currentOwnerId => AuthService.currentUser?.uid ?? 'owner_chuan_01';
-  String get _currentOwnerName => AuthService.currentUser?.fullName ?? 'Trần Văn Chủ Sân';
+  String get _currentOwnerId => AuthService.currentUser?.uid ?? '';
+  String get _currentOwnerName => AuthService.currentUser?.fullName ?? 'Chủ sân';
 
-  // Lọc sân thuộc sở hữu của chủ sân này (hoặc cụm sân Đống Đa/Chùa Bộc cho demo)
+  // Chỉ các sân do chính chủ sân này đăng ký (theo ownerId), không suy đoán theo quận hay tên.
   List<Venue> get _myVenues {
-    return _allVenues.where((v) {
-      final isMine = v.ownerId == _currentOwnerId ||
-          v.district == 'Đống Đa' ||
-          v.name.contains('Đống Đa') ||
-          v.name.contains('Chùa Bộc') ||
-          v.name.contains('Phúc Long') ||
-          v.id <= 3;
-      return isMine;
-    }).toList();
+    final id = _currentOwnerId;
+    if (id.isEmpty) return [];
+    return _allVenues.where((v) => v.ownerId == id).toList();
   }
 
   // Danh sách tên sân của tôi để lọc đơn đặt & doanh thu
-  Set<String> get _myVenueNames => _myVenues.map((v) => v.name).toSet();
+  Set<String> get _myVenueNames => _myVenues.map((v) => v.name.trim().toLowerCase()).toSet();
 
-  // Đơn đặt sân chỉ thuộc các sân của chủ sân này
+  // Đơn đặt sân chỉ thuộc các sân của chủ sân này (khớp đúng tên sân)
   List<BookingItem> get _myBookings {
-    return _allBookings.where((b) {
-      if (_myVenueNames.isEmpty) return true;
-      return _myVenueNames.any((vName) =>
-          b.venueName.toLowerCase().contains(vName.toLowerCase()) ||
-          vName.toLowerCase().contains(b.venueName.toLowerCase()));
+    final names = _myVenueNames;
+    return _allBookings.where((b) => names.contains(b.venueName.trim().toLowerCase())).toList();
+  }
+
+  // Khách hàng đã từng đặt tại sân của tôi (khớp số điện thoại, nếu thiếu thì theo tên)
+  List<CustomerItem> get _myCustomers {
+    String digits(String s) => s.replaceAll(RegExp(r'[^0-9]'), '');
+    final bookings = _myBookings;
+    return _allCustomers.where((c) {
+      final cp = digits(c.phone);
+      return bookings.any((b) {
+        final bp = digits(b.phone);
+        return (cp.isNotEmpty && bp == cp) ||
+            ((cp.isEmpty || bp.isEmpty) && b.customer.trim().toLowerCase() == c.name.trim().toLowerCase());
+      });
     }).toList();
   }
 
-  // Khách hàng đã từng đặt tại sân của tôi
-  List<CustomerItem> get _myCustomers {
-    final customerNames = _myBookings.map((b) => b.customer.toLowerCase().trim()).toSet();
-    if (customerNames.isEmpty) {
-      return _allCustomers.take(4).toList(); // Fallback demo
-    }
-    final matched = _allCustomers.where((c) => customerNames.contains(c.name.toLowerCase().trim())).toList();
-    return matched.isNotEmpty ? matched : _allCustomers.take(4).toList();
-  }
-
-  // Giao dịch thanh toán thuộc sân của tôi
+  // Giao dịch thanh toán thuộc đơn đặt của sân tôi
   List<PaymentItem> get _myPayments {
     final myBookingIds = _myBookings.map((b) => b.id).toSet();
-    final matched = _allPayments.where((p) => myBookingIds.contains(p.bookingId)).toList();
-    return matched.isNotEmpty ? matched : _allPayments.take(4).toList();
+    return _allPayments.where((p) => myBookingIds.contains(p.bookingId)).toList();
   }
 
   final List<String> _districts = [
@@ -119,7 +113,7 @@ class _OwnerScreenState extends State<OwnerScreen> with SingleTickerProviderStat
           ? widget.initialTabIndex
           : 0,
     );
-    _allVenues = List.from(widget.initialVenues.isNotEmpty ? widget.initialVenues : sampleVenues);
+    _allVenues = List.from(widget.initialVenues);
     _loadData();
   }
 
@@ -650,47 +644,71 @@ class _OwnerScreenState extends State<OwnerScreen> with SingleTickerProviderStat
   // TAB 2: DOANH THU & THỐNG KÊ SÂN CỦA TÔI
   // ==========================================
   Widget _buildRevenueTab() {
-    int totalRev = 0;
-    for (final b in _myBookings) {
-      final numStr = b.amount.replaceAll(RegExp(r'[^0-9]'), '');
-      totalRev += int.tryParse(numStr) ?? 0;
+    final mine = _myBookings;
+    final totalRev = mine
+        .where((b) => AdminStats.countsAsRevenue(b.status))
+        .fold<int>(0, (a, b) => a + AdminStats.parseMoney(b.amount));
+    final month = AdminStats.compute(bookings: mine, venues: _myVenues, period: AdminPeriod.month);
+    final change = AdminStats.change(month.revenue, month.prevRevenue);
+    final activeOrders = mine.where((b) => !BookingSlots.isCancelled(b.status)).length;
+    final cancelledOrders = mine.length - activeOrders;
+    final revenueByVenue = <String, int>{};
+    for (final b in mine.where((b) => AdminStats.countsAsRevenue(b.status))) {
+      final k = b.venueName.trim().toLowerCase();
+      revenueByVenue[k] = (revenueByVenue[k] ?? 0) + AdminStats.parseMoney(b.amount);
     }
-    if (totalRev == 0) totalRev = 14500000; // Demo fallback
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          if (_myVenues.isEmpty)
+            Container(
+              width: double.infinity,
+              margin: const EdgeInsets.only(bottom: 16),
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1E293B),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFF334155)),
+              ),
+              child: const Text(
+                'Bạn chưa có cụm sân nào. Thêm sân ở tab "Sân của tôi"; sau khi quản trị viên duyệt, đơn đặt và doanh thu sẽ hiển thị tại đây.',
+                style: TextStyle(color: Color(0xFF94A3B8), fontSize: 13, height: 1.4),
+              ),
+            ),
           Row(
             children: [
               Expanded(
                 child: _buildOwnerKpiCard(
-                  'Tổng Thu Sân Của Tôi',
-                  '${_formatMoney(totalRev)}đ',
+                  'Doanh Thu Sân Của Tôi',
+                  AdminStats.fmtMoney(totalRev),
                   Icons.monetization_on_outlined,
                   const Color(0xFF10B981),
-                  '+22% so với tháng trước',
+                  change == null
+                      ? '30 ngày qua: ${AdminStats.fmtMoney(month.revenue)}'
+                      : '${change >= 0 ? '+' : ''}${change.toStringAsFixed(1)}% so với 30 ngày trước',
                 ),
               ),
               const SizedBox(width: 10),
               Expanded(
                 child: _buildOwnerKpiCard(
                   'Tổng Lượt Đặt',
-                  '${_myBookings.length > 0 ? _myBookings.length : 48} lượt',
+                  '$activeOrders lượt',
                   Icons.receipt_long_outlined,
                   const Color(0xFF38BDF8),
-                  'Tỷ lệ hoàn thành 94%',
+                  mine.isEmpty ? 'Chưa có đơn' : '$cancelledOrders đơn đã hủy',
                 ),
               ),
               const SizedBox(width: 10),
               Expanded(
                 child: _buildOwnerKpiCard(
-                  'Khách Quen / Hội Viên',
-                  '${_myCustomers.length > 0 ? _myCustomers.length : 18} khách',
+                  'Khách Đã Đặt Sân',
+                  '${_myCustomers.length} khách',
                   Icons.people_outline,
                   const Color(0xFFFBBF24),
-                  'Thường xuyên đặt lịch',
+                  'Có hồ sơ trong hệ thống',
                 ),
               ),
             ],
@@ -743,8 +761,8 @@ class _OwnerScreenState extends State<OwnerScreen> with SingleTickerProviderStat
                           ),
                         ),
                         const SizedBox(width: 16),
-                        const Text('4.200.000đ',
-                            style: TextStyle(color: Color(0xFF38BDF8), fontWeight: FontWeight.bold, fontSize: 13)),
+                        Text(AdminStats.fmtMoney(revenueByVenue[v.name.trim().toLowerCase()] ?? 0),
+                            style: const TextStyle(color: Color(0xFF38BDF8), fontWeight: FontWeight.bold, fontSize: 13)),
                       ],
                     ),
                   );
@@ -913,9 +931,9 @@ class _OwnerScreenState extends State<OwnerScreen> with SingleTickerProviderStat
                           icon: const Icon(Icons.check_circle, color: Color(0xFF10B981), size: 22),
                           tooltip: 'Xác nhận đơn',
                           onPressed: () async {
-                            await FirestoreService.updateBookingStatus(b.id, 'Đã xác nhận');
+                            await FirestoreService.confirmBooking(b.id);
                             setState(() => b.status = 'Đã xác nhận');
-                            _showToast('Đã xác nhận đơn ${b.id}!');
+                            _showToast('Đã xác nhận đơn ${b.id} (đã nhận tiền chuyển khoản)!');
                           },
                         ),
                       ],
@@ -1080,6 +1098,7 @@ class _OwnerScreenState extends State<OwnerScreen> with SingleTickerProviderStat
     final addressCtrl = TextEditingController(text: existing?.address ?? '');
     final priceCtrl = TextEditingController(text: existing?.price ?? '120k - 220k/h');
     final hoursCtrl = TextEditingController(text: existing?.hours ?? '06:00 – 23:00');
+    final courtsCtrl = TextEditingController(text: (existing?.courts ?? Venue.defaultCourtCount(selectedType)).toString());
     final tagsCtrl = TextEditingController(
         text: existing?.tags.join(', ') ?? 'Mái che cao, Đèn LED, Thảm chuẩn, Chỗ đỗ xe');
     final imageCtrl = TextEditingController(
@@ -1162,6 +1181,7 @@ class _OwnerScreenState extends State<OwnerScreen> with SingleTickerProviderStat
                                       DropdownMenuItem(value: 'badminton', child: Text('🏸 Cầu lông')),
                                       DropdownMenuItem(value: 'football', child: Text('⚽ Bóng đá')),
                                       DropdownMenuItem(value: 'tennis', child: Text('🎾 Tennis')),
+                                      DropdownMenuItem(value: 'basketball', child: Text('🏀 Bóng rổ')),
                                     ],
                                     onChanged: (val) {
                                       if (val != null) {
@@ -1169,6 +1189,7 @@ class _OwnerScreenState extends State<OwnerScreen> with SingleTickerProviderStat
                                           selectedType = val;
                                           final list = _sampleImages[val] ?? _sampleImages['pickleball']!;
                                           imageCtrl.text = list[0];
+                                          if (!isEdit) courtsCtrl.text = Venue.defaultCourtCount(val).toString();
                                         });
                                       }
                                     },
@@ -1198,7 +1219,7 @@ class _OwnerScreenState extends State<OwnerScreen> with SingleTickerProviderStat
                                     isExpanded: true,
                                     dropdownColor: const Color(0xFF0F172A),
                                     style: const TextStyle(color: Colors.white, fontSize: 13),
-                                    items: _districts.map((d) => DropdownMenuItem(value: d, child: Text(d))).toList(),
+                                    items: {..._districts, selectedDist}.map((d) => DropdownMenuItem(value: d, child: Text(d))).toList(),
                                     onChanged: (val) {
                                       if (val != null) setDialogState(() => selectedDist = val);
                                     },
@@ -1220,6 +1241,8 @@ class _OwnerScreenState extends State<OwnerScreen> with SingleTickerProviderStat
                         Expanded(child: _dialogField('Giờ Mở Cửa', hoursCtrl, '06:00 – 23:00')),
                       ],
                     ),
+                    const SizedBox(height: 10),
+                    _dialogField('Số Sân Con Trong Cụm (1–30) *', courtsCtrl, 'VD: 8'),
                     const SizedBox(height: 12),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1376,6 +1399,7 @@ class _OwnerScreenState extends State<OwnerScreen> with SingleTickerProviderStat
                   }
 
                   final tagsList = tagsCtrl.text.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+                  final courtCount = (int.tryParse(courtsCtrl.text.trim()) ?? Venue.defaultCourtCount(selectedType)).clamp(1, 30);
 
                   if (isEdit) {
                     final updated = existing.copyWith(
@@ -1387,6 +1411,7 @@ class _OwnerScreenState extends State<OwnerScreen> with SingleTickerProviderStat
                       hours: hoursCtrl.text.trim(),
                       tags: tagsList.isNotEmpty ? tagsList : existing.tags,
                       image: imageCtrl.text.trim().isNotEmpty ? imageCtrl.text.trim() : existing.image,
+                      courtCount: courtCount,
                       // Sửa sân cũng chuyển về pending để Admin duyệt lại nếu cần
                       approvalStatus: 'pending',
                     );
@@ -1415,6 +1440,7 @@ class _OwnerScreenState extends State<OwnerScreen> with SingleTickerProviderStat
                       logo: _sampleImages['pickleball']![0],
                       ownerId: _currentOwnerId,
                       ownerName: _currentOwnerName,
+                      courtCount: courtCount,
                       approvalStatus: 'pending', // Yêu cầu admin duyệt
                     );
                     await FirestoreService.addVenue(newVenue);
@@ -1491,17 +1517,4 @@ class _OwnerScreenState extends State<OwnerScreen> with SingleTickerProviderStat
     );
   }
 
-  String _formatMoney(int amount) {
-    final s = amount.toString();
-    final buffer = StringBuffer();
-    int count = 0;
-    for (int i = s.length - 1; i >= 0; i--) {
-      buffer.write(s[i]);
-      count++;
-      if (count % 3 == 0 && i != 0) {
-        buffer.write('.');
-      }
-    }
-    return buffer.toString().split('').reversed.join();
-  }
 }

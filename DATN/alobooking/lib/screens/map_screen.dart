@@ -2,7 +2,6 @@ import '../widgets/venue_image_view.dart';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../models/venue.dart';
-import '../widgets/booking_bottom_sheet.dart';
 import '../widgets/web_map_view.dart';
 import 'visual_booking_screen.dart';
 
@@ -568,7 +567,7 @@ class _MapScreenState extends State<MapScreen> {
                           const Icon(Icons.star_rounded, size: 15, color: Color(0xFFF59E0B)),
                           const SizedBox(width: 2),
                           Text(
-                            v.rating.toString(),
+                            v.ratingLabel,
                             style: const TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.w700,

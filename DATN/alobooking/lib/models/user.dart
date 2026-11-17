@@ -17,23 +17,19 @@ class AppUser {
     DateTime? createdAt,
   }) : createdAt = createdAt ?? DateTime.now();
 
-  bool get isAdmin => role == 'admin' || email.toLowerCase().contains('admin') || email.toLowerCase().contains('dinhngochuy');
-  bool get isOwner => role == 'owner' || role == 'court_owner' || role == 'manager' || email.toLowerCase().contains('chusan');
-  bool get isGuest => role == 'guest' || role == 'viewer' || email.toLowerCase().contains('guest') || email.toLowerCase().contains('khachxem');
+  // Quyền chỉ dựa vào vai trò được lưu (role), KHÔNG suy ra từ địa chỉ email:
+  // nếu không, ai đăng ký email có chữ "admin" cũng thành quản trị viên.
+  bool get isAdmin => role == 'admin';
+  bool get isOwner => role == 'owner' || role == 'court_owner' || role == 'manager';
+  bool get isGuest => role == 'guest' || role == 'viewer';
   bool get canBook => !isGuest;
 
   factory AppUser.fromFirestoreFields(String docId, Map<String, dynamic> fields) {
     final email = fields['email']?['stringValue'] ?? '';
+    // Vai trò chỉ lấy từ trường `role` đã lưu; thiếu thì là khách hàng thường.
+    // Tuyệt đối không đoán từ email (ai đăng ký email có chữ "admin" sẽ thành quản trị viên).
     final rawRole = fields['role']?['stringValue'] ?? '';
-    final role = rawRole.isNotEmpty
-        ? rawRole
-        : (email.toLowerCase().contains('admin') || email.toLowerCase().contains('dinhngochuy')
-            ? 'admin'
-            : (email.toLowerCase().contains('chusan') || email.toLowerCase().contains('manager')
-                ? 'owner'
-                : (email.toLowerCase().contains('guest') || email.toLowerCase().contains('khachxem')
-                    ? 'guest'
-                    : 'customer')));
+    final role = rawRole.isNotEmpty ? rawRole : 'customer';
     return AppUser(
       uid: docId,
       fullName: fields['fullName']?['stringValue'] ?? fields['displayName']?['stringValue'] ?? '',

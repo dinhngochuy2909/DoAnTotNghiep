@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'floating_chatbot_button.dart';
+import 'floating_chat_button.dart';
 
 /// Danh sách thiết bị mẫu để giả lập giao diện
 enum DeviceType {
@@ -50,7 +50,7 @@ class _DeviceSimulatorWrapperState extends State<DeviceSimulatorWrapper> {
           const Positioned(
             bottom: 24,
             right: 16,
-            child: FloatingChatBotButton(),
+            child: FloatingChatButton(),
           ),
         ],
       );
@@ -66,7 +66,7 @@ class _DeviceSimulatorWrapperState extends State<DeviceSimulatorWrapper> {
           const Positioned(
             bottom: 86,
             right: 24,
-            child: FloatingChatBotButton(),
+            child: FloatingChatButton(),
           ),
 
           // Nút nổi ở góc dưới bên phải để bật lại chế độ Xem iPhone 18
@@ -414,7 +414,7 @@ class _DeviceSimulatorWrapperState extends State<DeviceSimulatorWrapper> {
                                 const Positioned(
                                   bottom: 24,
                                   right: 14,
-                                  child: FloatingChatBotButton(),
+                                  child: FloatingChatButton(),
                                 ),
                               ],
                             ),

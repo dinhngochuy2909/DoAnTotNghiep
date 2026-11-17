@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../services/auth_service.dart';
@@ -369,7 +370,8 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
 
             const SizedBox(height: 16),
 
-            // Gợi ý và điền nhanh 3 vai trò hệ thống
+            // Gợi ý tài khoản demo: chỉ hiện khi chạy debug, bản phát hành không có
+            if (kDebugMode)
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
               decoration: BoxDecoration(

@@ -3,7 +3,7 @@ class PaymentItem {
   final String bookingId;
   final String customer;
   final String amount;
-  final String method; // 'VietQR Pro' | 'Ví MoMo' | 'VNPay QR' | 'Tiền mặt'
+  final String method; // 'Chuyển khoản VietQR' | 'VietQR Pro' | 'Ví MoMo' | 'VNPay QR' ('Tiền mặt' chỉ còn ở dữ liệu cũ)
   final String time;
   String status; // 'Thành công' | 'Đang xử lý' | 'Đã hoàn tiền'
   final String bankRef;

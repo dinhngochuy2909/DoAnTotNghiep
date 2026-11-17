@@ -1,4 +1,6 @@
 import 'dart:math' as math;
+import 'demand_forecast_service.dart';
+import 'weather_service.dart';
 import '../models/venue.dart';
 import 'firestore_service.dart';
 
@@ -31,6 +33,7 @@ class RagIntent {
   String? sport; // pickleball | badminton | football | tennis
   String? district; // đã chuẩn hoá không dấu
   String? districtLabel;
+  final List<String> districts = []; // mọi quận được nhắc tới (để so sánh), đã bỏ dấu
   int? maxPricePerHour; // nghìn đồng
   int? hour; // giờ muốn chơi (0-23)
   DateTime date;
@@ -41,6 +44,8 @@ class RagIntent {
   final Set<String> amenities = {}; // den_dem, gui_xe, may_ban_bong, mai_che
   Venue? namedVenue;
   String? unknownArea; // địa điểm khách hỏi nhưng hệ thống không có sân
+  bool wantsStats = false; // hỏi về mặt bằng giá (trung bình, bao nhiêu...)
+  bool goldenHour = false; // hỏi giá khung giờ vàng / cao điểm
   final Set<String> topics = {}; // cancel, fixed, payment, promo, guide, weather, contact
 
   RagIntent(this.date);
@@ -50,6 +55,7 @@ class RagIntent {
       district != null ||
       namedVenue != null ||
       unknownArea != null ||
+      (wantsStats && (sport != null || district != null)) ||
       maxPricePerHour != null ||
       cheapest ||
       topRated ||
@@ -57,22 +63,60 @@ class RagIntent {
       amenities.isNotEmpty;
 }
 
+/// Thống kê giá của một nhóm sân (đơn vị nghìn đồng).
+class RagStats {
+  final String label;
+  final int count;
+  final double avgLow; // giá khung thường trung bình
+  final double avgHigh; // giá khung vàng (từ 17h) trung bình
+  final int minLow;
+  final int maxHigh;
+  final String unit; // 'giờ' | 'trận'
+
+  const RagStats({
+    required this.label,
+    required this.count,
+    required this.avgLow,
+    required this.avgHigh,
+    required this.minLow,
+    required this.maxHigh,
+    required this.unit,
+  });
+
+  static String _k(num v) => '${v.round()}k';
+
+  String toText({bool goldenFocus = false}) {
+    final b = StringBuffer();
+    b.writeln('Thống kê giá $label ($count sân, đơn vị: đồng/$unit):');
+    b.writeln('- Khung giờ vàng (từ 17:00) trung bình: ${_k(avgHigh)}/$unit');
+    b.writeln('- Khung giờ thường (trước 17:00) trung bình: ${_k(avgLow)}/$unit');
+    b.writeln('- Rẻ nhất: ${_k(minLow)}/$unit (khung thường); đắt nhất: ${_k(maxHigh)}/$unit (khung vàng)');
+    return b.toString().trim();
+  }
+}
+
 /// Kết quả truy xuất.
 class RagRetrievalResult {
   final String query;
   final RagIntent intent;
+  final RagStats? stats;
+  final List<RagStats> moreStats; // các nhóm so sánh khác (khi hỏi nhiều quận)
   final List<RagKnowledgeChunk> chunks;
   final List<Venue> matchedVenues;
   final String augmentedPromptText;
   final int totalVenues;
+  final String? forecastText; // dự đoán nhu cầu/hủy (khi khách hỏi)
 
   RagRetrievalResult({
     required this.query,
     required this.intent,
+    this.stats,
+    this.moreStats = const [],
     required this.chunks,
     required this.matchedVenues,
     required this.augmentedPromptText,
     required this.totalVenues,
+    this.forecastText,
   });
 
   bool get hasPolicy => chunks.any((c) => c.category != 'venue');
@@ -216,8 +260,9 @@ class RagService {
       keywords: [sport, v.district, v.type, ...v.tags],
       content: '''Sân: ${v.name}
 Môn: $sport
-Địa chỉ: ${v.address} (quận/huyện: ${v.district}, cách ~${v.distance})
+Địa chỉ: ${v.address} (quận/huyện/phường/xã: ${v.district}${v.distance.isEmpty ? '' : ', cách ~${v.distance}'})
 Giờ mở cửa: ${v.hours}
+Số sân con: ${v.courts} sân
 Giá: ${v.price}
 Đánh giá: ${v.rating}/5
 Tiện ích: ${v.tags.join(', ')}
@@ -247,11 +292,11 @@ Chủ sân: ${v.ownerName}''',
         RagKnowledgeChunk(
           id: 'policy_payment',
           category: 'policy',
-          title: 'Thanh toán và đặt cọc',
+          title: 'Thanh toán',
           keywords: ['thanh toan', 'vietqr', 'chuyen khoan', 'tien mat', 'dat coc', 'qr'],
-          content: '''- Chuyển khoản quét mã VietQR 24/7, hệ thống xác nhận đơn tự động.
-- Tiền mặt tại quầy lễ tân khi nhận sân (khách thành viên hoặc ca ngày thường).
-- Đặt cọc 50% cho ca tối cao điểm (17:30–20:30) và Thứ 7, Chủ nhật.''',
+          content: '''- Chỉ thanh toán bằng chuyển khoản ngân hàng quét mã VietQR (không nhận tiền mặt).
+- Sau khi bấm xác nhận, ứng dụng hiện mã QR đúng số tiền kèm nội dung chuyển khoản là mã đơn; đơn chuyển sang "Đã xác nhận" khi ban quản lý nhận được tiền.
+- Số tiền chuyển khoản là toàn bộ tiền các ca đã chọn (ứng dụng không có hình thức đặt cọc một phần).''',
         ),
         RagKnowledgeChunk(
           id: 'policy_promo',
@@ -272,7 +317,7 @@ Chủ sân: ${v.ownerName}''',
 3. Bảng giờ: ô trắng = trống, ô đỏ = đã có người đặt, ô xám = tạm khoá.
 4. Chạm vào các ô trắng muốn đặt (ô chọn có viền xanh đậm).
 5. Kiểm tra "Tổng giờ" và "Tổng tiền" ở thanh dưới, bấm "TIẾP THEO" để xác nhận và thanh toán.
-Khung giờ vàng (từ 17:00) giá cao hơn khung tiêu chuẩn khoảng 20%.''',
+Giá mỗi sân ghi dạng "giá giờ thường - giá giờ vàng": giờ thường là trước 17:00, giờ vàng từ 17:00 có giá cao hơn (mức chênh khác nhau theo từng sân).''',
         ),
         RagKnowledgeChunk(
           id: 'guide_weather',
@@ -308,6 +353,7 @@ Khung giờ vàng (từ 17:00) giá cao hơn khung tiêu chuẩn khoảng 20%.''
       _fillSlots(prev, hq);
       it.sport ??= prev.sport;
       it.district ??= prev.district;
+      if (it.districts.isEmpty) it.districts.addAll(prev.districts);
       it.districtLabel ??= prev.districtLabel;
       it.namedVenue ??= q.split(' ').length <= 8 ? prev.namedVenue : null;
       if (it.sport != null && it.district != null) break;
@@ -328,12 +374,12 @@ Khung giờ vàng (từ 17:00) giá cao hơn khung tiêu chuẩn khoảng 20%.''
     }
 
     // Quận
-    final known = {..._districts, ..._venues.map((v) => RagText.norm(v.district))};
-    for (final d in known) {
-      if (d.isNotEmpty && q.contains(d)) {
-        it.district = d;
-        break;
-      }
+    final known = {..._districts, ..._venues.expand(_districtNames)};
+    final found = known.where((d) => d.isNotEmpty && q.contains(d)).toList()
+      ..sort((a, b) => q.indexOf(a).compareTo(q.indexOf(b)));
+    if (found.isNotEmpty) {
+      it.district = found.first;
+      it.districts.addAll(found);
     }
     // Địa điểm ngoài phạm vi dữ liệu (tỉnh/thành khác, quận/huyện lạ)
     if (it.district == null) {
@@ -352,7 +398,7 @@ Khung giờ vàng (từ 17:00) giá cao hơn khung tiêu chuẩn khoảng 20%.''
 
     // Ngày
     final today = it.date;
-    if (q.contains('ngay mai') || RegExp(r'\bmai$').hasMatch(q)) {
+    if (RegExp(r'\b(ngay mai|toi mai|sang mai|chieu mai|trua mai)\b|\bmai$').hasMatch(q)) {
       it.date = today.add(const Duration(days: 1));
       it.dateExplicit = true;
     } else if (q.contains('ngay kia') || q.contains('hom kia')) {
@@ -378,7 +424,8 @@ Khung giờ vàng (từ 17:00) giá cao hơn khung tiêu chuẩn khoảng 20%.''
       var h = int.parse(hm.group(1)!);
       if (h <= 12 && RegExp(r'\b(toi|chieu|pm)\b').hasMatch(q) && h < 12) h += 12;
       if (h >= 0 && h <= 23) it.hour = h;
-    } else if (q.contains('toi')) {
+    } else if (RegExp(r'\b(toi nay|buoi toi|toi mai|gio vang)\b').hasMatch(q)) {
+      // Không dùng "toi" đơn lẻ: sau khi bỏ dấu, "tôi" (đại từ) trùng với "tối"
       it.hour = 19;
     } else if (q.contains('sang som')) {
       it.hour = 6;
@@ -388,8 +435,17 @@ Khung giờ vàng (từ 17:00) giá cao hơn khung tiêu chuẩn khoảng 20%.''
     final pm = RegExp(r'(?:duoi|toi da|khong qua|<)\s*(\d{2,3})\s*(?:k|nghin|ngan)?').firstMatch(q);
     if (pm != null) it.maxPricePerHour = int.parse(pm.group(1)!);
 
+    // Hỏi mặt bằng giá: "giá trung bình", "giá sân cầu lông là bao nhiêu"
+    if (RegExp(r'\bgia\b|bao nhieu tien|het bao nhieu|chi phi|tien san').hasMatch(q) ||
+        RegExp(r'trung binh|binh quan|mat bang').hasMatch(q)) {
+      it.wantsStats = true;
+    }
+    if (RegExp(r'gio vang|gio cao diem|cao diem|gio dep|buoi toi|khung toi').hasMatch(q)) {
+      it.goldenHour = true;
+    }
+
     // Sắp xếp
-    if (RegExp(r'\b(re nhat|gia re|re re|tiet kiem|binh dan)\b').hasMatch(q)) it.cheapest = true;
+    if (RegExp(r'\b(re nhat|gia re|re re|re hon|re nua|gia thap hon|tiet kiem|binh dan)\b').hasMatch(q)) it.cheapest = true;
     if (RegExp(r'tot nhat|danh gia cao|chat luong|uy tin|dep nhat|xin nhat').hasMatch(q)) it.topRated = true;
     if (RegExp(r'gan nhat|gan day|gan toi|gan em|gan minh').hasMatch(q)) it.nearest = true;
 
@@ -412,6 +468,9 @@ Khung giờ vàng (từ 17:00) giá cao hơn khung tiêu chuẩn khoảng 20%.''
       it.amenities.add('mai_che');
     }
     if (RegExp(r'lien he|hotline|zalo|so dien thoai|sdt|tong dai|ho tro').hasMatch(q)) it.topics.add('contact');
+    if (RegExp(r'du doan|(ty|ti) le (huy|dat)|dong khach|vang khach|co dong|nhu cau (dat|san)|ngay nao (dong|vang)|bao nhieu (don|luot) (dat|huy)').hasMatch(q)) {
+      it.topics.add('forecast');
+    }
 
     // Tên sân cụ thể
     it.namedVenue ??= _findNamedVenue(q);
@@ -439,13 +498,81 @@ Khung giờ vàng (từ 17:00) giá cao hơn khung tiêu chuẩn khoảng 20%.''
 
   // ───────────────────────── Truy xuất ─────────────────────────
 
+  /// Ghi đè ý định bằng kết quả LLM hiểu câu hỏi (đã xét cả lịch sử hội thoại).
+  /// LLM hiểu ngôn ngữ tự nhiên tốt hơn luật cứng; luật chỉ còn là phương án dự phòng.
+  static void applyLlmIntent(RagIntent it, Map<String, dynamic> m) {
+    String? s(String k) {
+      final v = m[k];
+      return v is String && v.trim().isNotEmpty && v.trim().toLowerCase() != 'null' ? v.trim() : null;
+    }
+
+    int? n(String k) => m[k] is num ? (m[k] as num).round() : int.tryParse('${m[k]}');
+    bool b(String k) => m[k] == true;
+
+    final sport = s('sport');
+    it.sport = const {'pickleball', 'badminton', 'football', 'tennis'}.contains(sport) ? sport : null;
+
+    final known = {..._districts, ..._venues.expand(_districtNames)}..remove('');
+    it.districts.clear();
+    it.district = null;
+    it.unknownArea = null;
+    final dList = m['districts'] is List ? (m['districts'] as List).map((e) => RagText.norm('$e')).toList() : <String>[];
+    for (final d in dList) {
+      final hit = known.where((k) => d == k || d.contains(k) || k.contains(d)).toList();
+      if (hit.isNotEmpty && !it.districts.contains(hit.first)) it.districts.add(hit.first);
+    }
+    if (it.districts.isNotEmpty) {
+      it.district = it.districts.first;
+      final sample = _venues.where((v) => RagText.norm(v.district) == it.district);
+      it.districtLabel = sample.isNotEmpty ? sample.first.district : it.district;
+    } else {
+      it.districtLabel = null;
+      final other = s('other_area');
+      if (other != null) it.unknownArea = other;
+    }
+
+    final p = n('max_price_k');
+    it.maxPricePerHour = (p != null && p > 0) ? p : null;
+    final h = n('hour');
+    it.hour = (h != null && h >= 0 && h <= 23) ? h : null;
+    final ds = s('date');
+    if (ds != null) {
+      final d = DateTime.tryParse(ds);
+      if (d != null) {
+        it.date = DateTime(d.year, d.month, d.day);
+        it.dateExplicit = true;
+      }
+    }
+
+    it.wantsStats = b('wants_price_stats');
+    it.goldenHour = b('golden_hour');
+    it.cheapest = b('cheapest');
+    it.topRated = b('top_rated');
+    it.nearest = b('nearest');
+
+    it.amenities
+      ..clear()
+      ..addAll(((m['amenities'] as List?) ?? const []).map((e) => '$e').where(const {'den_dem', 'gui_xe', 'may_ban_bong', 'mai_che'}.contains));
+    it.topics
+      ..clear()
+      ..addAll(((m['topics'] as List?) ?? const []).map((e) => '$e').where(const {'cancel', 'fixed', 'payment', 'promo', 'guide', 'weather', 'contact', 'forecast'}.contains));
+
+    final vn = s('venue_name');
+    it.namedVenue = vn != null ? _findNamedVenue(RagText.norm(vn)) : null;
+    if (it.namedVenue != null) {
+      it.unknownArea = null;
+    }
+  }
+
   static Future<RagRetrievalResult> retrieve(
     String query, {
     List<String> history = const [],
     int topVenues = 4,
+    Map<String, dynamic>? llmIntent,
   }) async {
     await ensureLoaded();
     final intent = parseIntent(query, history: history);
+    if (llmIntent != null) applyLlmIntent(intent, llmIntent);
 
     // 1. Tìm sân bằng bộ lọc có cấu trúc
     List<Venue> venues = [];
@@ -500,8 +627,33 @@ Khung giờ vàng (từ 17:00) giá cao hơn khung tiêu chuẩn khoảng 20%.''
     b.writeln('=== TRI THỨC ALOBOOKING (đã truy xuất) ===');
     b.writeln('Hôm nay: ${_fmtDate(DateTime.now())}. Ngày khách hỏi: ${_fmtDate(intent.date)}.');
     b.writeln('Tổng số sân đang hoạt động trên hệ thống: ${_venues.length}.');
+    final statsList = <RagStats>[];
+    if (intent.wantsStats && intent.unknownArea == null && intent.namedVenue == null) {
+      if (intent.districts.length > 1) {
+        for (final d in intent.districts) {
+          final st = priceStats(intent, onlyDistrict: d);
+          if (st != null) statsList.add(st);
+        }
+      } else {
+        final st = priceStats(intent);
+        if (st != null) statsList.add(st);
+      }
+    }
+    final stats = statsList.isNotEmpty ? statsList.first : null;
+    if (stats != null) {
+      for (final st in statsList) {
+        b.writeln('\n## ${st.toText()}');
+      }
+      if (statsList.length > 1) {
+        b.writeln('Khách muốn SO SÁNH: hãy đặt các nhóm cạnh nhau và nói rõ nhóm nào rẻ hơn bao nhiêu.');
+      }
+      b.writeln('Khi khách hỏi giá trung bình/mặt bằng giá, trả lời bằng đúng các con số thống kê này (nhấn mạnh khung giờ khách hỏi), sau đó mới nêu vài sân làm ví dụ.');
+    }
     if (venues.isNotEmpty) {
       b.writeln('\n## SÂN PHÙ HỢP (${venues.length} kết quả, đã sắp xếp theo yêu cầu)');
+      if (intent.amenities.contains('mai_che')) {
+        b.writeln('LƯU Ý: dữ liệu KHÔNG ghi sân nào có mái che/trong nhà. Các sân dưới đây chỉ là cầu lông/pickleball (thường chơi trong nhà). Đừng khẳng định chắc chắn có mái che; hãy nói "thường là sân trong nhà" và khuyên khách hỏi Hotline 0364059999 để xác nhận.');
+      }
       for (var i = 0; i < venues.length; i++) {
         b.writeln('[Sân ${i + 1}]');
         b.writeln(_venueChunk(venues[i]).content);
@@ -520,15 +672,63 @@ Khung giờ vàng (từ 17:00) giá cao hơn khung tiêu chuẩn khoảng 20%.''
       b.writeln(c.content);
       b.writeln();
     }
+    String? forecastText;
+    if (intent.topics.contains('forecast')) {
+      try {
+        final w = await WeatherService.getCurrentWeather();
+        forecastText = DemandForecastService.buildPromptSection(_bookings, intent.date,
+            rainByDate: w.rainByDate, sport: intent.sport);
+      } catch (_) {
+        forecastText = DemandForecastService.buildPromptSection(_bookings, intent.date, sport: intent.sport);
+      }
+      b.writeln('\n$forecastText');
+    }
     b.writeln('=== HẾT TRI THỨC ===');
 
     return RagRetrievalResult(
       query: query,
       intent: intent,
+      stats: stats,
+      moreStats: statsList.length > 1 ? statsList.sublist(1) : const [],
       chunks: chunks,
       matchedVenues: venues,
       augmentedPromptText: b.toString(),
       totalVenues: _venues.length,
+      forecastText: forecastText,
+    );
+  }
+
+  /// Thống kê giá trên TOÀN BỘ sân thuộc môn/quận khách hỏi (không chỉ vài sân đầu).
+  static RagStats? priceStats(RagIntent it, {String? onlyDistrict}) {
+    final dist = onlyDistrict ?? it.district;
+    final list = _venues.where((v) {
+      if (it.sport != null && v.type.toLowerCase() != it.sport) return false;
+      if (dist != null && !RagText.norm(v.district).contains(dist)) return false;
+      return true;
+    }).toList();
+
+    final prices = <(int, int)>[];
+    var perMatch = 0;
+    for (final v in list) {
+      final p = priceRange(v.price);
+      if (p == null) continue;
+      prices.add(p);
+      if (v.price.toLowerCase().contains('/trận') || v.price.toLowerCase().contains('/tran')) perMatch++;
+    }
+    if (prices.isEmpty) return null;
+
+    final sportName = it.sport != null ? sportLabel(it.sport!).toLowerCase() : 'các môn';
+    final distSample = dist == null ? <Venue>[] : _venues.where((v) => RagText.norm(v.district) == dist).toList();
+    final distLabel = distSample.isNotEmpty ? distSample.first.district : (dist ?? it.districtLabel);
+    final label = 'sân $sportName${distLabel != null ? ' tại $distLabel' : ' toàn hệ thống'}';
+    return RagStats(
+      label: label,
+      count: prices.length,
+      avgLow: prices.fold<int>(0, (s, p) => s + p.$1) / prices.length,
+      avgHigh: prices.fold<int>(0, (s, p) => s + p.$2) / prices.length,
+      minLow: prices.map((p) => p.$1).reduce(math.min),
+      maxHigh: prices.map((p) => p.$2).reduce(math.max),
+      unit: perMatch * 2 > prices.length ? 'trận' : 'giờ',
     );
   }
 
@@ -543,14 +743,17 @@ Khung giờ vàng (từ 17:00) giá cao hơn khung tiêu chuẩn khoảng 20%.''
 
     var list = _venues.where((v) {
       if (it.sport != null && v.type.toLowerCase() != it.sport) return false;
-      if (it.district != null &&
-          !RagText.norm(v.district).contains(it.district!) &&
-          !RagText.norm(v.address).contains(it.district!)) {
-        return false;
+      if (it.district != null) {
+        final ds = it.districts.isNotEmpty ? it.districts : [it.district!];
+        final inArea = ds.any((d) =>
+            RagText.norm(v.district).contains(d) || RagText.norm(v.address).contains(d));
+        if (!inArea) return false;
       }
       if (it.maxPricePerHour != null) {
         final p = priceRange(v.price);
-        if (p == null || p.$1 > it.maxPricePerHour!) return false;
+        // Ngân sách áp dụng cho đúng khung giờ khách muốn chơi: từ 17h (hoặc hỏi giờ vàng) tính giá cao
+        final peak = (it.hour ?? 0) >= 17 || it.goldenHour;
+        if (p == null || (peak ? p.$2 : p.$1) > it.maxPricePerHour!) return false;
       }
       if (it.amenities.contains('den_dem') && !hasTag(v, RegExp(r'den'))) return false;
       if (it.amenities.contains('gui_xe') && !hasTag(v, RegExp(r'gui xe|do xe'))) return false;
@@ -573,7 +776,10 @@ Khung giờ vàng (từ 17:00) giá cao hơn khung tiêu chuẩn khoảng 20%.''
     if (list.isEmpty && (it.sport != null || it.district != null)) {
       list = _venues.where((v) {
         if (it.sport != null && v.type.toLowerCase() != it.sport) return false;
-        if (it.district != null && !RagText.norm(v.district).contains(it.district!)) return false;
+        if (it.district != null) {
+          final ds = it.districts.isNotEmpty ? it.districts : [it.district!];
+          if (!ds.any((d) => RagText.norm(v.district).contains(d))) return false;
+        }
         return true;
       }).toList();
     }
@@ -668,6 +874,14 @@ Khung giờ vàng (từ 17:00) giá cao hơn khung tiêu chuẩn khoảng 20%.''
     final m = RegExp(r'(\d{1,2}):?\d{0,2}\s*[–-]\s*(\d{1,2}):?\d{0,2}').firstMatch(hours);
     if (m == null) return true;
     return hour >= int.parse(m.group(1)!) && hour < int.parse(m.group(2)!);
+  }
+
+  /// Tên khu vực của sân để nhận diện trong câu hỏi: đầy đủ và bỏ tiền tố "phường/xã"
+  /// (sân nhập từ OpenStreetMap ghi theo phường/xã: "Phường Xuân Đỉnh" ~ "xuân đỉnh").
+  static Iterable<String> _districtNames(Venue v) {
+    final full = RagText.norm(v.district);
+    final short = full.replaceFirst(RegExp(r'^(phuong|xa) '), '');
+    return {full, short};
   }
 
   static double _km(String d) => double.tryParse(RegExp(r'[\d.]+').stringMatch(d) ?? '') ?? 999;

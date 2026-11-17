@@ -2,8 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../models/venue.dart';
 import '../widgets/venue_image_view.dart';
-import '../widgets/booking_bottom_sheet.dart';
 import '../services/auth_service.dart';
+import '../services/booking_slots.dart';
+import '../services/firestore_service.dart';
 import 'visual_booking_screen.dart';
 
 class VenueDetailScreen extends StatefulWidget {
@@ -27,38 +28,109 @@ class _VenueDetailScreenState extends State<VenueDetailScreen> with SingleTicker
   late bool _isFav;
   final List<String> _tabs = [
     'Thông tin',
-    'Gói hội viên',
-    'Dịch vụ',
     'Hình ảnh',
-    'Điều khoản & quy định',
+    'Quy định',
     'Đánh giá',
   ];
+
+  // Đánh giá thật của khách đã chơi tại sân này
+  List<ReviewItem> _reviews = [];
+  bool _reviewsLoading = true;
+  bool _canReview = false;
 
   @override
   void initState() {
     super.initState();
     _isFav = widget.isFavorite;
     _tabController = TabController(length: _tabs.length, vsync: this);
+    _loadReviews();
+  }
+
+  Future<void> _loadReviews() async {
+    final reviews = await FirestoreService.getReviews(widget.venue.id);
+    var can = false;
+    final user = AuthService.currentUser;
+    if (user != null && !AuthService.isGuest) {
+      final bookings = await FirestoreService.getBookings();
+      final now = DateTime.now();
+      final played = bookings.any((b) {
+        if (b.venueName.trim().toLowerCase() != widget.venue.name.trim().toLowerCase()) return false;
+        if (!b.belongsTo(uid: user.uid, phone: user.phone, name: user.fullName)) return false;
+        if (BookingSlots.isCancelled(b.status) || b.status.toLowerCase().contains('chờ')) return false;
+        final d = BookingSlots.parseDate(b.date);
+        final r = BookingSlots.parseRanges(b.time);
+        if (d == null) return false;
+        final endMin = r.isEmpty ? 24 * 60 : r.last.$2;
+        return DateTime(d.year, d.month, d.day).add(Duration(minutes: endMin)).isBefore(now);
+      });
+      can = played && !reviews.any((r) => r.userId == user.uid);
+    }
+    if (!mounted) return;
+    setState(() {
+      _reviews = reviews;
+      _canReview = can;
+      _reviewsLoading = false;
+    });
+  }
+
+  Future<void> _writeReview() async {
+    var stars = 5;
+    final ctrl = TextEditingController();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setD) => AlertDialog(
+          title: const Text('Đánh giá sân', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 17)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  for (var i = 1; i <= 5; i++)
+                    IconButton(
+                      onPressed: () => setD(() => stars = i),
+                      icon: Icon(i <= stars ? Icons.star_rounded : Icons.star_border_rounded,
+                          color: const Color(0xFFF59E0B), size: 30),
+                    ),
+                ],
+              ),
+              TextField(
+                controller: ctrl,
+                maxLines: 4,
+                maxLength: 500,
+                decoration: const InputDecoration(hintText: 'Chia sẻ trải nghiệm của bạn tại sân này', border: OutlineInputBorder()),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Hủy')),
+            FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Gửi đánh giá')),
+          ],
+        ),
+      ),
+    );
+    if (ok != true || !mounted) return;
+    final user = AuthService.currentUser!;
+    final saved = await FirestoreService.addReview(ReviewItem(
+      id: 'RV-${DateTime.now().millisecondsSinceEpoch}',
+      venueId: widget.venue.id,
+      userId: user.uid,
+      userName: user.fullName,
+      stars: stars,
+      comment: ctrl.text.trim(),
+    ));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(saved ? 'Cảm ơn bạn đã đánh giá!' : 'Chưa gửi được đánh giá, vui lòng thử lại')),
+    );
+    if (saved) _loadReviews();
   }
 
   @override
   void dispose() {
     _tabController.dispose();
     super.dispose();
-  }
-
-  String _generateSlug(String name) {
-    return name
-        .toLowerCase()
-        .replaceAll(RegExp(r'[àáạảãâầấậẩẫăằắặẳẵ]'), 'a')
-        .replaceAll(RegExp(r'[èéẹẻẽêềếệểễ]'), 'e')
-        .replaceAll(RegExp(r'[ìíịỉĩ]'), 'i')
-        .replaceAll(RegExp(r'[òóọỏõôồốộổỗơờớợởỡ]'), 'o')
-        .replaceAll(RegExp(r'[ùúụủũưừứựửữ]'), 'u')
-        .replaceAll(RegExp(r'[ỳýỵỷỹ]'), 'y')
-        .replaceAll(RegExp(r'[đ]'), 'd')
-        .replaceAll(RegExp(r'[^a-z0-9]'), '_')
-        .replaceAll(RegExp(r'_+'), '_');
   }
 
   void _openBookingSheet() {
@@ -149,8 +221,7 @@ class _VenueDetailScreenState extends State<VenueDetailScreen> with SingleTicker
   @override
   Widget build(BuildContext context) {
     final v = widget.venue;
-    final slug = _generateSlug(v.name);
-    final bookingUrl = 'https://datlich.alobo.vn/san/sport_${v.type}_$slug';
+    final shareText = '${v.name}\n${v.address}\nGiờ mở cửa: ${v.hours}\nGiá: ${v.price}';
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -181,9 +252,9 @@ class _VenueDetailScreenState extends State<VenueDetailScreen> with SingleTicker
                     child: IconButton(
                       icon: const Icon(Icons.share, color: Color(0xFF0F172A), size: 18),
                       onPressed: () {
-                        Clipboard.setData(ClipboardData(text: bookingUrl));
+                        Clipboard.setData(ClipboardData(text: shareText));
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Đã sao chép link chia sẻ sân!')),
+                          const SnackBar(content: Text('Đã sao chép thông tin sân để chia sẻ')),
                         );
                       },
                     ),
@@ -284,7 +355,7 @@ class _VenueDetailScreenState extends State<VenueDetailScreen> with SingleTicker
                                 const Icon(Icons.star, color: Colors.white, size: 16),
                                 const SizedBox(width: 5),
                                 Text(
-                                  v.rating > 0 ? '${v.rating} ★ (120 đánh giá)' : 'Chưa có đánh giá',
+                                  v.rating > 0 ? '${v.rating} ★' : 'Chưa có đánh giá',
                                   style: const TextStyle(
                                     color: Colors.white,
                                     fontWeight: FontWeight.bold,
@@ -513,22 +584,9 @@ class _VenueDetailScreenState extends State<VenueDetailScreen> with SingleTicker
         body: TabBarView(
           controller: _tabController,
           children: [
-            // 1. Tab THÔNG TIN (khớp 100% với ảnh của người dùng)
-            _buildTabInfo(bookingUrl),
-
-            // 2. Tab GÓI HỘI VIÊN
-            _buildTabMemberships(),
-
-            // 3. Tab DỊCH VỤ
-            _buildTabServices(),
-
-            // 4. Tab HÌNH ẢNH
+            _buildTabInfo(),
             _buildTabGallery(),
-
-            // 5. Tab ĐIỀU KHOẢN & QUY ĐỊNH
             _buildTabRules(),
-
-            // 6. Tab ĐÁNH GIÁ
             _buildTabReviews(),
           ],
         ),
@@ -587,103 +645,216 @@ class _VenueDetailScreenState extends State<VenueDetailScreen> with SingleTicker
     );
   }
 
-  // 1. Tab THÔNG TIN
-  Widget _buildTabInfo(String bookingUrl) {
+  // 1. Tab THÔNG TIN: chỉ hiển thị dữ liệu thật của sân
+  Widget _buildTabInfo() {
+    final v = widget.venue;
+    Widget row(IconData icon, String label, String value) => Padding(
+          padding: const EdgeInsets.symmetric(vertical: 7),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(icon, size: 18, color: const Color(0xFF15803D)),
+              const SizedBox(width: 10),
+              SizedBox(width: 92, child: Text(label, style: const TextStyle(fontSize: 12.5, color: Color(0xFF64748B)))),
+              Expanded(
+                child: Text(value.isEmpty ? 'Chưa cập nhật' : value,
+                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF0F172A))),
+              ),
+            ],
+          ),
+        );
+    const sportNames = {
+      'pickleball': 'Pickleball',
+      'badminton': 'Cầu lông',
+      'football': 'Bóng đá',
+      'tennis': 'Tennis',
+      'basketball': 'Bóng rổ',
+    };
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Section: Link đặt lịch online (màu cam như trong ảnh)
-          const Text(
-            'Link đặt lịch online',
-            style: TextStyle(
-              color: Color(0xFFEA580C), // Orange color from screenshot
-              fontWeight: FontWeight.bold,
-              fontSize: 14,
-            ),
-          ),
+          const Text('Thông tin cụm sân', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF0F172A))),
           const SizedBox(height: 6),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF8FAFC),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: const Color(0xFFE2E8F0)),
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    bookingUrl,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: Color(0xFF0F766E),
-                      fontStyle: FontStyle.italic,
-                    ),
-                  ),
+          row(Icons.sports_tennis, 'Môn', sportNames[v.type] ?? v.type),
+          row(Icons.location_on_outlined, 'Địa chỉ', v.address),
+          row(Icons.map_outlined, 'Khu vực', v.district),
+          row(Icons.grid_view_rounded, 'Số sân', '${v.courts} sân'),
+          row(Icons.schedule_rounded, 'Giờ mở cửa', v.hours),
+          row(Icons.payments_outlined, 'Giá', v.price),
+          row(Icons.qr_code_2_rounded, 'Thanh toán', 'Chuyển khoản VietQR (không nhận tiền mặt)'),
+          if (v.ownerName.trim().isNotEmpty) row(Icons.person_outline_rounded, 'Quản lý', v.ownerName),
+          if (v.fromOpenStreetMap)
+            Padding(
+              padding: const EdgeInsets.only(top: 10),
+              child: Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF1F5F9),
+                  borderRadius: BorderRadius.circular(8),
                 ),
-                const SizedBox(width: 8),
-                InkWell(
-                  onTap: () {
-                    Clipboard.setData(ClipboardData(text: bookingUrl));
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Đã sao chép link đặt lịch online!')),
-                    );
-                  },
-                  child: const Icon(
-                    Icons.copy,
-                    color: Color(0xFF0F766E),
-                    size: 19,
-                  ),
+                child: const Text(
+                  'Vị trí và thông tin cơ bản lấy từ dữ liệu mở © OpenStreetMap contributors (giấy phép ODbL). '
+                  'Giá thuê, giờ mở cửa và số sân là mức tham khảo theo mặt bằng chung của môn này, '
+                  'chưa được cơ sở xác nhận; vui lòng liên hệ trực tiếp để xác nhận trước khi đặt.',
+                  style: TextStyle(fontSize: 12, height: 1.4, color: Color(0xFF475569)),
                 ),
-              ],
+              ),
             ),
-          ),
-          const SizedBox(height: 20),
-
-          // Giới thiệu sân
-          const Text('Giới thiệu cụm sân', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF0F172A))),
-          const SizedBox(height: 6),
-          Text(
-            'Cụm sân ${widget.venue.name} đạt tiêu chuẩn thi đấu quốc gia với mặt thảm chống trơn trượt cao cấp, hệ thống đèn LED chống lóa, trần cao thoáng mát. Đầy đủ các tiện ích phục vụ người chơi thể thao chuyên nghiệp và phong trào.',
-            style: const TextStyle(fontSize: 13, color: Color(0xFF475569), height: 1.5),
-          ),
-          const SizedBox(height: 20),
-
-          // Tiện ích nổi bật
-          const Text('Tiện ích có sẵn', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF0F172A))),
+          const SizedBox(height: 18),
+          const Text('Tiện ích', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF0F172A))),
           const SizedBox(height: 10),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              _facilityChip(Icons.roofing, 'Mái che cao'),
-              _facilityChip(Icons.lightbulb_outline, 'Đèn LED ban đêm'),
-              _facilityChip(Icons.local_parking, 'Bãi đỗ ô tô & xe máy'),
-              _facilityChip(Icons.shower, 'Phòng tắm nóng lạnh'),
-              _facilityChip(Icons.local_drink, 'Nước uống miễn phí'),
-              _facilityChip(Icons.wifi, 'Wifi tốc độ cao'),
-              _facilityChip(Icons.sports, 'Cho thuê vợt & bóng'),
-              _facilityChip(Icons.fastfood, 'Căn tin giải khát'),
-            ],
-          ),
-          const SizedBox(height: 20),
-
-          // Sơ đồ cụm sân
-          const Text('Sơ đồ các sân con', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF0F172A))),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(child: _courtBox('Sân #1', 'Thảm Pro', true)),
-              const SizedBox(width: 8),
-              Expanded(child: _courtBox('Sân #2', 'Thảm Pro', true)),
-              const SizedBox(width: 8),
-              Expanded(child: _courtBox('Sân #3', 'Sân VIP', false)),
-            ],
-          ),
+          if (v.tags.isEmpty)
+            const Text('Sân chưa cập nhật thông tin tiện ích.', style: TextStyle(fontSize: 12.5, color: Color(0xFF64748B)))
+          else
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [for (final t in v.tags) _facilityChip(Icons.check_circle_outline_rounded, t)],
+            ),
         ],
       ),
+    );
+  }
+
+  // 3. Tab QUY ĐỊNH
+  Widget _buildTabRules() {
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF8FAFC),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
+          ),
+          child: const Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.event_busy_rounded, color: Color(0xFF15803D), size: 16),
+                  SizedBox(width: 8),
+                  Text('Hủy lịch và hoàn tiền',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF0F172A))),
+                ],
+              ),
+              SizedBox(height: 6),
+              Text(
+                'Bạn có thể hủy lịch sắp diễn ra trong mục "Lịch sử đặt sân". Việc hoàn tiền (nếu đã thanh toán trước) '
+                'do chủ sân xử lý theo chính sách riêng của từng sân. Nếu cần hỗ trợ, hãy liên hệ chủ sân hoặc Hotline/Zalo 0364059999.',
+                style: TextStyle(fontSize: 12, color: Color(0xFF64748B), height: 1.45),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        const Text(
+          'Quy định chi tiết về trang phục, giờ nhận sân và dịch vụ đi kèm do từng cụm sân quy định. '
+          'Vui lòng hỏi trực tiếp chủ sân trước khi đặt.',
+          style: TextStyle(fontSize: 12, color: Color(0xFF64748B), height: 1.45),
+        ),
+      ],
+    );
+  }
+
+  // 4. Tab ĐÁNH GIÁ: đánh giá thật của khách đã chơi
+  Widget _buildTabReviews() {
+    if (_reviewsLoading) {
+      return const Center(child: CircularProgressIndicator(color: Color(0xFF15803D)));
+    }
+    final avg = _reviews.isEmpty ? null : _reviews.fold<int>(0, (a, r) => a + r.stars) / _reviews.length;
+    final shown = avg ?? (widget.venue.rating > 0 ? widget.venue.rating : null);
+    String fmt(DateTime d) =>
+        '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
+
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF0FDF4),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: const Color(0xFF86EFAC)),
+          ),
+          child: Row(
+            children: [
+              Text(
+                shown == null ? '—' : shown.toStringAsFixed(1),
+                style: const TextStyle(fontSize: 32, fontWeight: FontWeight.w900, color: Color(0xFF15803D)),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Text(
+                  _reviews.isEmpty
+                      ? 'Chưa có đánh giá nào từ khách đã đặt sân.'
+                      : '${_reviews.length} đánh giá từ khách đã chơi tại sân này.',
+                  style: const TextStyle(fontSize: 12.5, color: Color(0xFF475569)),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        if (_canReview)
+          OutlinedButton.icon(
+            onPressed: _writeReview,
+            icon: const Icon(Icons.rate_review_outlined, size: 18),
+            label: const Text('Viết đánh giá'),
+          )
+        else
+          const Text(
+            'Chỉ khách đã chơi xong tại sân này mới có thể viết đánh giá.',
+            style: TextStyle(fontSize: 11.5, color: Color(0xFF94A3B8)),
+          ),
+        const SizedBox(height: 12),
+        ..._reviews.map((r) => Container(
+              margin: const EdgeInsets.only(bottom: 12),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          CircleAvatar(
+                            radius: 14,
+                            backgroundColor: const Color(0xFF15803D).withValues(alpha: 0.12),
+                            child: Text(
+                              r.userName.isEmpty ? '?' : r.userName.substring(0, 1).toUpperCase(),
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF15803D)),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(r.userName.isEmpty ? 'Khách' : r.userName,
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5)),
+                        ],
+                      ),
+                      Text(fmt(r.createdAt), style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 11)),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: List.generate(r.stars, (_) => const Icon(Icons.star, color: Color(0xFFF59E0B), size: 13)),
+                  ),
+                  if (r.comment.isNotEmpty) ...[
+                    const SizedBox(height: 6),
+                    Text(r.comment, style: const TextStyle(fontSize: 12, color: Color(0xFF334155), height: 1.35)),
+                  ],
+                ],
+              ),
+            )),
+      ],
     );
   }
 
@@ -702,182 +873,6 @@ class _VenueDetailScreenState extends State<VenueDetailScreen> with SingleTicker
           Text(label, style: const TextStyle(fontSize: 12, color: Color(0xFF334155))),
         ],
       ),
-    );
-  }
-
-  Widget _courtBox(String name, String type, bool isAvailable) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
-      decoration: BoxDecoration(
-        color: isAvailable ? const Color(0xFFF0FDF4) : const Color(0xFFFEF2F2),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: isAvailable ? const Color(0xFF86EFAC) : const Color(0xFFFECACA)),
-      ),
-      child: Column(
-        children: [
-          Text(name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF0F172A))),
-          const SizedBox(height: 2),
-          Text(type, style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
-          const SizedBox(height: 4),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-            decoration: BoxDecoration(
-              color: isAvailable ? const Color(0xFF16A34A) : const Color(0xFFDC2626),
-              borderRadius: BorderRadius.circular(4),
-            ),
-            child: Text(
-              isAvailable ? 'Đang trống' : 'Có lịch đặt',
-              style: const TextStyle(color: Colors.white, fontSize: 9.5, fontWeight: FontWeight.bold),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // 2. Tab GÓI HỘI VIÊN
-  Widget _buildTabMemberships() {
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        _membershipCard('Gói Tháng Linh Hoạt', '800.000đ/tháng', 'Giảm 15% so với đặt lẻ', [
-          'Cố định 2 buổi / tuần',
-          'Ưu tiên giữ sân khung giờ vàng (17h - 21h)',
-          'Tặng 1 buổi tập miễn phí với HLV',
-        ]),
-        const SizedBox(height: 12),
-        _membershipCard('Gói Quý VIP', '2.200.000đ/quý', 'Tiết kiệm 20%', [
-          'Cố định 3 buổi / tuần',
-          'Miễn phí 100% dịch vụ gửi xe',
-          'Tặng 2 lốc nước Pocari Sweat mỗi tháng',
-          'Đổi lịch linh hoạt trước 6 tiếng',
-        ]),
-        const SizedBox(height: 12),
-        _membershipCard('Gói Năm Kim Cương', '7.900.000đ/năm', 'Tiết kiệm 30% cao cấp', [
-          'Chơi không giới hạn khung giờ thường',
-          'Tặng bộ vợt và bóng chính hãng',
-          'Ưu tiên đăng ký giải đấu nội bộ',
-        ]),
-      ],
-    );
-  }
-
-  Widget _membershipCard(String title, String price, String badge, List<String> benefits) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-        boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 6),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF0F172A))),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(color: const Color(0xFFFEF3C7), borderRadius: BorderRadius.circular(10)),
-                child: Text(badge, style: const TextStyle(color: Color(0xFFD97706), fontSize: 10.5, fontWeight: FontWeight.bold)),
-              ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          Text(price, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: Color(0xFF15803D))),
-          const SizedBox(height: 8),
-          const Divider(height: 1),
-          const SizedBox(height: 8),
-          ...benefits.map((b) => Padding(
-                padding: const EdgeInsets.symmetric(vertical: 2),
-                child: Row(
-                  children: [
-                    const Icon(Icons.check_circle, size: 14, color: Color(0xFF10B981)),
-                    const SizedBox(width: 6),
-                    Text(b, style: const TextStyle(fontSize: 12, color: Color(0xFF475569))),
-                  ],
-                ),
-              )),
-          const SizedBox(height: 10),
-          SizedBox(
-            width: double.infinity,
-            child: OutlinedButton(
-              onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Đã chọn $title. Vui lòng liên hệ ban quản lý để kích hoạt!')),
-                );
-              },
-              style: OutlinedButton.styleFrom(
-                foregroundColor: const Color(0xFF15803D),
-                side: const BorderSide(color: Color(0xFF15803D)),
-              ),
-              child: const Text('Đăng Ký Gói Hội Viên'),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // 3. Tab DỊCH VỤ
-  Widget _buildTabServices() {
-    final services = [
-      {'name': 'Thuê vợt thể thao cao cấp', 'price': '30.000đ / buổi', 'icon': Icons.sports_tennis},
-      {'name': 'Mua bóng / quả cầu thi đấu', 'price': '25.000đ - 60.000đ / quả', 'icon': Icons.sports_baseball},
-      {'name': 'Nước uống giải khát (Pocari, Revive...)', 'price': '15.000đ - 25.000đ / chai', 'icon': Icons.local_drink},
-      {'name': 'Dịch vụ căng cước vợt lấy ngay', 'price': '80.000đ - 150.000đ / lần', 'icon': Icons.build},
-      {'name': 'Huấn luyện viên kèm 1-1', 'price': '250.000đ / giờ', 'icon': Icons.person},
-      {'name': 'Trọng tài điều hành trận đấu', 'price': '150.000đ / trận', 'icon': Icons.sports},
-    ];
-
-    return ListView.separated(
-      padding: const EdgeInsets.all(16),
-      itemCount: services.length,
-      separatorBuilder: (_, __) => const Divider(height: 16),
-      itemBuilder: (_, idx) {
-        final s = services[idx];
-        return Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF1F5F9),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Icon(s['icon'] as IconData, color: const Color(0xFF15803D), size: 22),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(s['name'] as String, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF0F172A))),
-                  const SizedBox(height: 2),
-                  Text(s['price'] as String, style: const TextStyle(fontSize: 12, color: Color(0xFF15803D), fontWeight: FontWeight.w600)),
-                ],
-              ),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Đã thêm yêu cầu: ${s['name']}')),
-                );
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFF1F5F9),
-                foregroundColor: const Color(0xFF0F172A),
-                elevation: 0,
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              ),
-              child: const Text('Chọn', style: TextStyle(fontSize: 12)),
-            ),
-          ],
-        );
-      },
     );
   }
 
@@ -906,147 +901,6 @@ class _VenueDetailScreenState extends State<VenueDetailScreen> with SingleTicker
     );
   }
 
-  // 5. Tab ĐIỀU KHOẢN & QUY ĐỊNH
-  Widget _buildTabRules() {
-    final rules = [
-      {'title': 'Chính sách hủy và hoàn tiền', 'desc': 'Khách hàng hủy trước 12 tiếng được hoàn 100% tiền cọc. Hủy từ 6-12 tiếng hoàn 50%. Sau thời gian này không hoàn cọc.'},
-      {'title': 'Quy định trang phục thi đấu', 'desc': 'Bắt buộc mang giày thể thao chuyên dụng có đế mềm để bảo vệ thảm sân. Không mang giày tây, dép lê vào khu vực sân.'},
-      {'title': 'Vệ sinh & An toàn', 'desc': 'Nghiêm cấm hút thuốc, mang kẹo cao su, rượu bia hoặc các chất dễ cháy nổ vào khu vực thi đấu. Giữ trật tự chung sau 22h đêm.'},
-      {'title': 'Check-in đúng giờ', 'desc': 'Quý khách vui lòng đến trước giờ đặt 10 phút để nhận sân và làm thủ tục check-in tại quầy lễ tân.'},
-    ];
-
-    return ListView.separated(
-      padding: const EdgeInsets.all(16),
-      itemCount: rules.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 12),
-      itemBuilder: (_, idx) {
-        final r = rules[idx];
-        return Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: const Color(0xFFF8FAFC),
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: const Color(0xFFE2E8F0)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  const Icon(Icons.verified, color: Color(0xFF15803D), size: 16),
-                  const SizedBox(width: 8),
-                  Expanded(child: Text(r['title']!, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF0F172A)))),
-                ],
-              ),
-              const SizedBox(height: 6),
-              Text(r['desc']!, style: const TextStyle(fontSize: 12, color: Color(0xFF64748B), height: 1.4)),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  // 6. Tab ĐÁNH GIÁ
-  Widget _buildTabReviews() {
-    final reviews = [
-      {'name': 'Nguyễn Văn An', 'stars': 5, 'date': '30/10/2026', 'comment': 'Sân rất đẹp, mặt thảm bám tốt, hệ thống đèn sáng không bị lóa mắt. Chủ sân nhiệt tình!'},
-      {'name': 'Trần Thị Bích', 'stars': 5, 'date': '28/10/2026', 'comment': 'Bãi đỗ xe rộng rãi, có phòng tắm nóng lạnh sạch sẽ. Giá cả rất hợp lý cho nhóm bạn.'},
-      {'name': 'Lê Hoàng Nam', 'stars': 4, 'date': '25/10/2026', 'comment': 'Sân thoáng, đặt lịch trên app rất nhanh và tiện lợi. Sẽ quay lại thường xuyên.'},
-    ];
-
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        // Tổng điểm
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: const Color(0xFFF0FDF4),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0xFF86EFAC)),
-          ),
-          child: Row(
-            children: [
-              Column(
-                children: [
-                  Text(
-                    widget.venue.rating > 0 ? widget.venue.rating.toStringAsFixed(1) : '4.8',
-                    style: const TextStyle(fontSize: 32, fontWeight: FontWeight.w900, color: Color(0xFF15803D)),
-                  ),
-                  const Row(
-                    children: [
-                      Icon(Icons.star, color: Color(0xFFF59E0B), size: 14),
-                      Icon(Icons.star, color: Color(0xFFF59E0B), size: 14),
-                      Icon(Icons.star, color: Color(0xFFF59E0B), size: 14),
-                      Icon(Icons.star, color: Color(0xFFF59E0B), size: 14),
-                      Icon(Icons.star, color: Color(0xFFF59E0B), size: 14),
-                    ],
-                  ),
-                ],
-              ),
-              const SizedBox(width: 20),
-              const Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Đánh giá chất lượng dịch vụ', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF0F172A))),
-                    SizedBox(height: 4),
-                    Text('98% người chơi hài lòng và muốn quay lại cụm sân này.', style: TextStyle(fontSize: 11.5, color: Color(0xFF475569))),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 16),
-
-        ...reviews.map((r) => Container(
-              margin: const EdgeInsets.only(bottom: 12),
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: const Color(0xFFE2E8F0)),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Row(
-                        children: [
-                          CircleAvatar(
-                            radius: 14,
-                            backgroundColor: const Color(0xFF15803D).withOpacity(0.12),
-                            child: Text(
-                              (r['name'] as String).substring(0, 1),
-                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF15803D)),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Text(r['name'] as String, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5)),
-                        ],
-                      ),
-                      Text(r['date'] as String, style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 11)),
-                    ],
-                  ),
-                  const SizedBox(height: 6),
-                  Row(
-                    children: List.generate(
-                      r['stars'] as int,
-                      (_) => const Icon(Icons.star, color: Color(0xFFF59E0B), size: 13),
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(r['comment'] as String, style: const TextStyle(fontSize: 12, color: Color(0xFF334155), height: 1.35)),
-                ],
-              ),
-            )),
-      ],
-    );
-  }
 }
 
 class _TabBarHeaderDelegate extends SliverPersistentHeaderDelegate {

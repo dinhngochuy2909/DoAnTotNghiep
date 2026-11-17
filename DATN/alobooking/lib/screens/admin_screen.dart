@@ -3,12 +3,17 @@ import 'package:flutter/material.dart';
 import '../models/venue.dart';
 import '../models/customer.dart';
 import '../models/payment.dart';
-import '../data/venues_data.dart';
 import '../services/firestore_service.dart';
 import '../services/auth_service.dart';
 import 'home_screen.dart';
 import 'login_screen.dart';
 import '../widgets/venue_image_view.dart';
+import 'package:flutter/services.dart';
+import '../widgets/admin_ui.dart';
+import '../services/admin_stats.dart';
+import '../services/booking_slots.dart';
+import '../services/demand_forecast_service.dart';
+import '../services/weather_service.dart';
 
 class AdminScreen extends StatefulWidget {
   final List<Venue> initialVenues;
@@ -45,7 +50,14 @@ class _AdminScreenState extends State<AdminScreen> {
   String _searchCustomerQuery = '';
   String _selectedCustomerRank = 'all'; // 'all' | 'vip' | 'active' | 'locked'
   String _searchPaymentQuery = '';
-  String _selectedPaymentMethod = 'all'; // 'all' | 'VietQR Pro' | 'Ví MoMo' | 'VNPay QR' | 'Tiền mặt'
+  String _selectedPaymentMethod = 'all'; // 'all' | 'VietQR' | 'Ví MoMo' | 'VNPay QR'
+
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+  Map<String, DayRain> _rainByDate = {};
+  DateTime? _lastLoaded;
+  String? _loadError;
+  DemandModel? _model;
+  List<BookingItem>? _modelFor;
 
   final List<String> _districts = [
     'Cầu Giấy', 'Đống Đa', 'Ba Đình', 'Hoàn Kiếm', 'Hai Bà Trưng',
@@ -104,7 +116,7 @@ class _AdminScreenState extends State<AdminScreen> {
     _selectedNavIndex = (widget.initialTabIndex >= 0 && widget.initialTabIndex < 5)
         ? widget.initialTabIndex
         : 0;
-    _venues = List.from(widget.initialVenues.isNotEmpty ? widget.initialVenues : sampleVenues);
+    _venues = List.from(widget.initialVenues);
     _loadData();
   }
 
@@ -114,20 +126,40 @@ class _AdminScreenState extends State<AdminScreen> {
   }
 
   Future<void> _loadData() async {
-    setState(() => _isLoading = true);
-    final fetchedVenues = await FirestoreService.getVenues();
-    final fetchedBookings = await FirestoreService.getBookings();
-    final fetchedCustomers = await FirestoreService.getCustomers();
-    final fetchedPayments = await FirestoreService.getPayments();
     setState(() {
-      if (fetchedVenues.isNotEmpty) {
-        _venues = fetchedVenues;
-      }
-      _bookings = fetchedBookings;
-      _customers = fetchedCustomers;
-      _payments = fetchedPayments;
-      _isLoading = false;
+      _isLoading = true;
+      _loadError = null;
     });
+    FirestoreService.lastLoadFailed = false;
+    try {
+      final results = await Future.wait<Object?>([
+        FirestoreService.getVenues(),
+        FirestoreService.getBookings(),
+        FirestoreService.getCustomers(),
+        FirestoreService.getPayments(),
+        WeatherService.getCurrentWeather(),
+      ]);
+      if (!mounted) return;
+      setState(() {
+        final v = results[0] as List<Venue>;
+        if (v.isNotEmpty) _venues = v;
+        _bookings = results[1] as List<BookingItem>;
+        _customers = FirestoreService.enrichCustomers(results[2] as List<CustomerItem>, _bookings);
+        _payments = results[3] as List<PaymentItem>;
+        if (FirestoreService.lastLoadFailed) {
+          _loadError = 'Một số dữ liệu chưa tải được từ máy chủ nên danh sách có thể chưa đầy đủ. Bấm làm mới để thử lại.';
+        }
+        _rainByDate = (results[4] as WeatherData).rainByDate;
+        _lastLoaded = DateTime.now();
+        _isLoading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _loadError = 'Không tải được dữ liệu. Kiểm tra kết nối rồi bấm làm mới.';
+      });
+    }
   }
 
   void _showToast(String msg, {bool isError = false}) {
@@ -180,443 +212,177 @@ class _AdminScreenState extends State<AdminScreen> {
   }
 
   // ==========================================
-  // BUILD MAIN SCAFFOLD - SIDEBAR LAYOUT
+  // KHUNG TRANG QUẢN TRỊ (sidebar + thanh trên), tự thu gọn theo độ rộng
   // ==========================================
+  static const _tabTitles = ['Tổng quan', 'Quản lý sân', 'Đơn đặt sân', 'Khách hàng', 'Thanh toán'];
+  static const _tabSubtitles = [
+    'Doanh thu, đơn đặt sân và dự báo nhu cầu từ dữ liệu thực',
+    'Duyệt sân, cập nhật thông tin và bảng giá',
+    'Theo dõi và xử lý lịch đặt của khách',
+    'Hồ sơ khách hàng và hạng thành viên',
+    'Giao dịch và đối soát thanh toán',
+  ];
+
   @override
   Widget build(BuildContext context) {
     return Theme(
       data: ThemeData.dark(useMaterial3: true).copyWith(
-        scaffoldBackgroundColor: const Color(0xFF050B18),
+        scaffoldBackgroundColor: AdminUi.bg,
+        dividerColor: AdminUi.border,
         colorScheme: const ColorScheme.dark(
-          primary: Color(0xFF10B981),
-          secondary: Color(0xFF34D399),
-          surface: Color(0xFF0F1F35),
+          primary: AdminUi.accent,
+          secondary: AdminUi.accent,
+          surface: AdminUi.surface,
         ),
-        textTheme: ThemeData.dark().textTheme.apply(
-          fontFamily: 'Be Vietnam Pro',
-        ),
+        textTheme: ThemeData.dark().textTheme.apply(fontFamily: 'Be Vietnam Pro'),
       ),
-      child: Scaffold(
-        backgroundColor: const Color(0xFF050B18),
-        body: _isLoading
-            ? const Center(child: CircularProgressIndicator(color: Color(0xFF10B981)))
-            : Row(
-                children: [
-                  // ── SIDEBAR ──
-                  _buildSidebar(),
-                  // ── MAIN CONTENT ──
-                  Expanded(
-                    child: Column(
-                      children: [
-                        _buildTopBar(),
-                        Expanded(
-                          child: _buildContentArea(),
-                        ),
-                      ],
+      child: LayoutBuilder(builder: (context, c) {
+        final w = c.maxWidth;
+        final mode = w >= 1100 ? 2 : (w >= 760 ? 1 : 0); // 2 = đầy đủ, 1 = chỉ biểu tượng, 0 = ngăn kéo
+        return Scaffold(
+          key: _scaffoldKey,
+          backgroundColor: AdminUi.bg,
+          drawer: mode == 0
+              ? Drawer(
+                  width: 270,
+                  backgroundColor: AdminUi.sidebar,
+                  child: SafeArea(child: _buildSidebar(expanded: true, inDrawer: true)),
+                )
+              : null,
+          body: Row(
+            children: [
+              if (mode != 0) _buildSidebar(expanded: mode == 2),
+              Expanded(
+                child: Column(
+                  children: [
+                    _buildTopBar(showMenu: mode == 0, compact: w < 1000),
+                    Expanded(
+                      child: _isLoading
+                          ? const Center(child: CircularProgressIndicator(color: AdminUi.accent, strokeWidth: 3))
+                          : _buildContentArea(),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-      ),
+            ],
+          ),
+        );
+      }),
     );
   }
 
-  // ── SIDEBAR NAVIGATION ──
-  Widget _buildSidebar() {
-    final pendingVenuesCount = _venues.where((v) => v.isPending).length;
-    final pendingBookingsCount = _bookings.where((b) => b.status == 'Chờ xác nhận').length;
-
-    final navSections = [
-      {
-        'title': 'TỔNG QUAN',
-        'items': [
-          {'index': 0, 'icon': Icons.insights_rounded, 'label': 'Thống Kê & KPI', 'badge': null, 'badgeColor': null},
-        ],
-      },
-      {
-        'title': 'QUẢN LÝ DỊCH VỤ',
-        'items': [
-          {
-            'index': 1,
-            'icon': Icons.sports_tennis_rounded,
-            'label': 'Quản Lý Sân',
-            'badge': pendingVenuesCount > 0 ? '$pendingVenuesCount chờ' : null,
-            'badgeColor': const Color(0xFFFBBF24),
-          },
-          {
-            'index': 2,
-            'icon': Icons.calendar_month_rounded,
-            'label': 'Đơn Đặt Sân',
-            'badge': pendingBookingsCount > 0 ? '$pendingBookingsCount mới' : null,
-            'badgeColor': const Color(0xFF38BDF8),
-          },
-          {
-            'index': 3,
-            'icon': Icons.people_alt_rounded,
-            'label': 'Khách Hàng',
-            'badge': '${_customers.length}',
-            'badgeColor': const Color(0xFF94A3B8),
-          },
-          {
-            'index': 4,
-            'icon': Icons.payments_rounded,
-            'label': 'Thanh Toán & Doanh Thu',
-            'badge': null,
-            'badgeColor': null,
-          },
-        ],
-      },
+  // ── SIDEBAR ──
+  Widget _buildSidebar({required bool expanded, bool inDrawer = false}) {
+    final pendingVenues = _venues.where((v) => v.isPending).length;
+    final pendingBookings = _bookings.where((b) => AdminStats.isPending(b.status)).length;
+    final items = <(int, IconData, String, int)>[
+      (0, Icons.space_dashboard_outlined, 'Tổng quan', 0),
+      (1, Icons.stadium_outlined, 'Quản lý sân', pendingVenues),
+      (2, Icons.event_note_outlined, 'Đơn đặt sân', pendingBookings),
+      (3, Icons.people_outline_rounded, 'Khách hàng', 0),
+      (4, Icons.account_balance_wallet_outlined, 'Thanh toán', 0),
     ];
+    final user = AuthService.currentUser;
+    final name = (user != null && user.fullName.trim().isNotEmpty) ? user.fullName.trim() : 'Quản trị viên';
 
     return Container(
-      width: 260,
-      decoration: BoxDecoration(
-        color: const Color(0xFF070E1B),
-        border: Border(
-          right: BorderSide(color: const Color(0xFF1E3A5F).withOpacity(0.5), width: 1),
-        ),
+      width: inDrawer ? null : (expanded ? 244 : 72),
+      decoration: const BoxDecoration(
+        color: AdminUi.sidebar,
+        border: Border(right: BorderSide(color: AdminUi.border)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // ── BRAND HEADER ──
+          // Thương hiệu
           Container(
-            padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
-            decoration: BoxDecoration(
-              border: Border(
-                bottom: BorderSide(color: const Color(0xFF1E3A5F).withOpacity(0.4)),
-              ),
-            ),
+            height: 64,
+            padding: EdgeInsets.symmetric(horizontal: expanded ? 18 : 0),
+            alignment: expanded ? Alignment.centerLeft : Alignment.center,
+            decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: AdminUi.border))),
             child: Row(
+              mainAxisSize: MainAxisSize.min,
               children: [
                 Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF10B981), Color(0xFF047857)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.circular(12),
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0xFF10B981).withOpacity(0.35),
-                        blurRadius: 14,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: const Center(
-                    child: Icon(Icons.sports_tennis, color: Colors.white, size: 22),
-                  ),
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(color: AdminUi.accent, borderRadius: BorderRadius.circular(8)),
+                  child: const Icon(Icons.sports_tennis_rounded, color: Colors.white, size: 18),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
+                if (expanded) ...[
+                  const SizedBox(width: 10),
+                  const Column(
+                    mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
-                        children: [
-                          const Text(
-                            'AloBooking',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              letterSpacing: -0.3,
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF10B981).withOpacity(0.18),
-                              borderRadius: BorderRadius.circular(4),
-                              border: Border.all(color: const Color(0xFF10B981).withOpacity(0.3)),
-                            ),
-                            child: const Text(
-                              'PRO',
-                              style: TextStyle(
-                                color: Color(0xFF34D399),
-                                fontSize: 9,
-                                fontWeight: FontWeight.bold,
-                                letterSpacing: 0.5,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 2),
-                      const Text(
-                        'Hệ Thống Quản Trị Cấp Cao',
-                        style: TextStyle(color: Color(0xFF94A3B8), fontSize: 11),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
+                      Text('AloBooking',
+                          style: TextStyle(color: AdminUi.text, fontSize: 15, fontWeight: FontWeight.w700, letterSpacing: -0.2)),
+                      Text('Quản trị hệ thống', style: AdminUi.caption),
                     ],
                   ),
-                ),
-              ],
-            ),
-          ),
-
-          // ── ADMIN USER INFO WIDGET ──
-          Container(
-            margin: const EdgeInsets.fromLTRB(14, 14, 14, 10),
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  const Color(0xFF0F203C).withOpacity(0.8),
-                  const Color(0xFF0A1324).withOpacity(0.8),
                 ],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFF1E3A5F).withOpacity(0.6)),
-            ),
-            child: Row(
-              children: [
-                Stack(
-                  children: [
-                    Container(
-                      width: 36,
-                      height: 36,
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFF6366F1), Color(0xFF3B82F6)],
-                        ),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Center(
-                        child: Text(
-                          (AuthService.currentUser?.fullName.isNotEmpty == true)
-                              ? AuthService.currentUser!.fullName[0].toUpperCase()
-                              : 'A',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 15,
-                          ),
-                        ),
-                      ),
-                    ),
-                    Positioned(
-                      right: 0,
-                      bottom: 0,
-                      child: Container(
-                        width: 10,
-                        height: 10,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF10B981),
-                          shape: BoxShape.circle,
-                          border: Border.all(color: const Color(0xFF070E1B), width: 1.5),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        AuthService.currentUser?.fullName ?? 'Đinh Ngọc Huy',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 12.5,
-                          fontWeight: FontWeight.bold,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 2),
-                      Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFF59E0B).withOpacity(0.15),
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: const Text(
-                              '👑 ROOT ADMIN',
-                              style: TextStyle(
-                                color: Color(0xFFFBBF24),
-                                fontSize: 9,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
               ],
             ),
           ),
 
-          // ── NAVIGATION MENU ──
+          // Điều hướng
           Expanded(
             child: ListView(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              padding: EdgeInsets.symmetric(horizontal: expanded ? 12 : 10, vertical: 14),
               children: [
-                for (final section in navSections) ...[
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(12, 12, 12, 6),
-                    child: Text(
-                      section['title'] as String,
-                      style: const TextStyle(
-                        color: Color(0xFF64748B),
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 1.1,
-                      ),
-                    ),
+                if (expanded)
+                  const Padding(
+                    padding: EdgeInsets.fromLTRB(10, 0, 10, 8),
+                    child: Text('VẬN HÀNH',
+                        style: TextStyle(color: AdminUi.faint, fontSize: 10.5, fontWeight: FontWeight.w600, letterSpacing: 1)),
                   ),
-                  for (final item in section['items'] as List<Map<String, dynamic>>) ...[
-                    Builder(builder: (ctx) {
-                      final itemIdx = item['index'] as int;
-                      final isSelected = _selectedNavIndex == itemIdx;
-                      final badgeText = item['badge'] as String?;
-                      final badgeColor = (item['badgeColor'] as Color?) ?? const Color(0xFF10B981);
-
-                      return Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 2.5),
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 180),
-                          decoration: BoxDecoration(
-                            gradient: isSelected
-                                ? LinearGradient(
-                                    colors: [
-                                      const Color(0xFF10B981).withOpacity(0.18),
-                                      const Color(0xFF10B981).withOpacity(0.04),
-                                    ],
-                                    begin: Alignment.centerLeft,
-                                    end: Alignment.centerRight,
-                                  )
-                                : null,
-                            borderRadius: BorderRadius.circular(10),
-                            border: isSelected
-                                ? Border.all(color: const Color(0xFF10B981).withOpacity(0.35))
-                                : null,
-                          ),
-                          child: InkWell(
-                            onTap: () => setState(() => _selectedNavIndex = itemIdx),
-                            borderRadius: BorderRadius.circular(10),
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                              child: Row(
-                                children: [
-                                  // Left accent bar
-                                  if (isSelected)
-                                    Container(
-                                      width: 3.5,
-                                      height: 18,
-                                      margin: const EdgeInsets.only(right: 8),
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFF10B981),
-                                        borderRadius: BorderRadius.circular(2),
-                                        boxShadow: [
-                                          BoxShadow(
-                                            color: const Color(0xFF10B981).withOpacity(0.6),
-                                            blurRadius: 6,
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  Icon(
-                                    item['icon'] as IconData,
-                                    color: isSelected
-                                        ? const Color(0xFF10B981)
-                                        : const Color(0xFF64748B),
-                                    size: 19,
-                                  ),
-                                  const SizedBox(width: 10),
-                                  Expanded(
-                                    child: Text(
-                                      item['label'] as String,
-                                      style: TextStyle(
-                                        color: isSelected ? Colors.white : const Color(0xFF94A3B8),
-                                        fontSize: 13,
-                                        fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                                      ),
-                                    ),
-                                  ),
-                                  if (badgeText != null)
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                                      decoration: BoxDecoration(
-                                        color: badgeColor.withOpacity(0.18),
-                                        borderRadius: BorderRadius.circular(10),
-                                        border: Border.all(color: badgeColor.withOpacity(0.4)),
-                                      ),
-                                      child: Text(
-                                        badgeText,
-                                        style: TextStyle(
-                                          color: badgeColor,
-                                          fontSize: 10.5,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                    ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                      );
-                    }),
-                  ],
-                ],
+                for (final it in items)
+                  _navItem(index: it.$1, icon: it.$2, label: it.$3, badge: it.$4, expanded: expanded, inDrawer: inDrawer),
               ],
             ),
           ),
 
-          // ── BOTTOM ACTIONS ──
+          // Tài khoản
           Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: const Color(0xFF050B15),
-              border: Border(
-                top: BorderSide(color: const Color(0xFF1E3A5F).withOpacity(0.5)),
-              ),
-            ),
+            padding: EdgeInsets.all(expanded ? 12 : 10),
+            decoration: const BoxDecoration(border: Border(top: BorderSide(color: AdminUi.border))),
             child: Column(
               children: [
-                _sidebarBottomBtn(
-                  icon: Icons.phone_android_rounded,
-                  label: 'Xem App Người Dùng',
-                  color: const Color(0xFF60A5FA),
-                  onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const HomeScreen()),
-                  ),
+                _footerAction(
+                  icon: Icons.smartphone_rounded,
+                  label: 'Xem ứng dụng khách',
+                  expanded: expanded,
+                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const HomeScreen())),
                 ),
-                const SizedBox(height: 6),
-                _sidebarBottomBtn(
-                  icon: Icons.cloud_sync_outlined,
-                  label: 'Đồng Bộ Firestore',
-                  color: const Color(0xFF34D399),
-                  onTap: _syncToFirestore,
-                ),
-                const SizedBox(height: 6),
-                _sidebarBottomBtn(
+                const SizedBox(height: 4),
+                _footerAction(
                   icon: Icons.logout_rounded,
-                  label: 'Đăng Xuất Admin',
-                  color: const Color(0xFFF87171),
+                  label: 'Đăng xuất',
+                  expanded: expanded,
+                  color: AdminUi.danger,
                   onTap: _confirmLogoutAdmin,
                 ),
-                const SizedBox(height: 8),
-                const Center(
-                  child: Text(
-                    'AloBooking Cloud Engine v2.5.0',
-                    style: TextStyle(color: Color(0xFF475569), fontSize: 10),
-                  ),
+                const SizedBox(height: 10),
+                Row(
+                  mainAxisAlignment: expanded ? MainAxisAlignment.start : MainAxisAlignment.center,
+                  children: [
+                    _avatar(name, 30),
+                    if (expanded) ...[
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(name,
+                                style: const TextStyle(color: AdminUi.text, fontSize: 12.5, fontWeight: FontWeight.w600),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis),
+                            const Text('Quản trị viên', style: AdminUi.caption),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ],
             ),
@@ -626,65 +392,140 @@ class _AdminScreenState extends State<AdminScreen> {
     );
   }
 
-  Widget _sidebarBottomBtn({
+  Widget _avatar(String name, double size) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: const BoxDecoration(color: AdminUi.surfaceAlt, shape: BoxShape.circle),
+      alignment: Alignment.center,
+      child: Text(
+        name.isNotEmpty ? name[0].toUpperCase() : 'A',
+        style: TextStyle(color: AdminUi.text, fontWeight: FontWeight.w700, fontSize: size * 0.42),
+      ),
+    );
+  }
+
+  Widget _navItem({
+    required int index,
     required IconData icon,
     required String label,
-    required Color color,
-    required VoidCallback onTap,
+    required int badge,
+    required bool expanded,
+    bool inDrawer = false,
   }) {
-    return InkWell(
+    final selected = _selectedNavIndex == index;
+    final tile = Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(8),
+        onTap: () {
+          setState(() => _selectedNavIndex = index);
+          if (inDrawer) Navigator.pop(context);
+        },
+        child: Container(
+          height: 42,
+          padding: EdgeInsets.symmetric(horizontal: expanded ? 12 : 0),
+          decoration: BoxDecoration(
+            color: selected ? AdminUi.surfaceAlt : Colors.transparent,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: expanded
+              ? Row(
+                  children: [
+                    Icon(icon, size: 20, color: selected ? AdminUi.accent : AdminUi.muted),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        label,
+                        style: TextStyle(
+                          color: selected ? AdminUi.text : AdminUi.muted,
+                          fontSize: 13.5,
+                          fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                    if (badge > 0)
+                      Container(
+                        constraints: const BoxConstraints(minWidth: 20),
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                        decoration: BoxDecoration(color: AdminUi.warn, borderRadius: BorderRadius.circular(10)),
+                        child: Text('$badge',
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(color: Color(0xFF1A1200), fontSize: 11, fontWeight: FontWeight.w700)),
+                      ),
+                  ],
+                )
+              : Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    Icon(icon, size: 21, color: selected ? AdminUi.accent : AdminUi.muted),
+                    if (badge > 0)
+                      Positioned(
+                        top: 9,
+                        right: 20,
+                        child: Container(
+                          width: 8,
+                          height: 8,
+                          decoration: const BoxDecoration(color: AdminUi.warn, shape: BoxShape.circle),
+                        ),
+                      ),
+                  ],
+                ),
+        ),
+      ),
+    );
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: expanded ? tile : Tooltip(message: badge > 0 ? '$label ($badge cần xử lý)' : label, child: tile),
+    );
+  }
+
+  Widget _footerAction({
+    required IconData icon,
+    required String label,
+    required bool expanded,
+    required VoidCallback onTap,
+    Color color = AdminUi.muted,
+  }) {
+    final w = InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(8),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(8),
-          color: color.withOpacity(0.08),
-          border: Border.all(color: color.withOpacity(0.2)),
-        ),
+        height: 38,
+        padding: EdgeInsets.symmetric(horizontal: expanded ? 10 : 0),
         child: Row(
+          mainAxisAlignment: expanded ? MainAxisAlignment.start : MainAxisAlignment.center,
           children: [
-            Icon(icon, color: color, size: 16),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                label,
-                style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w600),
-              ),
-            ),
-            Icon(Icons.arrow_forward_ios_rounded, color: color.withOpacity(0.6), size: 10),
+            Icon(icon, size: 18, color: color),
+            if (expanded) ...[
+              const SizedBox(width: 10),
+              Expanded(child: Text(label, style: TextStyle(color: color, fontSize: 13, fontWeight: FontWeight.w500))),
+            ],
           ],
         ),
       ),
     );
+    return Material(color: Colors.transparent, child: expanded ? w : Tooltip(message: label, child: w));
   }
 
   void _confirmLogoutAdmin() {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF0B1424),
+        backgroundColor: AdminUi.surface,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-          side: BorderSide(color: const Color(0xFF1E3A5F).withOpacity(0.8)),
+          borderRadius: BorderRadius.circular(14),
+          side: const BorderSide(color: AdminUi.border),
         ),
-        title: const Row(
-          children: [
-            Icon(Icons.logout, color: Color(0xFFEF4444), size: 22),
-            SizedBox(width: 10),
-            Text('Đăng Xuất Quản Trị', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
-          ],
-        ),
-        content: const Text(
-          'Bạn có chắc chắn muốn đăng xuất khỏi trang quản trị Admin và quay về màn hình đăng nhập?',
-          style: TextStyle(color: Color(0xFF94A3B8), fontSize: 13.5),
-        ),
+        title: const Text('Đăng xuất khỏi trang quản trị?',
+            style: TextStyle(color: AdminUi.text, fontWeight: FontWeight.w600, fontSize: 16)),
+        content: const Text('Bạn sẽ quay về màn hình đăng nhập.', style: TextStyle(color: AdminUi.muted, fontSize: 13.5)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Hủy', style: TextStyle(color: Color(0xFF64748B))),
+            child: const Text('Hủy', style: TextStyle(color: AdminUi.muted)),
           ),
-          ElevatedButton(
+          FilledButton(
             onPressed: () {
               Navigator.pop(ctx);
               AuthService.logout();
@@ -693,278 +534,230 @@ class _AdminScreenState extends State<AdminScreen> {
                 (route) => false,
               );
             },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFEF4444),
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            ),
-            child: const Text('Đăng Xuất', style: TextStyle(fontWeight: FontWeight.bold)),
+            style: FilledButton.styleFrom(backgroundColor: AdminUi.danger, foregroundColor: Colors.white),
+            child: const Text('Đăng xuất'),
           ),
         ],
       ),
     );
   }
 
-  // ── TOP BAR ──
-  Widget _buildTopBar() {
-    final tabNames = [
-      'Thống Kê & Báo Cáo KPI',
-      'Quản Lý Cụm Sân Thể Thao',
-      'Quản Lý Đơn Đặt Sân',
-      'Quản Lý Khách Hàng & Hội Viên',
-      'Thanh Toán & Dòng Tiền',
-    ];
-    final tabSubtitles = [
-      'Tổng hợp chỉ số doanh thu, tỷ lệ lấp đầy sân và dự báo AI',
-      'Phê duyệt bài đăng, cập nhật thông tin và bảng giá sân',
-      'Theo dõi trạng thái lịch đặt sân trực tiếp và tại quầy',
-      'Thông tin hội viên, phân hạng VIP và lịch sử giao dịch',
-      'Theo dõi giao dịch VietQR, MoMo, VNPay và tiền mặt tại quầy',
-    ];
-    final tabIcons = [
-      Icons.insights_rounded,
-      Icons.sports_tennis_rounded,
-      Icons.calendar_month_rounded,
-      Icons.people_alt_rounded,
-      Icons.payments_rounded,
-    ];
+  void _confirmSync() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AdminUi.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+          side: const BorderSide(color: AdminUi.border),
+        ),
+        title: const Text('Ghi dữ liệu sân lên Firestore?',
+            style: TextStyle(color: AdminUi.text, fontWeight: FontWeight.w600, fontSize: 16)),
+        content: Text(
+          'Thao tác sẽ ghi ${_venues.length} sân đang hiển thị lên Firestore và có thể ghi đè dữ liệu hiện có. '
+          'Chỉ dùng khi cần khôi phục hoặc nạp dữ liệu ban đầu.',
+          style: const TextStyle(color: AdminUi.muted, fontSize: 13.5, height: 1.45),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Hủy', style: TextStyle(color: AdminUi.muted)),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              _syncToFirestore();
+            },
+            style: FilledButton.styleFrom(backgroundColor: AdminUi.warn, foregroundColor: const Color(0xFF1A1200)),
+            child: const Text('Ghi lên Firestore'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── THANH TRÊN ──
+  Widget _buildTopBar({required bool showMenu, required bool compact}) {
+    final pendingVenues = _venues.where((v) => v.isPending).length;
+    final pendingBookings = _bookings.where((b) => AdminStats.isPending(b.status)).length;
+    final todayD = DateTime.now();
+    final todayStart = DateTime(todayD.year, todayD.month, todayD.day);
+    final overdue = _bookings.where((b) {
+      final d = BookingSlots.parseDate(b.date);
+      return AdminStats.isPending(b.status) && d != null && d.isBefore(todayStart);
+    }).length;
+    final alerts = pendingVenues + pendingBookings;
+    final user = AuthService.currentUser;
+    final name = (user != null && user.fullName.trim().isNotEmpty) ? user.fullName.trim() : 'Quản trị viên';
+    final updated = _lastLoaded == null
+        ? null
+        : 'Cập nhật ${_lastLoaded!.hour.toString().padLeft(2, '0')}:${_lastLoaded!.minute.toString().padLeft(2, '0')}';
 
     return Container(
-      height: 68,
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      decoration: BoxDecoration(
-        color: const Color(0xFF070E1B),
-        border: Border(
-          bottom: BorderSide(color: const Color(0xFF1E3A5F).withOpacity(0.5)),
-        ),
+      height: 64,
+      padding: EdgeInsets.symmetric(horizontal: showMenu ? 8 : 24),
+      decoration: const BoxDecoration(
+        color: AdminUi.bg,
+        border: Border(bottom: BorderSide(color: AdminUi.border)),
       ),
       child: Row(
         children: [
-          // Breadcrumb & Title
+          if (showMenu)
+            IconButton(
+              icon: const Icon(Icons.menu_rounded, color: AdminUi.text),
+              tooltip: 'Menu',
+              onPressed: () => _scaffoldKey.currentState?.openDrawer(),
+            ),
           Expanded(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  children: [
-                    const Text('AloBooking', style: TextStyle(color: Color(0xFF64748B), fontSize: 11.5)),
-                    const SizedBox(width: 4),
-                    const Icon(Icons.chevron_right, color: Color(0xFF475569), size: 14),
-                    const SizedBox(width: 4),
-                    const Text('Quản Trị', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 11.5)),
-                    const SizedBox(width: 4),
-                    const Icon(Icons.chevron_right, color: Color(0xFF475569), size: 14),
-                    const SizedBox(width: 4),
-                    Text(
-                      tabNames[_selectedNavIndex],
-                      style: const TextStyle(
-                        color: Color(0xFF10B981),
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 2),
-                Row(
-                  children: [
-                    Icon(tabIcons[_selectedNavIndex], color: const Color(0xFF10B981), size: 18),
-                    const SizedBox(width: 8),
-                    Text(
-                      tabNames[_selectedNavIndex],
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: -0.3,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Text(
-                      '• ${tabSubtitles[_selectedNavIndex]}',
-                      style: const TextStyle(color: Color(0xFF64748B), fontSize: 11.5),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ),
+                Text(_tabTitles[_selectedNavIndex],
+                    style: const TextStyle(color: AdminUi.text, fontSize: 17, fontWeight: FontWeight.w700, letterSpacing: -0.3),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis),
+                if (!compact)
+                  Text(_tabSubtitles[_selectedNavIndex],
+                      style: AdminUi.subtitle, maxLines: 1, overflow: TextOverflow.ellipsis),
               ],
             ),
           ),
-
-          // Right Controls: Quick Search + Live System + Refresh + Notifications
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Live System Badge
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF10B981).withOpacity(0.12),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: const Color(0xFF10B981).withOpacity(0.3)),
+          if (updated != null && !compact) Text(updated, style: AdminUi.caption),
+          IconButton(
+            icon: const Icon(Icons.refresh_rounded, color: AdminUi.muted, size: 20),
+            tooltip: 'Tải lại dữ liệu',
+            onPressed: _isLoading ? null : _loadData,
+          ),
+          PopupMenuButton<String>(
+            tooltip: 'Việc cần xử lý',
+            offset: const Offset(0, 46),
+            color: AdminUi.surface,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: const BorderSide(color: AdminUi.border),
+            ),
+            onSelected: (v) => setState(() {
+              if (v == 'venues') {
+                _selectedApprovalFilter = 'pending';
+                _selectedNavIndex = 1;
+              } else {
+                _selectedBookingStatus = 'Chờ xác nhận';
+                _selectedNavIndex = 2;
+              }
+            }),
+            itemBuilder: (ctx) => [
+              const PopupMenuItem(
+                enabled: false,
+                height: 36,
+                child: Text('Việc cần xử lý', style: TextStyle(color: AdminUi.faint, fontSize: 12, fontWeight: FontWeight.w600)),
+              ),
+              if (alerts == 0)
+                const PopupMenuItem(
+                  enabled: false,
+                  child: Text('Không có việc tồn đọng', style: TextStyle(color: AdminUi.muted, fontSize: 13)),
                 ),
-                child: Row(
+              if (pendingVenues > 0)
+                PopupMenuItem(
+                  value: 'venues',
+                  child: Text('$pendingVenues sân chờ duyệt', style: const TextStyle(color: AdminUi.text, fontSize: 13)),
+                ),
+              if (pendingBookings > 0)
+                PopupMenuItem(
+                  value: 'bookings',
+                  child: Text(
+                    '$pendingBookings đơn chờ xác nhận${overdue > 0 ? ' ($overdue đã quá ngày chơi)' : ''}',
+                    style: const TextStyle(color: AdminUi.text, fontSize: 13),
+                  ),
+                ),
+            ],
+            child: Padding(
+              padding: const EdgeInsets.all(8),
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  const Icon(Icons.notifications_none_rounded, color: AdminUi.muted, size: 22),
+                  if (alerts > 0)
+                    Positioned(
+                      top: -4,
+                      right: -6,
+                      child: Container(
+                        constraints: const BoxConstraints(minWidth: 16),
+                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                        decoration: BoxDecoration(color: AdminUi.danger, borderRadius: BorderRadius.circular(8)),
+                        child: Text(alerts > 99 ? '99+' : '$alerts',
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w700)),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(width: 6),
+          PopupMenuButton<String>(
+            tooltip: 'Tài khoản',
+            offset: const Offset(0, 46),
+            color: AdminUi.surface,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: const BorderSide(color: AdminUi.border),
+            ),
+            onSelected: (v) {
+              if (v == 'logout') {
+                _confirmLogoutAdmin();
+              } else if (v == 'home') {
+                Navigator.push(context, MaterialPageRoute(builder: (_) => const HomeScreen()));
+              } else if (v == 'sync') {
+                _confirmSync();
+              }
+            },
+            itemBuilder: (ctx) => [
+              PopupMenuItem(
+                enabled: false,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Container(
-                      width: 7,
-                      height: 7,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF10B981),
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                            color: const Color(0xFF10B981).withOpacity(0.8),
-                            blurRadius: 6,
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    const Text(
-                      'Cloud Sync Live',
-                      style: TextStyle(
-                        color: Color(0xFF34D399),
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
+                    Text(name, style: const TextStyle(color: AdminUi.text, fontWeight: FontWeight.w600, fontSize: 13)),
+                    if ((user?.email ?? '').isNotEmpty)
+                      Text(user!.email, style: const TextStyle(color: AdminUi.muted, fontSize: 11.5)),
                   ],
                 ),
               ),
-              const SizedBox(width: 10),
-
-              // Reload Button
-              IconButton(
-                icon: const Icon(Icons.refresh_rounded, color: Color(0xFF94A3B8), size: 20),
-                tooltip: 'Tải lại dữ liệu Firestore',
-                onPressed: _loadData,
+              const PopupMenuDivider(height: 1),
+              const PopupMenuItem(
+                value: 'home',
+                child: Text('Xem ứng dụng khách', style: TextStyle(color: AdminUi.text, fontSize: 13)),
               ),
-              const SizedBox(width: 4),
-
-              // Notification bell
-              Stack(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF0F1E36),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: const Color(0xFF1E3A5F).withOpacity(0.5)),
-                    ),
-                    child: const Icon(Icons.notifications_none_rounded, color: Color(0xFF94A3B8), size: 18),
-                  ),
-                  Positioned(
-                    right: 6,
-                    top: 6,
-                    child: Container(
-                      width: 8,
-                      height: 8,
-                      decoration: const BoxDecoration(
-                        color: Color(0xFFEF4444),
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                  ),
-                ],
+              const PopupMenuItem(
+                value: 'sync',
+                child: Text('Ghi dữ liệu sân lên Firestore…', style: TextStyle(color: AdminUi.text, fontSize: 13)),
               ),
-              const SizedBox(width: 12),
-
-              // Admin Profile Dropdown Menu with Logout
-              PopupMenuButton<String>(
-                offset: const Offset(0, 48),
-                color: const Color(0xFF0F203C),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  side: BorderSide(color: const Color(0xFF1E3A5F).withOpacity(0.6)),
-                ),
-                onSelected: (val) {
-                  if (val == 'logout') {
-                    _confirmLogoutAdmin();
-                  } else if (val == 'home') {
-                    Navigator.push(context, MaterialPageRoute(builder: (_) => const HomeScreen()));
-                  }
-                },
-                itemBuilder: (ctx) => [
-                  PopupMenuItem(
-                    value: 'info',
-                    enabled: false,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          AuthService.currentUser?.fullName ?? 'Đinh Ngọc Huy',
-                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
-                        ),
-                        const SizedBox(height: 2),
-                        const Text(
-                          'admin@alobooking.com',
-                          style: TextStyle(color: Color(0xFF94A3B8), fontSize: 11),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const PopupMenuDivider(height: 1),
-                  const PopupMenuItem(
-                    value: 'home',
-                    child: Row(
-                      children: [
-                        Icon(Icons.phone_android_rounded, color: Color(0xFF60A5FA), size: 16),
-                        SizedBox(width: 8),
-                        Text('Xem App Khách', style: TextStyle(color: Colors.white, fontSize: 12.5)),
-                      ],
-                    ),
-                  ),
-                  const PopupMenuItem(
-                    value: 'logout',
-                    child: Row(
-                      children: [
-                        Icon(Icons.logout_rounded, color: Color(0xFFEF4444), size: 16),
-                        SizedBox(width: 8),
-                        Text('Đăng Xuất Hệ Thống', style: TextStyle(color: Color(0xFFEF4444), fontSize: 12.5, fontWeight: FontWeight.bold)),
-                      ],
-                    ),
-                  ),
-                ],
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF0F1E36),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: const Color(0xFF1E3A5F).withOpacity(0.6)),
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 26,
-                        height: 26,
-                        decoration: const BoxDecoration(
-                          gradient: LinearGradient(colors: [Color(0xFF6366F1), Color(0xFF3B82F6)]),
-                          shape: BoxShape.circle,
-                        ),
-                        child: Center(
-                          child: Text(
-                            (AuthService.currentUser?.fullName.isNotEmpty == true)
-                                ? AuthService.currentUser!.fullName[0].toUpperCase()
-                                : 'A',
-                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        AuthService.currentUser?.fullName ?? 'Admin',
-                        style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
-                      ),
-                      const SizedBox(width: 4),
-                      const Icon(Icons.arrow_drop_down, color: Color(0xFF94A3B8), size: 18),
-                    ],
-                  ),
-                ),
+              const PopupMenuItem(
+                value: 'logout',
+                child: Text('Đăng xuất', style: TextStyle(color: AdminUi.danger, fontSize: 13, fontWeight: FontWeight.w600)),
               ),
             ],
+            child: Padding(
+              padding: const EdgeInsets.all(4),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _avatar(name, 32),
+                  if (!compact) ...[
+                    const SizedBox(width: 8),
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 140),
+                      child: Text(name,
+                          style: const TextStyle(color: AdminUi.text, fontSize: 13, fontWeight: FontWeight.w500),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis),
+                    ),
+                    const Icon(Icons.expand_more_rounded, color: AdminUi.muted, size: 18),
+                  ],
+                ],
+              ),
+            ),
           ),
         ],
       ),
@@ -974,803 +767,512 @@ class _AdminScreenState extends State<AdminScreen> {
   // ── CONTENT AREA ──
   Widget _buildContentArea() {
     switch (_selectedNavIndex) {
-      case 0: return _buildAnalyticsTab();
-      case 1: return _buildVenuesManagementTab();
-      case 2: return _buildBookingsTab();
-      case 3: return _buildCustomersTab();
-      case 4: return _buildPaymentsTab();
-      default: return _buildAnalyticsTab();
+      case 1:
+        return _minWidthScroll(_buildVenuesManagementTab());
+      case 2:
+        return _minWidthScroll(_buildBookingsTab());
+      case 3:
+        return _minWidthScroll(_buildCustomersTab());
+      case 4:
+        return _minWidthScroll(_buildPaymentsTab());
+      default:
+        return _buildAnalyticsTab();
     }
   }
 
-  // AppBar replaced by Sidebar + TopBar layout
-
-  // ==========================================
-  // TAB 1: THỐNG KÊ & BÁO CÁO (ANALYTICS)
-  // ==========================================
-  Widget _buildAnalyticsTab() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Period selector
-          _buildPeriodSelector(),
-          const SizedBox(height: 16),
-
-          // 4 KPI Cards
-          _buildKpiGrid(),
-          const SizedBox(height: 20),
-
-          // Charts Row
-          LayoutBuilder(builder: (context, constraints) {
-            final isDesktop = constraints.maxWidth > 900;
-            if (isDesktop) {
-              return Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(flex: 3, child: _buildRevenueChartCard()),
-                  const SizedBox(width: 16),
-                  Expanded(flex: 2, child: _buildDonutChartCard()),
-                ],
-              );
-            }
-            return Column(
-              children: [
-                _buildRevenueChartCard(),
-                const SizedBox(height: 16),
-                _buildDonutChartCard(),
-              ],
-            );
-          }),
-          const SizedBox(height: 16),
-
-          // Peak Hours & Sport Usage Row
-          LayoutBuilder(builder: (context, constraints) {
-            final isDesktop = constraints.maxWidth > 900;
-            if (isDesktop) {
-              return Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(child: _buildSportUsageBarChartCard()),
-                  const SizedBox(width: 16),
-                  Expanded(child: _buildPeakHoursChartCard()),
-                ],
-              );
-            }
-            return Column(
-              children: [
-                _buildSportUsageBarChartCard(),
-                const SizedBox(height: 16),
-                _buildPeakHoursChartCard(),
-              ],
-            );
-          }),
-          const SizedBox(height: 20),
-
-          // Top Venues table
-          _buildTopVenuesCard(),
-          const SizedBox(height: 20),
-
-          // AI Insights
-          _buildAiInsightsCard(),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPeriodSelector() {
-    final periods = [
-      {'key': 'today', 'label': 'Hôm nay'},
-      {'key': 'week', 'label': '7 ngày qua'},
-      {'key': 'month', 'label': 'Tháng này'},
-      {'key': 'year', 'label': 'Năm 2026'},
-    ];
-
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Container(
-          padding: const EdgeInsets.all(4),
-          decoration: BoxDecoration(
-            color: const Color(0xFF070E1B),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0xFF1E3A5F).withOpacity(0.6)),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: periods.map((p) {
-              final isSelected = _selectedPeriod == p['key'];
-              return InkWell(
-                onTap: () => setState(() => _selectedPeriod = p['key'] as String),
-                borderRadius: BorderRadius.circular(8),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 150),
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  decoration: BoxDecoration(
-                    gradient: isSelected
-                        ? const LinearGradient(
-                            colors: [Color(0xFF10B981), Color(0xFF059669)],
-                          )
-                        : null,
-                    borderRadius: BorderRadius.circular(8),
-                    boxShadow: isSelected
-                        ? [
-                            BoxShadow(
-                              color: const Color(0xFF10B981).withOpacity(0.3),
-                              blurRadius: 8,
-                            ),
-                          ]
-                        : null,
-                  ),
-                  child: Text(
-                    p['label'] as String,
-                    style: TextStyle(
-                      color: isSelected ? Colors.white : const Color(0xFF94A3B8),
-                      fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                      fontSize: 13,
-                    ),
-                  ),
-                ),
-              );
-            }).toList(),
-          ),
-        ),
-        ElevatedButton.icon(
-          onPressed: () => _showToast('Đang xuất báo cáo thống kê định dạng Excel...'),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFF0F203C),
-            foregroundColor: const Color(0xFF38BDF8),
-            elevation: 0,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
-              side: BorderSide(color: const Color(0xFF38BDF8).withOpacity(0.3)),
-            ),
-          ),
-          icon: const Icon(Icons.file_download_outlined, size: 18),
-          label: const Text('Xuất Báo Cáo Excel', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildKpiGrid() {
-    String revenue = '128.500.000đ';
-    String bookings = '984 lượt';
-    String occupancy = '86.2%';
-    String newUsers = '215 người';
-
-    if (_selectedPeriod == 'today') {
-      revenue = '4.850.000đ';
-      bookings = '38 lượt';
-      occupancy = '81.2%';
-      newUsers = '14 người';
-    } else if (_selectedPeriod == 'week') {
-      revenue = '32.400.000đ';
-      bookings = '246 lượt';
-      occupancy = '84.6%';
-      newUsers = '62 người';
-    } else if (_selectedPeriod == 'year') {
-      revenue = '582.600.000đ';
-      bookings = '4.512 lượt';
-      occupancy = '88.5%';
-      newUsers = '1.840 người';
-    }
-
-    final kpis = [
-      {
-        'title': 'Tổng Doanh Thu',
-        'value': revenue,
-        'change': '+16.8%',
-        'icon': Icons.attach_money,
-        'color': const Color(0xFF10B981),
-      },
-      {
-        'title': 'Lượt Đặt Sân',
-        'value': bookings,
-        'change': '+11.4%',
-        'icon': Icons.calendar_month,
-        'color': const Color(0xFF3B82F6),
-      },
-      {
-        'title': 'Tỷ Lệ Lấp Đầy',
-        'value': occupancy,
-        'change': '+5.3%',
-        'icon': Icons.bolt,
-        'color': const Color(0xFFF59E0B),
-      },
-      {
-        'title': 'Khách Hàng Mới',
-        'value': newUsers,
-        'change': '+22.5%',
-        'icon': Icons.people,
-        'color': const Color(0xFFA855F7),
-      },
-    ];
-
-    return LayoutBuilder(builder: (context, constraints) {
-      int count = constraints.maxWidth > 900 ? 4 : (constraints.maxWidth > 600 ? 2 : 1);
-      return GridView.builder(
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        itemCount: kpis.length,
-        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: count,
-          crossAxisSpacing: 12,
-          mainAxisSpacing: 12,
-          childAspectRatio: 1.95,
-        ),
-        itemBuilder: (ctx, i) {
-          final item = kpis[i];
-          final color = item['color'] as Color;
-          return Container(
-            padding: const EdgeInsets.all(18),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  const Color(0xFF0F203C),
-                  const Color(0xFF070E1B),
-                ],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: color.withOpacity(0.3), width: 1.2),
-              boxShadow: [
-                BoxShadow(
-                  color: color.withOpacity(0.08),
-                  blurRadius: 18,
-                  offset: const Offset(0, 6),
-                ),
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.35),
-                  blurRadius: 10,
-                  offset: const Offset(0, 3),
-                ),
-              ],
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [color.withOpacity(0.25), color.withOpacity(0.08)],
-                        ),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: color.withOpacity(0.35)),
-                      ),
-                      child: Icon(item['icon'] as IconData, color: color, size: 22),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF10B981).withOpacity(0.15),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: const Color(0xFF10B981).withOpacity(0.3)),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(Icons.trending_up_rounded, color: Color(0xFF34D399), size: 13),
-                          const SizedBox(width: 3),
-                          Text(
-                            item['change'] as String,
-                            style: const TextStyle(
-                              color: Color(0xFF34D399),
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      item['value'] as String,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 22,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: -0.5,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      item['title'] as String,
-                      style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12.5, fontWeight: FontWeight.w500),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          );
-        },
+  /// Các tab danh sách cần tối thiểu ~800px; màn hẹp hơn thì cuộn ngang thay vì bị tràn.
+  Widget _minWidthScroll(Widget child) {
+    const minW = 800.0;
+    return LayoutBuilder(builder: (context, c) {
+      if (c.maxWidth >= minW) return child;
+      return SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: SizedBox(width: minW, height: c.maxHeight, child: child),
       );
     });
   }
 
-  // --- REVENUE LINE CHART ---
-  Widget _buildRevenueChartCard() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF0F1F35), Color(0xFF0A1628)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFF1E3A5F).withOpacity(0.6)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.3),
-            blurRadius: 20,
-            offset: const Offset(0, 6),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Xu Hướng Doanh Thu & Dự Báo AI',
-                    style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold),
-                  ),
-                  SizedBox(height: 2),
-                  Text('Biểu đồ tăng trưởng thực tế kết hợp ML Forecast',
-                      style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12)),
-                ],
-              ),
-              Row(
-                children: [
-                  _chartLegend(const Color(0xFF6366F1), 'Thực tế'),
-                  const SizedBox(width: 12),
-                  _chartLegend(const Color(0xFF10B981), 'Dự báo AI'),
-                ],
-              ),
-            ],
-          ),
-          const SizedBox(height: 24),
-          SizedBox(
-            height: 180,
-            width: double.infinity,
-            child: CustomPaint(
-              painter: RevenueLineChartPainter(),
-            ),
-          ),
-        ],
-      ),
-    );
+  // ==========================================
+  // TAB 1: TỔNG QUAN (số liệu tính từ đơn đặt thật)
+  // ==========================================
+  AdminStats get _stats => AdminStats.compute(
+        bookings: _bookings,
+        venues: _venues,
+        period: AdminPeriod.byKey(_selectedPeriod),
+      );
+
+  DemandModel get _demandModel {
+    if (_model == null || !identical(_modelFor, _bookings)) {
+      _model = DemandModel.fit(_bookings);
+      _modelFor = _bookings;
+    }
+    return _model!;
   }
 
-  Widget _chartLegend(Color color, String label) {
+  static String _dm(DateTime d) =>
+      '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}';
+
+  Widget _twoCol(bool wide, Widget left, Widget right, {int l = 1, int r = 1}) {
+    if (!wide) return Column(children: [left, const SizedBox(height: 16), right]);
     return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Container(width: 10, height: 10, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
-        const SizedBox(width: 4),
-        Text(label, style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 11)),
+        Expanded(flex: l, child: left),
+        const SizedBox(width: 16),
+        Expanded(flex: r, child: right),
       ],
     );
   }
 
-  // --- DONUT CHART (Cơ cấu doanh thu theo môn) ---
-  Widget _buildDonutChartCard() {
-    final sportsShare = [
-      {'label': 'Pickleball', 'percent': 42, 'color': const Color(0xFF3B82F6)},
-      {'label': 'Cầu lông', 'percent': 28, 'color': const Color(0xFF10B981)},
-      {'label': 'Bóng đá', 'percent': 18, 'color': const Color(0xFFF97316)},
-      {'label': 'Tennis', 'percent': 12, 'color': const Color(0xFFEAB308)},
-    ];
-
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF0F1F35), Color(0xFF0A1628)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFF1E3A5F).withOpacity(0.6)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.3),
-            blurRadius: 20,
-            offset: const Offset(0, 6),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Cơ Cấu Doanh Thu Theo Môn',
-            style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              SizedBox(
-                width: 120,
-                height: 120,
-                child: CustomPaint(
-                  painter: DonutChartPainter(
-                    slices: [0.42, 0.28, 0.18, 0.12],
-                    colors: [
-                      const Color(0xFF3B82F6),
-                      const Color(0xFF10B981),
-                      const Color(0xFFF97316),
-                      const Color(0xFFEAB308),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  children: sportsShare.map((s) {
-                    return Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 4),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Row(
-                            children: [
-                              Container(
-                                width: 8,
-                                height: 8,
-                                decoration: BoxDecoration(
-                                  color: s['color'] as Color,
-                                  shape: BoxShape.circle,
-                                ),
-                              ),
-                              const SizedBox(width: 6),
-                              Text(s['label'] as String,
-                                  style: const TextStyle(color: Colors.white70, fontSize: 12)),
-                            ],
-                          ),
-                          Text(
-                            '${s['percent']}%',
-                            style: const TextStyle(
-                                color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
-                          ),
-                        ],
-                      ),
-                    );
-                  }).toList(),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  // --- SPORT USAGE BAR CHART ---
-  Widget _buildSportUsageBarChartCard() {
-    final bars = [
-      {'name': 'Pickleball', 'hours': 420, 'max': 500, 'color': const Color(0xFF3B82F6)},
-      {'name': 'Cầu lông', 'hours': 315, 'max': 500, 'color': const Color(0xFF10B981)},
-      {'name': 'Bóng đá', 'hours': 240, 'max': 500, 'color': const Color(0xFFF97316)},
-      {'name': 'Tennis', 'hours': 160, 'max': 500, 'color': const Color(0xFFEAB308)},
-      {'name': 'Bóng rổ', 'hours': 95, 'max': 500, 'color': const Color(0xFFEC4899)},
-    ];
-
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF0F1F35), Color(0xFF0A1628)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFF1E3A5F).withOpacity(0.6)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.3),
-            blurRadius: 20,
-            offset: const Offset(0, 6),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Tần Suất Giờ Đặt Theo Môn Thể Thao',
-            style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 14),
-          ...bars.map((b) {
-            final double ratio = (b['hours'] as int) / (b['max'] as int);
-            return Padding(
-              padding: const EdgeInsets.symmetric(vertical: 6),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(b['name'] as String,
-                          style: const TextStyle(color: Colors.white70, fontSize: 12)),
-                      Text('${b['hours']} giờ',
-                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(4),
-                    child: LinearProgressIndicator(
-                      value: ratio,
-                      backgroundColor: const Color(0xFF334155),
-                      valueColor: AlwaysStoppedAnimation<Color>(b['color'] as Color),
-                      minHeight: 7,
-                    ),
-                  ),
-                ],
-              ),
-            );
-          }),
-        ],
-      ),
-    );
-  }
-
-  // --- PEAK HOURS CHART ---
-  Widget _buildPeakHoursChartCard() {
-    final slots = [
-      {'slot': '06h - 09h', 'val': 65, 'isPeak': false},
-      {'slot': '09h - 14h', 'val': 42, 'isPeak': false},
-      {'slot': '14h - 17h', 'val': 58, 'isPeak': false},
-      {'slot': '17h - 20h 🔥', 'val': 98, 'isPeak': true},
-      {'slot': '20h - 23h', 'val': 88, 'isPeak': false},
-    ];
-
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF0F1F35), Color(0xFF0A1628)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFF1E3A5F).withOpacity(0.6)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.3),
-            blurRadius: 20,
-            offset: const Offset(0, 6),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
-                'Khung Giờ Đặt Sân Trong Ngày',
-                style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold),
-              ),
+  Widget _buildAnalyticsTab() {
+    final s = _stats;
+    return LayoutBuilder(builder: (context, c) {
+      final wide = c.maxWidth >= 980;
+      return SingleChildScrollView(
+        padding: EdgeInsets.all(c.maxWidth >= 760 ? 24 : 16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildOverviewHeader(s),
+            const SizedBox(height: 16),
+            if (_loadError != null) ...[
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFEF4444).withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Text('Giờ vàng: 17h–20h',
-                    style: TextStyle(color: Color(0xFFF87171), fontSize: 11, fontWeight: FontWeight.bold)),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          ...slots.map((s) {
-            final double ratio = (s['val'] as int) / 100.0;
-            final isPeak = s['isPeak'] as bool;
-            return Padding(
-              padding: const EdgeInsets.symmetric(vertical: 6),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(s['slot'] as String,
-                          style: TextStyle(
-                            color: isPeak ? const Color(0xFFF87171) : Colors.white70,
-                            fontWeight: isPeak ? FontWeight.bold : FontWeight.normal,
-                            fontSize: 12,
-                          )),
-                      Text('${s['val']}% công suất',
-                          style: TextStyle(
-                            color: isPeak ? const Color(0xFFF87171) : Colors.white,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 12,
-                          )),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(4),
-                    child: LinearProgressIndicator(
-                      value: ratio,
-                      backgroundColor: const Color(0xFF334155),
-                      valueColor: AlwaysStoppedAnimation<Color>(
-                        isPeak ? const Color(0xFFEF4444) : const Color(0xFF6366F1),
-                      ),
-                      minHeight: 7,
-                    ),
-                  ),
-                ],
-              ),
-            );
-          }),
-        ],
-      ),
-    );
-  }
-
-  // --- TOP VENUES ---
-  Widget _buildTopVenuesCard() {
-    final topVenues = _venues.take(5).toList();
-
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF0F1F35), Color(0xFF0A1628)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFF1E3A5F).withOpacity(0.6)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.3),
-            blurRadius: 20,
-            offset: const Offset(0, 6),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Row(
-                children: [
-                  Icon(Icons.emoji_events, color: Color(0xFFF59E0B), size: 20),
-                  SizedBox(width: 8),
-                  Text('Top Cụm Sân Doanh Thu Cao Nhất',
-                      style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold)),
-                ],
-              ),
-              TextButton(
-                onPressed: () => setState(() => _selectedNavIndex = 1),
-                child: const Text('Xem tất cả sân →', style: TextStyle(color: Color(0xFF34D399))),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          ListView.separated(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: topVenues.length,
-            separatorBuilder: (_, __) => const Divider(color: Color(0xFF334155), height: 1),
-            itemBuilder: (ctx, idx) {
-              final v = topVenues[idx];
-              return Padding(
-                padding: const EdgeInsets.symmetric(vertical: 10),
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: AdminUi.card(color: AdminUi.danger.withValues(alpha: 0.10), borderColor: AdminUi.danger.withValues(alpha: 0.4)),
                 child: Row(
                   children: [
-                    CircleAvatar(
-                      radius: 14,
-                      backgroundColor: const Color(0xFF10B981).withOpacity(0.2),
-                      child: Text('${idx + 1}',
-                          style: const TextStyle(
-                              color: Color(0xFF34D399), fontWeight: FontWeight.bold, fontSize: 12)),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(v.name,
-                              style: const TextStyle(
-                                  color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis),
-                          Text('${v.district} • ${v.hours}',
-                              style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 11)),
-                        ],
-                      ),
-                    ),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Text(v.price,
-                            style: const TextStyle(
-                                color: Color(0xFF34D399), fontWeight: FontWeight.bold, fontSize: 13)),
-                        Row(
-                          children: [
-                            const Icon(Icons.star, color: Color(0xFFF59E0B), size: 12),
-                            const SizedBox(width: 2),
-                            Text('${v.rating}',
-                                style: const TextStyle(color: Color(0xFFF59E0B), fontSize: 11, fontWeight: FontWeight.bold)),
-                          ],
-                        ),
-                      ],
-                    ),
+                    const Icon(Icons.error_outline_rounded, color: AdminUi.danger, size: 18),
+                    const SizedBox(width: 10),
+                    Expanded(child: Text(_loadError!, style: const TextStyle(color: AdminUi.text, fontSize: 13))),
+                    TextButton(onPressed: _loadData, child: const Text('Thử lại')),
                   ],
                 ),
-              );
-            },
+              ),
+              const SizedBox(height: 16),
+            ],
+            _buildKpiRow(s),
+            const SizedBox(height: 16),
+            _twoCol(wide, _buildRevenueCard(s), _buildSportShareCard(s), l: 3, r: 2),
+            const SizedBox(height: 16),
+            _twoCol(wide, _buildSlotsCard(s), _buildTopVenuesCard(s)),
+            const SizedBox(height: 16),
+            _twoCol(wide, _buildForecastCard(), _buildAttentionCard(s)),
+            const SizedBox(height: 16),
+            Text(
+              'Nguồn: ${_bookings.length} đơn đặt sân trên Firestore. Doanh thu chỉ gồm đơn đã xác nhận hoặc hoàn thành; '
+              'kỳ thống kê tính theo ngày chơi. Mức thay đổi chỉ hiển thị khi kỳ trước có dữ liệu.',
+              style: AdminUi.caption,
+            ),
+          ],
+        ),
+      );
+    });
+  }
+
+  Widget _buildOverviewHeader(AdminStats s) {
+    return Wrap(
+      spacing: 12,
+      runSpacing: 10,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      alignment: WrapAlignment.spaceBetween,
+      children: [
+        SegmentedTabs(
+          items: [for (final p in AdminPeriod.all) (p.key, p.label)],
+          selected: _selectedPeriod,
+          onChanged: (k) => setState(() => _selectedPeriod = k),
+        ),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('${_dm(s.from)} – ${_dm(s.to)}', style: AdminUi.caption),
+            const SizedBox(width: 12),
+            OutlinedButton.icon(
+              onPressed: () async {
+                await Clipboard.setData(ClipboardData(text: s.toCsv()));
+                if (mounted) _showToast('Đã sao chép báo cáo CSV. Dán vào Excel hoặc Google Sheets.');
+              },
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AdminUi.text,
+                side: const BorderSide(color: AdminUi.border),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              icon: const Icon(Icons.copy_all_rounded, size: 16),
+              label: const Text('Sao chép CSV', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildKpiRow(AdminStats s) {
+    final tiles = <Widget>[
+      KpiTile(
+        label: 'Doanh thu',
+        value: AdminStats.fmtMoney(s.revenue),
+        icon: Icons.payments_outlined,
+        color: AdminUi.accent,
+        change: AdminStats.change(s.revenue, s.prevRevenue),
+        footnote: s.hasData ? 'Chưa có kỳ trước để so sánh' : 'Chưa có đơn trong kỳ',
+      ),
+      KpiTile(
+        label: 'Đơn đặt sân',
+        value: '${s.orders}',
+        icon: Icons.event_available_outlined,
+        color: AdminUi.info,
+        change: AdminStats.change(s.orders, s.prevOrders),
+        footnote: '${s.pending} đơn đang chờ xác nhận',
+      ),
+      KpiTile(
+        label: 'Tỷ lệ hủy',
+        value: s.cancelRate == null ? '—' : '${(s.cancelRate! * 100).toStringAsFixed(1)}%',
+        icon: Icons.event_busy_outlined,
+        color: AdminUi.warn,
+        invertGood: true,
+        change: (s.cancelRate == null || s.prevCancelRate == null)
+            ? null
+            : AdminStats.change(s.cancelRate! * 100, s.prevCancelRate! * 100),
+        footnote: '${s.cancelled} đơn hủy trong kỳ',
+      ),
+      KpiTile(
+        label: 'Khách đặt sân',
+        value: '${s.customers}',
+        icon: Icons.people_outline_rounded,
+        color: AdminUi.violet,
+        change: AdminStats.change(s.customers, s.prevCustomers),
+        footnote: s.orders == 0 ? 'Chưa có đơn trong kỳ' : 'TB ${AdminStats.fmtMoney(s.avgOrderValue)}/đơn',
+      ),
+    ];
+    return LayoutBuilder(builder: (context, c) {
+      final cols = c.maxWidth >= 900 ? 4 : (c.maxWidth >= 520 ? 2 : 1);
+      final w = (c.maxWidth - 12 * (cols - 1)) / cols;
+      return Wrap(
+        spacing: 12,
+        runSpacing: 12,
+        children: [for (final t in tiles) SizedBox(width: w, child: t)],
+      );
+    });
+  }
+
+  Widget _buildRevenueCard(AdminStats s) {
+    final empty = s.series.every((b) => b.revenue == 0 && b.orders == 0);
+    return AdminCard(
+      title: 'Doanh thu theo thời gian',
+      subtitle: s.period.days <= 1
+          ? 'Theo giờ bắt đầu của ca đặt'
+          : (s.period.days <= 31 ? 'Theo ngày chơi' : 'Theo tháng'),
+      trailing: Text(AdminStats.fmtCompact(s.revenue),
+          style: const TextStyle(color: AdminUi.text, fontSize: 20, fontWeight: FontWeight.w700)),
+      child: empty
+          ? const EmptyHint(icon: Icons.bar_chart_rounded, text: 'Chưa có đơn nào trong kỳ này.\nThử chọn kỳ dài hơn.')
+          : MiniBarChart(
+              values: [for (final b in s.series) b.revenue.toDouble()],
+              labels: [for (final b in s.series) b.label],
+              tooltips: [
+                for (final b in s.series) '${b.tooltip}\n${AdminStats.fmtMoney(b.revenue)} • ${b.orders} đơn'
+              ],
+            ),
+    );
+  }
+
+  Widget _buildSportShareCard(AdminStats s) {
+    final entries = s.revenueBySport.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
+    final total = entries.fold<int>(0, (a, e) => a + e.value);
+    return AdminCard(
+      title: 'Doanh thu theo môn',
+      subtitle: 'Tỷ trọng trong kỳ',
+      child: total == 0
+          ? const EmptyHint(icon: Icons.donut_large_rounded, text: 'Chưa có doanh thu trong kỳ này.')
+          : Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                SizedBox(
+                  width: 116,
+                  height: 116,
+                  child: CustomPaint(
+                    painter: DonutChartPainter(
+                      slices: [for (final e in entries) e.value / total],
+                      colors: [for (final e in entries) AdminUi.sportColor(e.key)],
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 18),
+                Expanded(
+                  child: Column(
+                    children: [
+                      for (final e in entries)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 5),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 9,
+                                height: 9,
+                                decoration: BoxDecoration(color: AdminUi.sportColor(e.key), shape: BoxShape.circle),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(e.key,
+                                    style: const TextStyle(color: AdminUi.text, fontSize: 13),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis),
+                              ),
+                              Text('${(e.value / total * 100).round()}%',
+                                  style: const TextStyle(color: AdminUi.text, fontSize: 13, fontWeight: FontWeight.w600)),
+                              const SizedBox(width: 8),
+                              SizedBox(
+                                width: 56,
+                                child: Text(AdminStats.fmtCompact(e.value),
+                                    textAlign: TextAlign.right, style: AdminUi.caption),
+                              ),
+                            ],
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+    );
+  }
+
+  Widget _buildSlotsCard(AdminStats s) {
+    final maxOrders = s.slots.fold<int>(0, (a, e) => e.orders > a ? e.orders : a);
+    return AdminCard(
+      title: 'Khung giờ được đặt nhiều nhất',
+      subtitle: 'Số đơn theo giờ bắt đầu ca',
+      child: maxOrders == 0
+          ? const EmptyHint(icon: Icons.schedule_rounded, text: 'Chưa có đơn nào trong kỳ này.')
+          : Column(
+              children: [
+                for (final sl in s.slots)
+                  HBarRow(
+                    label: sl.label,
+                    valueText: '${sl.orders} đơn',
+                    ratio: sl.orders / maxOrders,
+                    color: sl.orders == maxOrders ? AdminUi.warn : AdminUi.info,
+                    note: sl.orders == maxOrders ? 'Cao điểm trong kỳ' : null,
+                  ),
+              ],
+            ),
+    );
+  }
+
+  Widget _buildTopVenuesCard(AdminStats s) {
+    return AdminCard(
+      title: 'Cụm sân doanh thu cao nhất',
+      subtitle: 'Top 5 trong kỳ',
+      trailing: TextButton(
+        onPressed: () => setState(() => _selectedNavIndex = 1),
+        child: const Text('Quản lý sân'),
+      ),
+      child: s.topVenues.isEmpty
+          ? const EmptyHint(icon: Icons.stadium_outlined, text: 'Chưa có doanh thu trong kỳ này.')
+          : Column(
+              children: [
+                for (var i = 0; i < s.topVenues.length; i++) ...[
+                  if (i > 0) const Divider(height: 1, color: AdminUi.border),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    child: Row(
+                      children: [
+                        SizedBox(
+                          width: 22,
+                          child: Text('${i + 1}', style: const TextStyle(color: AdminUi.faint, fontSize: 13, fontWeight: FontWeight.w600)),
+                        ),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(s.topVenues[i].name,
+                                  style: const TextStyle(color: AdminUi.text, fontSize: 13, fontWeight: FontWeight.w500),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis),
+                              Text(
+                                '${s.topVenues[i].district != null ? '${s.topVenues[i].district} • ' : ''}${s.topVenues[i].orders} đơn',
+                                style: AdminUi.caption,
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(AdminStats.fmtMoney(s.topVenues[i].revenue),
+                            style: const TextStyle(color: AdminUi.text, fontSize: 13, fontWeight: FontWeight.w600)),
+                      ],
+                    ),
+                  ),
+                ],
+              ],
+            ),
+    );
+  }
+
+  Widget _buildForecastCard() {
+    final model = _demandModel;
+    final now = DateTime.now();
+    final start = DateTime(now.year, now.month, now.day);
+    final days = [
+      for (var i = 0; i < 7; i++)
+        model.forecastDay(start.add(Duration(days: i)), rain: _rainByDate[VnCalendar.key(start.add(Duration(days: i)))]),
+    ];
+    Color levelColor(String l) {
+      switch (l) {
+        case 'RẤT CAO':
+        case 'CAO':
+          return AdminUi.accent;
+        case 'BÌNH THƯỜNG':
+          return AdminUi.info;
+        default:
+          return AdminUi.warn;
+      }
+    }
+
+    return AdminCard(
+      title: 'Dự báo 7 ngày tới',
+      subtitle: 'Nhu cầu và tỷ lệ hủy dự kiến (mô hình thống kê)',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          for (var i = 0; i < days.length; i++) ...[
+            if (i > 0) const Divider(height: 1, color: AdminUi.border),
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 9),
+              child: Row(
+                children: [
+                  Expanded(
+                    flex: 5,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('${VnWeekday.name(days[i].date)} ${_dm(days[i].date)}',
+                            style: const TextStyle(color: AdminUi.text, fontSize: 13, fontWeight: FontWeight.w500)),
+                        if (days[i].holiday != null || days[i].weekend || (days[i].rain?.prob ?? 0) >= 50)
+                          Text(
+                            [
+                              if (days[i].holiday != null) days[i].holiday!.name else if (days[i].weekend) 'Cuối tuần',
+                              if ((days[i].rain?.prob ?? 0) >= 50) 'mưa ${days[i].rain!.prob.round()}%',
+                            ].join(' • '),
+                            style: AdminUi.caption,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                      ],
+                    ),
+                  ),
+                  Expanded(
+                    flex: 4,
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: StatusPill(days[i].level[0] + days[i].level.substring(1).toLowerCase(), levelColor(days[i].level)),
+                    ),
+                  ),
+                  Expanded(
+                    flex: 3,
+                    child: Text(
+                      days[i].expectedBookings == null ? '—' : '~${days[i].expectedBookings!.round()} đơn',
+                      textAlign: TextAlign.right,
+                      style: const TextStyle(color: AdminUi.text, fontSize: 13),
+                    ),
+                  ),
+                  Expanded(
+                    flex: 3,
+                    child: Text('hủy ${(days[i].cancelRate * 100).round()}%',
+                        textAlign: TextAlign.right, style: const TextStyle(color: AdminUi.muted, fontSize: 13)),
+                  ),
+                ],
+              ),
+            ),
+          ],
+          const SizedBox(height: 10),
+          Text(
+            'Học từ ${model.n} đơn lịch sử. Mọi đơn mới đều chuyển khoản trước nên tỉ lệ hủy được dự báo theo nhóm trả trước. '
+            'Ảnh hưởng của mưa và ngày lễ là giả định chuyên môn, chưa kiểm chứng bằng dữ liệu. '
+            'Độ tin cậy: ${model.confidenceText.split(' (').first.toLowerCase()}.',
+            style: AdminUi.caption,
           ),
         ],
       ),
     );
   }
 
-  // --- AI INSIGHTS ---
-  Widget _buildAiInsightsCard() {
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [const Color(0xFF1E293B), const Color(0xFF1E1B4B)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFF6366F1).withOpacity(0.4)),
-      ),
+  Widget _buildAttentionCard(AdminStats s) {
+    final pendingVenues = _venues.where((v) => v.isPending).length;
+    final items = <(IconData, String, int, Color, VoidCallback)>[
+      if (pendingVenues > 0)
+        (Icons.stadium_outlined, 'Sân đang chờ duyệt', pendingVenues, AdminUi.warn, () => setState(() {
+              _selectedApprovalFilter = 'pending';
+              _selectedNavIndex = 1;
+            })),
+      if (s.pending > 0)
+        (Icons.hourglass_top_rounded, 'Đơn chờ xác nhận', s.pending, AdminUi.info, () => setState(() {
+              _selectedBookingStatus = 'Chờ xác nhận';
+              _selectedNavIndex = 2;
+            })),
+      if (s.overduePending > 0)
+        (Icons.warning_amber_rounded, 'Đơn chờ xác nhận đã quá ngày chơi', s.overduePending, AdminUi.danger, () => setState(() {
+              _selectedBookingStatus = 'Chờ xác nhận';
+              _selectedNavIndex = 2;
+            })),
+    ];
+    final pay = s.paymentMethods.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
+    final payTotal = pay.fold<int>(0, (a, e) => a + e.value);
+
+    return AdminCard(
+      title: 'Cần xử lý & thanh toán',
+      subtitle: 'Việc tồn đọng và cách khách thanh toán trong kỳ',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF6366F1).withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Icon(Icons.auto_awesome, color: Color(0xFF818CF8), size: 18),
+          if (items.isEmpty)
+            const Padding(
+              padding: EdgeInsets.only(bottom: 8),
+              child: Row(
+                children: [
+                  Icon(Icons.check_circle_outline_rounded, color: AdminUi.accent, size: 18),
+                  SizedBox(width: 8),
+                  Text('Không có việc tồn đọng', style: TextStyle(color: AdminUi.muted, fontSize: 13)),
+                ],
               ),
-              const SizedBox(width: 8),
-              const Text('AI Insights & Đề Xuất Doanh Thu',
-                  style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold)),
-            ],
-          ),
-          const SizedBox(height: 12),
-          const Text(
-            '• Dự báo thứ 7 tới nhu cầu sân Pickleball tăng 35% từ 17h–21h. Đề xuất mở thêm 2 sân dự bị.\n'
-            '• Tỷ lệ đặt khung 09h–14h ngày thường chỉ đạt 42%. Nên áp dụng mã giảm giá HAPPYHOUR20 để tối ưu công suất.\n'
-            '• Hệ thống phát hiện cụm sân Cầu Giấy đã kín 100% lịch tuần tới, nên gợi ý khách sang cụm sân Nam Từ Liêm lân cận.',
-            style: TextStyle(color: Color(0xFFCBD5E1), fontSize: 13, height: 1.6),
-          ),
+            )
+          else
+            for (final it in items)
+              InkWell(
+                onTap: it.$5,
+                borderRadius: BorderRadius.circular(8),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+                  child: Row(
+                    children: [
+                      Icon(it.$1, color: it.$4, size: 18),
+                      const SizedBox(width: 10),
+                      Expanded(child: Text(it.$2, style: const TextStyle(color: AdminUi.text, fontSize: 13))),
+                      StatusPill('${it.$3}', it.$4),
+                      const SizedBox(width: 6),
+                      const Icon(Icons.chevron_right_rounded, color: AdminUi.faint, size: 18),
+                    ],
+                  ),
+                ),
+              ),
+          const SizedBox(height: 10),
+          const Divider(height: 1, color: AdminUi.border),
+          const SizedBox(height: 10),
+          const Text('Phương thức thanh toán', style: TextStyle(color: AdminUi.muted, fontSize: 12.5, fontWeight: FontWeight.w600)),
+          const SizedBox(height: 4),
+          if (payTotal == 0)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 8),
+              child: Text('Chưa có đơn trong kỳ này.', style: AdminUi.caption),
+            )
+          else
+            for (final e in pay.take(4))
+              HBarRow(
+                label: e.key,
+                valueText: '${(e.value / payTotal * 100).round()}% • ${e.value} đơn',
+                ratio: e.value / payTotal,
+                color: AdminUi.info,
+              ),
         ],
       ),
     );
@@ -1785,7 +1287,7 @@ class _AdminScreenState extends State<AdminScreen> {
         // Controls Bar (Search + Filter + Add Button)
         Container(
           padding: const EdgeInsets.all(16),
-          color: const Color(0xFF0A1628),
+          color: AdminUi.surface,
           child: Column(
             children: [
               Row(
@@ -1793,17 +1295,17 @@ class _AdminScreenState extends State<AdminScreen> {
                   Expanded(
                     child: Container(
                       decoration: BoxDecoration(
-                        color: const Color(0xFF050B18),
+                        color: AdminUi.bg,
                         borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: const Color(0xFF1E3A5F).withOpacity(0.5)),
+                        border: Border.all(color: AdminUi.border.withOpacity(0.5)),
                       ),
                       child: TextField(
                         onChanged: (val) => setState(() => _searchVenueQuery = val),
                         style: const TextStyle(color: Colors.white, fontSize: 13),
                         decoration: const InputDecoration(
                           hintText: 'Tìm kiếm sân theo tên, quận, địa chỉ...',
-                          hintStyle: TextStyle(color: Color(0xFF64748B), fontSize: 13),
-                          prefixIcon: Icon(Icons.search, color: Color(0xFF64748B), size: 18),
+                          hintStyle: TextStyle(color: AdminUi.faint, fontSize: 13),
+                          prefixIcon: Icon(Icons.search, color: AdminUi.faint, size: 18),
                           border: InputBorder.none,
                           isDense: true,
                           contentPadding: EdgeInsets.symmetric(vertical: 12),
@@ -1815,7 +1317,7 @@ class _AdminScreenState extends State<AdminScreen> {
                   ElevatedButton.icon(
                     onPressed: _openAddVenueDialog,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF10B981),
+                      backgroundColor: AdminUi.accent,
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -1842,14 +1344,14 @@ class _AdminScreenState extends State<AdminScreen> {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF0F172A),
+                        color: AdminUi.bg,
                         borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: const Color(0xFF334155)),
+                        border: Border.all(color: AdminUi.border),
                       ),
                       child: DropdownButtonHideUnderline(
                         child: DropdownButton<String>(
                           value: _selectedDistrict,
-                          dropdownColor: const Color(0xFF0B1424),
+                          dropdownColor: AdminUi.surface,
                           style: const TextStyle(color: Colors.white, fontSize: 12),
                           items: [
                             const DropdownMenuItem(value: 'all', child: Text('Tất cả quận')),
@@ -1872,9 +1374,9 @@ class _AdminScreenState extends State<AdminScreen> {
                     const SizedBox(width: 6),
                     _approvalFilterChip('pending', 'Chờ Duyệt ⏳ (${_venues.where((v) => v.isPending).length})'),
                     const SizedBox(width: 6),
-                    _approvalFilterChip('approved', 'Đã Duyệt ✅ (${_venues.where((v) => v.isApproved).length})'),
+                    _approvalFilterChip('approved', 'Đã Duyệt (${_venues.where((v) => v.isApproved).length})'),
                     const SizedBox(width: 6),
-                    _approvalFilterChip('rejected', 'Từ Chối ❌ (${_venues.where((v) => v.isRejected).length})'),
+                    _approvalFilterChip('rejected', 'Từ Chối (${_venues.where((v) => v.isRejected).length})'),
                   ],
                 ),
               ),
@@ -1887,7 +1389,7 @@ class _AdminScreenState extends State<AdminScreen> {
           child: _filteredVenues.isEmpty
               ? const Center(
                   child: Text('Không tìm thấy sân phù hợp.',
-                      style: TextStyle(color: Color(0xFF94A3B8), fontSize: 14)),
+                      style: TextStyle(color: AdminUi.muted, fontSize: 14)),
                 )
               : ListView.builder(
                   padding: const EdgeInsets.all(16),
@@ -1912,23 +1414,23 @@ class _AdminScreenState extends State<AdminScreen> {
           decoration: BoxDecoration(
             gradient: selected
                 ? const LinearGradient(
-                    colors: [Color(0xFF10B981), Color(0xFF059669)],
+                    colors: [AdminUi.accent, AdminUi.accent],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   )
                 : const LinearGradient(
-                    colors: [Color(0xFF0F203C), Color(0xFF070E1B)],
+                    colors: [AdminUi.surfaceAlt, AdminUi.sidebar],
                   ),
             borderRadius: BorderRadius.circular(10),
             border: Border.all(
               color: selected
-                  ? const Color(0xFF34D399)
-                  : const Color(0xFF1E3A5F).withOpacity(0.6),
+                  ? AdminUi.accent
+                  : AdminUi.border.withOpacity(0.6),
             ),
             boxShadow: selected
                 ? [
                     BoxShadow(
-                      color: const Color(0xFF10B981).withOpacity(0.35),
+                      color: AdminUi.accent.withOpacity(0.35),
                       blurRadius: 8,
                       offset: const Offset(0, 2),
                     ),
@@ -1938,7 +1440,7 @@ class _AdminScreenState extends State<AdminScreen> {
           child: Text(
             label,
             style: TextStyle(
-              color: selected ? Colors.white : const Color(0xFF94A3B8),
+              color: selected ? Colors.white : AdminUi.muted,
               fontSize: 12.5,
               fontWeight: selected ? FontWeight.bold : FontWeight.w500,
             ),
@@ -1950,14 +1452,14 @@ class _AdminScreenState extends State<AdminScreen> {
 
   Widget _approvalFilterChip(String key, String label) {
     final selected = _selectedApprovalFilter == key;
-    Color activeColor = const Color(0xFF10B981);
-    Color activeColorDark = const Color(0xFF059669);
+    Color activeColor = AdminUi.accent;
+    Color activeColorDark = AdminUi.accent;
     if (key == 'pending') {
-      activeColor = const Color(0xFFF59E0B);
+      activeColor = AdminUi.warn;
       activeColorDark = const Color(0xFFD97706);
     } else if (key == 'rejected') {
-      activeColor = const Color(0xFFEF4444);
-      activeColorDark = const Color(0xFFDC2626);
+      activeColor = AdminUi.danger;
+      activeColorDark = AdminUi.danger;
     }
 
     return Padding(
@@ -1976,11 +1478,11 @@ class _AdminScreenState extends State<AdminScreen> {
                     end: Alignment.bottomRight,
                   )
                 : const LinearGradient(
-                    colors: [Color(0xFF0F203C), Color(0xFF070E1B)],
+                    colors: [AdminUi.surfaceAlt, AdminUi.sidebar],
                   ),
             borderRadius: BorderRadius.circular(10),
             border: Border.all(
-              color: selected ? activeColor : const Color(0xFF1E3A5F).withOpacity(0.6),
+              color: selected ? activeColor : AdminUi.border.withOpacity(0.6),
             ),
             boxShadow: selected
                 ? [
@@ -1995,7 +1497,7 @@ class _AdminScreenState extends State<AdminScreen> {
           child: Text(
             label,
             style: TextStyle(
-              color: selected ? Colors.white : const Color(0xFF94A3B8),
+              color: selected ? Colors.white : AdminUi.muted,
               fontSize: 12.5,
               fontWeight: selected ? FontWeight.bold : FontWeight.w500,
             ),
@@ -2006,17 +1508,17 @@ class _AdminScreenState extends State<AdminScreen> {
   }
 
   Widget _buildVenueRowCard(Venue v) {
-    Color statusBg = const Color(0xFF10B981).withOpacity(0.15);
-    Color statusColor = const Color(0xFF10B981);
+    Color statusBg = AdminUi.accent.withOpacity(0.15);
+    Color statusColor = AdminUi.accent;
     String statusText = 'Đã duyệt';
 
     if (v.isPending) {
-      statusBg = const Color(0xFFFBBF24).withOpacity(0.15);
-      statusColor = const Color(0xFFFBBF24);
+      statusBg = AdminUi.warn.withOpacity(0.15);
+      statusColor = AdminUi.warn;
       statusText = 'Chờ duyệt';
     } else if (v.isRejected) {
-      statusBg = const Color(0xFFEF4444).withOpacity(0.15);
-      statusColor = const Color(0xFFEF4444);
+      statusBg = AdminUi.danger.withOpacity(0.15);
+      statusColor = AdminUi.danger;
       statusText = 'Từ chối';
     }
 
@@ -2024,23 +1526,12 @@ class _AdminScreenState extends State<AdminScreen> {
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF0F1F35), Color(0xFF0A1628)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
+        color: AdminUi.surface,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
-          color: v.isPending ? const Color(0xFFFBBF24).withOpacity(0.6) : const Color(0xFF1E3A5F).withOpacity(0.5),
+          color: v.isPending ? AdminUi.warn.withOpacity(0.6) : AdminUi.border.withOpacity(0.5),
           width: v.isPending ? 1.5 : 1.0,
         ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.2),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -2070,13 +1561,13 @@ class _AdminScreenState extends State<AdminScreen> {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF10B981).withOpacity(0.15),
+                            color: AdminUi.accent.withOpacity(0.15),
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: Text(
                             v.type.toUpperCase(),
                             style: const TextStyle(
-                                color: Color(0xFF34D399), fontSize: 10, fontWeight: FontWeight.bold),
+                                color: AdminUi.accent, fontSize: 10, fontWeight: FontWeight.bold),
                           ),
                         ),
                         const SizedBox(width: 6),
@@ -2095,7 +1586,7 @@ class _AdminScreenState extends State<AdminScreen> {
                         const SizedBox(width: 6),
                         Text(
                           '#${v.id}',
-                          style: const TextStyle(color: Color(0xFF64748B), fontSize: 11, fontFamily: 'monospace'),
+                          style: const TextStyle(color: AdminUi.faint, fontSize: 11, fontFamily: 'monospace'),
                         ),
                       ],
                     ),
@@ -2110,7 +1601,7 @@ class _AdminScreenState extends State<AdminScreen> {
                     const SizedBox(height: 2),
                     Text(
                       '${v.address} (${v.district}) • Chủ: ${v.ownerName}',
-                      style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 11),
+                      style: const TextStyle(color: AdminUi.muted, fontSize: 11),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -2119,11 +1610,11 @@ class _AdminScreenState extends State<AdminScreen> {
                       children: [
                         Text(v.price,
                             style: const TextStyle(
-                                color: Color(0xFF10B981), fontWeight: FontWeight.bold, fontSize: 12)),
+                                color: AdminUi.accent, fontWeight: FontWeight.bold, fontSize: 12)),
                         const SizedBox(width: 10),
-                        const Icon(Icons.access_time, size: 12, color: Color(0xFF64748B)),
+                        const Icon(Icons.access_time, size: 12, color: AdminUi.faint),
                         const SizedBox(width: 2),
-                        Text(v.hours, style: const TextStyle(color: Color(0xFF64748B), fontSize: 11)),
+                        Text(v.hours, style: const TextStyle(color: AdminUi.faint, fontSize: 11)),
                       ],
                     ),
                   ],
@@ -2140,12 +1631,12 @@ class _AdminScreenState extends State<AdminScreen> {
                     onPressed: () => _openViewDetailDialog(v),
                   ),
                   IconButton(
-                    icon: const Icon(Icons.edit_outlined, color: Color(0xFF818CF8), size: 20),
+                    icon: const Icon(Icons.edit_outlined, color: AdminUi.violet, size: 20),
                     tooltip: 'Chỉnh sửa',
                     onPressed: () => _openEditVenueDialog(v),
                   ),
                   IconButton(
-                    icon: const Icon(Icons.delete_outline, color: Color(0xFFF87171), size: 20),
+                    icon: const Icon(Icons.delete_outline, color: AdminUi.danger, size: 20),
                     tooltip: 'Xóa sân',
                     onPressed: () => _openDeleteVenueDialog(v),
                   ),
@@ -2160,18 +1651,18 @@ class _AdminScreenState extends State<AdminScreen> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
               decoration: BoxDecoration(
-                color: const Color(0xFF0F172A),
+                color: AdminUi.bg,
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: const Color(0xFFFBBF24).withOpacity(0.3)),
+                border: Border.all(color: AdminUi.warn.withOpacity(0.3)),
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.shield_outlined, color: Color(0xFFFBBF24), size: 16),
+                  const Icon(Icons.shield_outlined, color: AdminUi.warn, size: 16),
                   const SizedBox(width: 6),
                   const Expanded(
                     child: Text(
                       'Yêu cầu đăng bài từ Chủ sân cần bạn phê duyệt:',
-                      style: TextStyle(color: Color(0xFFFBBF24), fontSize: 12, fontWeight: FontWeight.w500),
+                      style: TextStyle(color: AdminUi.warn, fontSize: 12, fontWeight: FontWeight.w500),
                     ),
                   ),
                   ElevatedButton.icon(
@@ -2185,7 +1676,7 @@ class _AdminScreenState extends State<AdminScreen> {
                     icon: const Icon(Icons.check_circle, size: 14),
                     label: const Text('Duyệt Đăng', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold)),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF10B981),
+                      backgroundColor: AdminUi.accent,
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     ),
@@ -2196,8 +1687,8 @@ class _AdminScreenState extends State<AdminScreen> {
                     icon: const Icon(Icons.cancel_outlined, size: 14),
                     label: const Text('Từ Chối', style: TextStyle(fontSize: 11.5)),
                     style: OutlinedButton.styleFrom(
-                      foregroundColor: const Color(0xFFEF4444),
-                      side: const BorderSide(color: Color(0xFFEF4444)),
+                      foregroundColor: AdminUi.danger,
+                      side: const BorderSide(color: AdminUi.danger),
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                     ),
                   ),
@@ -2215,11 +1706,11 @@ class _AdminScreenState extends State<AdminScreen> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF0B1424),
+        backgroundColor: AdminUi.surface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Row(
           children: [
-            Icon(Icons.cancel, color: Color(0xFFEF4444)),
+            Icon(Icons.cancel, color: AdminUi.danger),
             SizedBox(width: 8),
             Text('Từ Chối Bài Đăng Sân', style: TextStyle(color: Colors.white, fontSize: 16)),
           ],
@@ -2229,7 +1720,7 @@ class _AdminScreenState extends State<AdminScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text('Nhập lý do từ chối để gửi phản hồi cho chủ sân "${v.name}":',
-                style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13)),
+                style: const TextStyle(color: AdminUi.muted, fontSize: 13)),
             const SizedBox(height: 10),
             _dialogTextField('Lý Do Từ Chối *', reasonCtrl, 'VD: Cần cập nhật giấy phép / ảnh thực tế'),
           ],
@@ -2237,7 +1728,7 @@ class _AdminScreenState extends State<AdminScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Hủy', style: TextStyle(color: Color(0xFF94A3B8))),
+            child: const Text('Hủy', style: TextStyle(color: AdminUi.muted)),
           ),
           ElevatedButton(
             onPressed: () async {
@@ -2249,7 +1740,7 @@ class _AdminScreenState extends State<AdminScreen> {
               Navigator.pop(ctx);
               _showToast('Đã từ chối duyệt bài sân "${v.name}"!', isError: true);
             },
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFEF4444)),
+            style: ElevatedButton.styleFrom(backgroundColor: AdminUi.danger),
             child: const Text('Xác Nhận Từ Chối', style: TextStyle(color: Colors.white)),
           ),
         ],
@@ -2277,20 +1768,9 @@ class _AdminScreenState extends State<AdminScreen> {
                 child: Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF0F1F35), Color(0xFF0A1628)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
+                    color: AdminUi.surface,
                     borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: const Color(0xFF38BDF8).withOpacity(0.25)),
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0xFF38BDF8).withOpacity(0.05),
-                        blurRadius: 15,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
+                    border: Border.all(color: AdminUi.info.withOpacity(0.25)),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -2298,14 +1778,14 @@ class _AdminScreenState extends State<AdminScreen> {
                       const Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text('Tổng Đơn Đặt', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12)),
-                          Icon(Icons.calendar_month_outlined, color: Color(0xFF38BDF8), size: 18),
+                          Flexible(child: Text('Tổng Đơn Đặt', style: const TextStyle(color: AdminUi.muted, fontSize: 12), maxLines: 1, overflow: TextOverflow.ellipsis)),
+                          Icon(Icons.calendar_month_outlined, color: AdminUi.info, size: 18),
                         ],
                       ),
                       const SizedBox(height: 6),
                       Text('${_bookings.length}', style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
                       const SizedBox(height: 2),
-                      const Text('Tất cả lịch đặt trên hệ thống', style: TextStyle(color: Color(0xFF38BDF8), fontSize: 11)),
+                      const Text('Tất cả lịch đặt trên hệ thống', style: TextStyle(color: AdminUi.info, fontSize: 11)),
                     ],
                   ),
                 ),
@@ -2315,20 +1795,9 @@ class _AdminScreenState extends State<AdminScreen> {
                 child: Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF0F1F35), Color(0xFF0A1628)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
+                    color: AdminUi.surface,
                     borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: const Color(0xFFFBBF24).withOpacity(0.25)),
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0xFFFBBF24).withOpacity(0.05),
-                        blurRadius: 15,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
+                    border: Border.all(color: AdminUi.warn.withOpacity(0.25)),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -2336,14 +1805,14 @@ class _AdminScreenState extends State<AdminScreen> {
                       const Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text('Chờ Xác Nhận', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12)),
-                          Icon(Icons.hourglass_top_rounded, color: Color(0xFFFBBF24), size: 18),
+                          Flexible(child: Text('Chờ Xác Nhận', style: const TextStyle(color: AdminUi.muted, fontSize: 12), maxLines: 1, overflow: TextOverflow.ellipsis)),
+                          Icon(Icons.hourglass_top_rounded, color: AdminUi.warn, size: 18),
                         ],
                       ),
                       const SizedBox(height: 6),
                       Text('$pendingCount', style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
                       const SizedBox(height: 2),
-                      const Text('Cần xử lý ngay', style: TextStyle(color: Color(0xFFFBBF24), fontSize: 11, fontWeight: FontWeight.w600)),
+                      const Text('Cần xử lý ngay', style: TextStyle(color: AdminUi.warn, fontSize: 11, fontWeight: FontWeight.w600)),
                     ],
                   ),
                 ),
@@ -2353,20 +1822,9 @@ class _AdminScreenState extends State<AdminScreen> {
                 child: Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF0F1F35), Color(0xFF0A1628)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
+                    color: AdminUi.surface,
                     borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: const Color(0xFF10B981).withOpacity(0.25)),
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0xFF10B981).withOpacity(0.05),
-                        blurRadius: 15,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
+                    border: Border.all(color: AdminUi.accent.withOpacity(0.25)),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -2374,14 +1832,14 @@ class _AdminScreenState extends State<AdminScreen> {
                       const Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text('Đã Xác Nhận / Đang Đá', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12)),
-                          Icon(Icons.check_circle_outline, color: Color(0xFF10B981), size: 18),
+                          Flexible(child: Text('Đã Xác Nhận / Đang Đá', style: const TextStyle(color: AdminUi.muted, fontSize: 12), maxLines: 1, overflow: TextOverflow.ellipsis)),
+                          Icon(Icons.check_circle_outline, color: AdminUi.accent, size: 18),
                         ],
                       ),
                       const SizedBox(height: 6),
                       Text('$confirmedCount', style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
                       const SizedBox(height: 2),
-                      const Text('Lịch thi đấu sẵn sàng', style: TextStyle(color: Color(0xFF10B981), fontSize: 11)),
+                      const Text('Lịch thi đấu sẵn sàng', style: TextStyle(color: AdminUi.accent, fontSize: 11)),
                     ],
                   ),
                 ),
@@ -2391,20 +1849,9 @@ class _AdminScreenState extends State<AdminScreen> {
                 child: Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF0F1F35), Color(0xFF0A1628)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
+                    color: AdminUi.surface,
                     borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: const Color(0xFF818CF8).withOpacity(0.25)),
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0xFF818CF8).withOpacity(0.05),
-                        blurRadius: 15,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
+                    border: Border.all(color: AdminUi.violet.withOpacity(0.25)),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -2412,14 +1859,14 @@ class _AdminScreenState extends State<AdminScreen> {
                       const Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text('Đã Hoàn Thành', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12)),
-                          Icon(Icons.task_alt, color: Color(0xFF818CF8), size: 18),
+                          Flexible(child: Text('Đã Hoàn Thành', style: const TextStyle(color: AdminUi.muted, fontSize: 12), maxLines: 1, overflow: TextOverflow.ellipsis)),
+                          Icon(Icons.task_alt, color: AdminUi.violet, size: 18),
                         ],
                       ),
                       const SizedBox(height: 6),
                       Text('$completedCount', style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
                       const SizedBox(height: 2),
-                      const Text('Đã chơi xong & thu tiền', style: TextStyle(color: Color(0xFF818CF8), fontSize: 11)),
+                      const Text('Đã chơi xong & thu tiền', style: TextStyle(color: AdminUi.violet, fontSize: 11)),
                     ],
                   ),
                 ),
@@ -2432,13 +1879,9 @@ class _AdminScreenState extends State<AdminScreen> {
           Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFF0F1F35), Color(0xFF0A1628)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
+              color: AdminUi.surface,
               borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: const Color(0xFF1E3A5F).withOpacity(0.5)),
+              border: Border.all(color: AdminUi.border.withOpacity(0.5)),
             ),
             child: Column(
               children: [
@@ -2448,13 +1891,13 @@ class _AdminScreenState extends State<AdminScreen> {
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 12),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF050B18),
+                          color: AdminUi.bg,
                           borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: const Color(0xFF1E3A5F).withOpacity(0.5)),
+                          border: Border.all(color: AdminUi.border.withOpacity(0.5)),
                         ),
                         child: Row(
                           children: [
-                            const Icon(Icons.search, color: Color(0xFF64748B), size: 18),
+                            const Icon(Icons.search, color: AdminUi.faint, size: 18),
                             const SizedBox(width: 8),
                             Expanded(
                               child: TextField(
@@ -2462,7 +1905,7 @@ class _AdminScreenState extends State<AdminScreen> {
                                 style: const TextStyle(color: Colors.white, fontSize: 13),
                                 decoration: const InputDecoration(
                                   hintText: 'Tìm theo mã đơn (BK-...), tên khách, SĐT, tên sân...',
-                                  hintStyle: TextStyle(color: Color(0xFF64748B), fontSize: 13),
+                                  hintStyle: TextStyle(color: AdminUi.faint, fontSize: 13),
                                   border: InputBorder.none,
                                   isDense: true,
                                   contentPadding: EdgeInsets.symmetric(vertical: 12),
@@ -2472,7 +1915,7 @@ class _AdminScreenState extends State<AdminScreen> {
                             if (_searchBookingQuery.isNotEmpty)
                               GestureDetector(
                                 onTap: () => setState(() => _searchBookingQuery = ''),
-                                child: const Icon(Icons.close, color: Color(0xFF94A3B8), size: 16),
+                                child: const Icon(Icons.close, color: AdminUi.muted, size: 16),
                               ),
                           ],
                         ),
@@ -2482,7 +1925,7 @@ class _AdminScreenState extends State<AdminScreen> {
                     ElevatedButton.icon(
                       onPressed: _openAddWalkinBookingDialog,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF10B981),
+                        backgroundColor: AdminUi.accent,
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -2519,9 +1962,9 @@ class _AdminScreenState extends State<AdminScreen> {
               alignment: Alignment.center,
               child: const Column(
                 children: [
-                  Icon(Icons.event_busy, color: Color(0xFF64748B), size: 48),
+                  Icon(Icons.event_busy, color: AdminUi.faint, size: 48),
                   SizedBox(height: 12),
-                  Text('Không tìm thấy lịch đặt sân phù hợp', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 14)),
+                  Text('Không tìm thấy lịch đặt sân phù hợp', style: TextStyle(color: AdminUi.muted, fontSize: 14)),
                 ],
               ),
             )
@@ -2539,29 +1982,18 @@ class _AdminScreenState extends State<AdminScreen> {
   }
 
   Widget _buildBookingItemCard(BookingItem b) {
-    Color statusColor = const Color(0xFFF59E0B);
-    if (b.status == 'Đã xác nhận') statusColor = const Color(0xFF10B981);
-    if (b.status == 'Hoàn thành') statusColor = const Color(0xFF6366F1);
-    if (b.status == 'Đã hủy') statusColor = const Color(0xFFEF4444);
+    Color statusColor = AdminUi.warn;
+    if (b.status == 'Đã xác nhận') statusColor = AdminUi.accent;
+    if (b.status == 'Hoàn thành') statusColor = AdminUi.violet;
+    if (b.status == 'Đã hủy') statusColor = AdminUi.danger;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF0F1F35), Color(0xFF0A1628)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
+        color: AdminUi.surface,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFF1E3A5F).withOpacity(0.5)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.2),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
-          ),
-        ],
+        border: Border.all(color: AdminUi.border.withOpacity(0.5)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -2574,7 +2006,7 @@ class _AdminScreenState extends State<AdminScreen> {
                   Text(
                     b.id,
                     style: const TextStyle(
-                        color: Color(0xFF818CF8), fontWeight: FontWeight.bold, fontFamily: 'monospace'),
+                        color: AdminUi.violet, fontWeight: FontWeight.bold, fontFamily: 'monospace'),
                   ),
                   const SizedBox(width: 8),
                   Container(
@@ -2593,31 +2025,31 @@ class _AdminScreenState extends State<AdminScreen> {
               ),
               Text(
                 b.amount,
-                style: const TextStyle(color: Color(0xFF10B981), fontWeight: FontWeight.bold, fontSize: 15),
+                style: const TextStyle(color: AdminUi.accent, fontWeight: FontWeight.bold, fontSize: 15),
               ),
             ],
           ),
           const SizedBox(height: 8),
           Row(
             children: [
-              const Icon(Icons.person, color: Color(0xFF94A3B8), size: 14),
+              const Icon(Icons.person, color: AdminUi.muted, size: 14),
               const SizedBox(width: 4),
               Text(b.customer,
                   style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 13)),
               const SizedBox(width: 12),
-              const Icon(Icons.phone, color: Color(0xFF94A3B8), size: 14),
+              const Icon(Icons.phone, color: AdminUi.muted, size: 14),
               const SizedBox(width: 4),
-              Text(b.phone, style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12)),
+              Text(b.phone, style: const TextStyle(color: AdminUi.muted, fontSize: 12)),
             ],
           ),
           const SizedBox(height: 4),
           Row(
             children: [
-              const Icon(Icons.sports_tennis, color: Color(0xFF94A3B8), size: 14),
+              const Icon(Icons.sports_tennis, color: AdminUi.muted, size: 14),
               const SizedBox(width: 4),
               Expanded(
                 child: Text('${b.venueName} (${b.field})',
-                    style: const TextStyle(color: Color(0xFFCBD5E1), fontSize: 12),
+                    style: const TextStyle(color: AdminUi.muted, fontSize: 12),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis),
               ),
@@ -2629,10 +2061,10 @@ class _AdminScreenState extends State<AdminScreen> {
             children: [
               Row(
                 children: [
-                  const Icon(Icons.access_time, color: Color(0xFF94A3B8), size: 14),
+                  const Icon(Icons.access_time, color: AdminUi.muted, size: 14),
                   const SizedBox(width: 4),
                   Text('${b.time} • ${b.date}',
-                      style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12)),
+                      style: const TextStyle(color: AdminUi.muted, fontSize: 12)),
                 ],
               ),
               // Action buttons (Approve, Complete, Cancel)
@@ -2640,16 +2072,21 @@ class _AdminScreenState extends State<AdminScreen> {
                 children: [
                   if (b.status == 'Chờ xác nhận') ...[
                     IconButton(
-                      icon: const Icon(Icons.check_circle_outline, color: Color(0xFF10B981), size: 22),
+                      icon: const Icon(Icons.check_circle_outline, color: AdminUi.accent, size: 22),
                       tooltip: 'Xác nhận đơn',
                       onPressed: () async {
-                        await FirestoreService.updateBookingStatus(b.id, 'Đã xác nhận');
-                        setState(() => b.status = 'Đã xác nhận');
-                        _showToast('Đã xác nhận đơn ${b.id}!');
+                        await FirestoreService.confirmBooking(b.id);
+                        setState(() {
+                          b.status = 'Đã xác nhận';
+                          for (final p in _payments) {
+                            if (p.bookingId == b.id && p.status.toLowerCase().contains('xử lý')) p.status = 'Thành công';
+                          }
+                        });
+                        _showToast('Đã xác nhận đơn ${b.id} và đối soát tiền chuyển khoản!');
                       },
                     ),
                     IconButton(
-                      icon: const Icon(Icons.cancel_outlined, color: Color(0xFFEF4444), size: 22),
+                      icon: const Icon(Icons.cancel_outlined, color: AdminUi.danger, size: 22),
                       tooltip: 'Hủy đơn',
                       onPressed: () async {
                         await FirestoreService.updateBookingStatus(b.id, 'Đã hủy');
@@ -2660,7 +2097,7 @@ class _AdminScreenState extends State<AdminScreen> {
                   ],
                   if (b.status == 'Đã xác nhận') ...[
                     IconButton(
-                      icon: const Icon(Icons.done_all, color: Color(0xFF6366F1), size: 22),
+                      icon: const Icon(Icons.done_all, color: AdminUi.violet, size: 22),
                       tooltip: 'Đánh dấu hoàn thành',
                       onPressed: () async {
                         await FirestoreService.updateBookingStatus(b.id, 'Hoàn thành');
@@ -2712,20 +2149,9 @@ class _AdminScreenState extends State<AdminScreen> {
                 child: Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF0F1F35), Color(0xFF0A1628)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
+                    color: AdminUi.surface,
                     borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: const Color(0xFF38BDF8).withOpacity(0.25)),
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0xFF38BDF8).withOpacity(0.05),
-                        blurRadius: 15,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
+                    border: Border.all(color: AdminUi.info.withOpacity(0.25)),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -2733,14 +2159,14 @@ class _AdminScreenState extends State<AdminScreen> {
                       const Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text('Tổng Khách Hàng', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12)),
-                          Icon(Icons.people_outline, color: Color(0xFF38BDF8), size: 18),
+                          Flexible(child: Text('Tổng Khách Hàng', style: const TextStyle(color: AdminUi.muted, fontSize: 12), maxLines: 1, overflow: TextOverflow.ellipsis)),
+                          Icon(Icons.people_outline, color: AdminUi.info, size: 18),
                         ],
                       ),
                       const SizedBox(height: 6),
                       Text('${_customers.length}', style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
                       const SizedBox(height: 2),
-                      const Text('Đã đồng bộ cơ sở dữ liệu', style: TextStyle(color: Color(0xFF38BDF8), fontSize: 11)),
+                      const Text('Đã đồng bộ cơ sở dữ liệu', style: TextStyle(color: AdminUi.info, fontSize: 11)),
                     ],
                   ),
                 ),
@@ -2750,20 +2176,9 @@ class _AdminScreenState extends State<AdminScreen> {
                 child: Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF0F1F35), Color(0xFF0A1628)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
+                    color: AdminUi.surface,
                     borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: const Color(0xFFFBBF24).withOpacity(0.25)),
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0xFFFBBF24).withOpacity(0.05),
-                        blurRadius: 15,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
+                    border: Border.all(color: AdminUi.warn.withOpacity(0.25)),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -2771,14 +2186,14 @@ class _AdminScreenState extends State<AdminScreen> {
                       const Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text('Hội Viên VIP', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12)),
-                          Icon(Icons.workspace_premium, color: Color(0xFFFBBF24), size: 18),
+                          Flexible(child: Text('Hội Viên VIP', style: const TextStyle(color: AdminUi.muted, fontSize: 12), maxLines: 1, overflow: TextOverflow.ellipsis)),
+                          Icon(Icons.workspace_premium, color: AdminUi.warn, size: 18),
                         ],
                       ),
                       const SizedBox(height: 6),
                       Text('$vipCount', style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
                       const SizedBox(height: 2),
-                      const Text('Vàng & Kim Cương', style: TextStyle(color: Color(0xFFFBBF24), fontSize: 11)),
+                      const Text('Vàng & Kim Cương', style: TextStyle(color: AdminUi.warn, fontSize: 11)),
                     ],
                   ),
                 ),
@@ -2788,20 +2203,9 @@ class _AdminScreenState extends State<AdminScreen> {
                 child: Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF0F1F35), Color(0xFF0A1628)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
+                    color: AdminUi.surface,
                     borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: const Color(0xFF10B981).withOpacity(0.25)),
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0xFF10B981).withOpacity(0.05),
-                        blurRadius: 15,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
+                    border: Border.all(color: AdminUi.accent.withOpacity(0.25)),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -2809,14 +2213,14 @@ class _AdminScreenState extends State<AdminScreen> {
                       const Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text('Đang Hoạt Động', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12)),
-                          Icon(Icons.check_circle_outline, color: Color(0xFF10B981), size: 18),
+                          Flexible(child: Text('Đang Hoạt Động', style: const TextStyle(color: AdminUi.muted, fontSize: 12), maxLines: 1, overflow: TextOverflow.ellipsis)),
+                          Icon(Icons.check_circle_outline, color: AdminUi.accent, size: 18),
                         ],
                       ),
                       const SizedBox(height: 6),
                       Text('$activeCount', style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
                       const SizedBox(height: 2),
-                      const Text('Tài khoản khả dụng', style: TextStyle(color: Color(0xFF10B981), fontSize: 11)),
+                      const Text('Tài khoản khả dụng', style: TextStyle(color: AdminUi.accent, fontSize: 11)),
                     ],
                   ),
                 ),
@@ -2829,13 +2233,9 @@ class _AdminScreenState extends State<AdminScreen> {
           Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFF0F1F35), Color(0xFF0A1628)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
+              color: AdminUi.surface,
               borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: const Color(0xFF1E3A5F).withOpacity(0.5)),
+              border: Border.all(color: AdminUi.border.withOpacity(0.5)),
             ),
             child: Column(
               children: [
@@ -2845,13 +2245,13 @@ class _AdminScreenState extends State<AdminScreen> {
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 12),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF0F172A),
+                          color: AdminUi.bg,
                           borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: const Color(0xFF334155)),
+                          border: Border.all(color: AdminUi.border),
                         ),
                         child: Row(
                           children: [
-                            const Icon(Icons.search, color: Color(0xFF94A3B8), size: 18),
+                            const Icon(Icons.search, color: AdminUi.muted, size: 18),
                             const SizedBox(width: 8),
                             Expanded(
                               child: TextField(
@@ -2859,7 +2259,7 @@ class _AdminScreenState extends State<AdminScreen> {
                                 style: const TextStyle(color: Colors.white, fontSize: 13),
                                 decoration: const InputDecoration(
                                   hintText: 'Tìm theo tên, số điện thoại, email...',
-                                  hintStyle: TextStyle(color: Color(0xFF64748B), fontSize: 13),
+                                  hintStyle: TextStyle(color: AdminUi.faint, fontSize: 13),
                                   border: InputBorder.none,
                                   isDense: true,
                                   contentPadding: EdgeInsets.symmetric(vertical: 10),
@@ -2869,7 +2269,7 @@ class _AdminScreenState extends State<AdminScreen> {
                             if (_searchCustomerQuery.isNotEmpty)
                               GestureDetector(
                                 onTap: () => setState(() => _searchCustomerQuery = ''),
-                                child: const Icon(Icons.close, color: Color(0xFF94A3B8), size: 16),
+                                child: const Icon(Icons.close, color: AdminUi.muted, size: 16),
                               ),
                           ],
                         ),
@@ -2881,7 +2281,7 @@ class _AdminScreenState extends State<AdminScreen> {
                       icon: const Icon(Icons.person_add, size: 16),
                       label: const Text('Thêm Khách', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5)),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF10B981),
+                        backgroundColor: AdminUi.accent,
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
@@ -2917,9 +2317,9 @@ class _AdminScreenState extends State<AdminScreen> {
               alignment: Alignment.center,
               child: const Column(
                 children: [
-                  Icon(Icons.person_search, color: Color(0xFF64748B), size: 48),
+                  Icon(Icons.person_search, color: AdminUi.faint, size: 48),
                   SizedBox(height: 12),
-                  Text('Không tìm thấy khách hàng phù hợp', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 14)),
+                  Text('Không tìm thấy khách hàng phù hợp', style: TextStyle(color: AdminUi.muted, fontSize: 14)),
                 ],
               ),
             )
@@ -2932,29 +2332,18 @@ class _AdminScreenState extends State<AdminScreen> {
               itemBuilder: (ctx, i) {
                 final c = filtered[i];
                 Color rankColor = const Color(0xFFCD7F32); // Bronze
-                if (c.rank.contains('Kim Cương')) rankColor = const Color(0xFF38BDF8);
-                else if (c.rank.contains('Vàng')) rankColor = const Color(0xFFFBBF24);
-                else if (c.rank.contains('Bạc')) rankColor = const Color(0xFF94A3B8);
+                if (c.rank.contains('Kim Cương')) rankColor = AdminUi.info;
+                else if (c.rank.contains('Vàng')) rankColor = AdminUi.warn;
+                else if (c.rank.contains('Bạc')) rankColor = AdminUi.muted;
 
                 final isLocked = c.status == 'Tạm khóa';
 
                 return Container(
                   padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF0F1F35), Color(0xFF0A1628)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
+                    color: AdminUi.surface,
                     borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: isLocked ? const Color(0xFFEF4444).withOpacity(0.3) : const Color(0xFF1E3A5F).withOpacity(0.5)),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.2),
-                        blurRadius: 10,
-                        offset: const Offset(0, 3),
-                      ),
-                    ],
+                    border: Border.all(color: isLocked ? AdminUi.danger.withOpacity(0.3) : AdminUi.border.withOpacity(0.5)),
                   ),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.center,
@@ -3008,10 +2397,10 @@ class _AdminScreenState extends State<AdminScreen> {
                                   Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                     decoration: BoxDecoration(
-                                      color: const Color(0xFFEF4444).withOpacity(0.15),
+                                      color: AdminUi.danger.withOpacity(0.15),
                                       borderRadius: BorderRadius.circular(4),
                                     ),
-                                    child: const Text('Tạm khóa', style: TextStyle(color: Color(0xFFEF4444), fontSize: 10, fontWeight: FontWeight.bold)),
+                                    child: const Text('Tạm khóa', style: TextStyle(color: AdminUi.danger, fontSize: 10, fontWeight: FontWeight.bold)),
                                   ),
                                 ],
                               ],
@@ -3024,25 +2413,25 @@ class _AdminScreenState extends State<AdminScreen> {
                                 Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    const Icon(Icons.phone_outlined, color: Color(0xFF64748B), size: 13),
+                                    const Icon(Icons.phone_outlined, color: AdminUi.faint, size: 13),
                                     const SizedBox(width: 4),
-                                    Text(c.phone, style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12)),
+                                    Text(c.phone, style: const TextStyle(color: AdminUi.muted, fontSize: 12)),
                                   ],
                                 ),
                                 Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    const Icon(Icons.email_outlined, color: Color(0xFF64748B), size: 13),
+                                    const Icon(Icons.email_outlined, color: AdminUi.faint, size: 13),
                                     const SizedBox(width: 4),
-                                    Text(c.email, style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12)),
+                                    Text(c.email, style: const TextStyle(color: AdminUi.muted, fontSize: 12)),
                                   ],
                                 ),
                                 Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    const Icon(Icons.sports, color: Color(0xFF64748B), size: 13),
+                                    const Icon(Icons.sports, color: AdminUi.faint, size: 13),
                                     const SizedBox(width: 4),
-                                    Text('Môn: ${c.favoriteSport}', style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12)),
+                                    Text('Môn: ${c.favoriteSport}', style: const TextStyle(color: AdminUi.muted, fontSize: 12)),
                                   ],
                                 ),
                               ],
@@ -3059,12 +2448,12 @@ class _AdminScreenState extends State<AdminScreen> {
                           children: [
                             Text(
                               c.totalSpent,
-                              style: const TextStyle(color: Color(0xFF10B981), fontWeight: FontWeight.bold, fontSize: 14),
+                              style: const TextStyle(color: AdminUi.accent, fontWeight: FontWeight.bold, fontSize: 14),
                             ),
                             const SizedBox(height: 2),
                             Text(
                               '${c.bookingsCount} lượt đặt',
-                              style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 11),
+                              style: const TextStyle(color: AdminUi.muted, fontSize: 11),
                             ),
                           ],
                         ),
@@ -3072,8 +2461,8 @@ class _AdminScreenState extends State<AdminScreen> {
 
                       // Nút hành động
                       PopupMenuButton<String>(
-                        icon: const Icon(Icons.more_vert, color: Color(0xFF94A3B8), size: 20),
-                        color: const Color(0xFF0B1424),
+                        icon: const Icon(Icons.more_vert, color: AdminUi.muted, size: 20),
+                        color: AdminUi.surface,
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                         onSelected: (action) {
                           if (action == 'edit') {
@@ -3097,7 +2486,7 @@ class _AdminScreenState extends State<AdminScreen> {
                             value: 'edit',
                             child: Row(
                               children: [
-                                Icon(Icons.edit, color: Color(0xFF38BDF8), size: 16),
+                                Icon(Icons.edit, color: AdminUi.info, size: 16),
                                 SizedBox(width: 8),
                                 Text('Chỉnh sửa', style: TextStyle(color: Colors.white, fontSize: 13)),
                               ],
@@ -3107,7 +2496,7 @@ class _AdminScreenState extends State<AdminScreen> {
                             value: 'toggle_status',
                             child: Row(
                               children: [
-                                Icon(isLocked ? Icons.lock_open : Icons.lock_outline, color: const Color(0xFFFBBF24), size: 16),
+                                Icon(isLocked ? Icons.lock_open : Icons.lock_outline, color: AdminUi.warn, size: 16),
                                 SizedBox(width: 8),
                                 Text(isLocked ? 'Mở khóa tài khoản' : 'Tạm khóa tài khoản', style: const TextStyle(color: Colors.white, fontSize: 13)),
                               ],
@@ -3117,9 +2506,9 @@ class _AdminScreenState extends State<AdminScreen> {
                             value: 'delete',
                             child: Row(
                               children: [
-                                Icon(Icons.delete_outline, color: Color(0xFFEF4444), size: 16),
+                                Icon(Icons.delete_outline, color: AdminUi.danger, size: 16),
                                 SizedBox(width: 8),
-                                Text('Xóa khách', style: TextStyle(color: Color(0xFFEF4444), fontSize: 13)),
+                                Text('Xóa khách', style: TextStyle(color: AdminUi.danger, fontSize: 13)),
                               ],
                             ),
                           ),
@@ -3138,6 +2527,62 @@ class _AdminScreenState extends State<AdminScreen> {
   // ==========================================
   // TAB 5: THANH TOÁN & DOANH THU (PAYMENTS)
   // ==========================================
+  Widget _buildPaymentKpis() {
+    int total = 0, online = 0, awaiting = 0, okCount = 0, processing = 0, refunded = 0;
+    for (final p in _payments) {
+      final st = p.status.toLowerCase();
+      if (st.contains('hoàn')) {
+        refunded++;
+        continue;
+      }
+      if (st.contains('xử lý')) {
+        processing++;
+        awaiting += AdminStats.parseMoney(p.amount);
+        continue;
+      }
+      final amt = AdminStats.parseMoney(p.amount);
+      total += amt;
+      okCount++;
+      // Giao dịch tiền mặt cũ (nếu còn trong dữ liệu) vẫn nằm trong tổng đã thu, nhưng không tính vào chuyển khoản
+      if (!p.method.toLowerCase().contains('tiền mặt')) online += amt;
+    }
+    String share(int v) => total == 0 ? 'Chưa có giao dịch thành công' : '${(v / total * 100).toStringAsFixed(1)}% tổng đã thu';
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          child: KpiTile(
+            label: 'Tổng đã thu',
+            value: AdminStats.fmtMoney(total),
+            icon: Icons.account_balance_wallet_outlined,
+            color: AdminUi.accent,
+            footnote: '$okCount thành công • $processing đang xử lý • $refunded hoàn tiền',
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: KpiTile(
+            label: 'Đã nhận qua chuyển khoản / ví',
+            value: AdminStats.fmtMoney(online),
+            icon: Icons.qr_code_2_rounded,
+            color: AdminUi.info,
+            footnote: share(online),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: KpiTile(
+            label: 'Chờ đối soát chuyển khoản',
+            value: AdminStats.fmtMoney(awaiting),
+            icon: Icons.hourglass_top_rounded,
+            color: AdminUi.warn,
+            footnote: processing == 0 ? 'Không có giao dịch chờ' : '$processing giao dịch chờ xác nhận đã nhận tiền',
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildPaymentsTab() {
     final filtered = _payments.where((p) {
       final q = _searchPaymentQuery.toLowerCase().trim();
@@ -3156,137 +2601,17 @@ class _AdminScreenState extends State<AdminScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 1. TỔNG QUAN TÀI CHÍNH / THU NGÂN
-          Row(
-            children: [
-              Expanded(
-                child: Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF0F1F35), Color(0xFF0A1628)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: const Color(0xFF10B981).withOpacity(0.25)),
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0xFF10B981).withOpacity(0.05),
-                        blurRadius: 15,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: const Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text('Thu ngân hôm nay', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12)),
-                          Icon(Icons.trending_up, color: Color(0xFF10B981), size: 18),
-                        ],
-                      ),
-                      SizedBox(height: 6),
-                      Text('4.850.000đ', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
-                      SizedBox(height: 2),
-                      Text('+18% so với hôm qua', style: TextStyle(color: Color(0xFF10B981), fontSize: 11, fontWeight: FontWeight.w600)),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF0F1F35), Color(0xFF0A1628)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: const Color(0xFF38BDF8).withOpacity(0.25)),
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0xFF38BDF8).withOpacity(0.05),
-                        blurRadius: 15,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: const Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text('Online (VietQR/MoMo)', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12)),
-                          Icon(Icons.qr_code_scanner, color: Color(0xFF38BDF8), size: 18),
-                        ],
-                      ),
-                      SizedBox(height: 6),
-                      Text('3.620.000đ', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
-                      SizedBox(height: 2),
-                      Text('74.6% tổng giao dịch', style: TextStyle(color: Color(0xFF38BDF8), fontSize: 11, fontWeight: FontWeight.w600)),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF0F1F35), Color(0xFF0A1628)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: const Color(0xFFFBBF24).withOpacity(0.25)),
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0xFFFBBF24).withOpacity(0.05),
-                        blurRadius: 15,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: const Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text('Tiền mặt tại quầy', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12)),
-                          Icon(Icons.payments_outlined, color: Color(0xFFFBBF24), size: 18),
-                        ],
-                      ),
-                      SizedBox(height: 6),
-                      Text('1.230.000đ', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
-                      SizedBox(height: 2),
-                      Text('25.4% tổng giao dịch', style: TextStyle(color: Color(0xFFFBBF24), fontSize: 11, fontWeight: FontWeight.w600)),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
+          // 1. TỔNG QUAN THU NGÂN (tính từ giao dịch thật)
+          _buildPaymentKpis(),
           const SizedBox(height: 16),
 
           // 2. SEARCH & FILTER
           Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFF0F1F35), Color(0xFF0A1628)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
+              color: AdminUi.surface,
               borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: const Color(0xFF1E3A5F).withOpacity(0.5)),
+              border: Border.all(color: AdminUi.border.withOpacity(0.5)),
             ),
             child: Column(
               children: [
@@ -3296,13 +2621,13 @@ class _AdminScreenState extends State<AdminScreen> {
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 12),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF0F172A),
+                          color: AdminUi.bg,
                           borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: const Color(0xFF334155)),
+                          border: Border.all(color: AdminUi.border),
                         ),
                         child: Row(
                           children: [
-                            const Icon(Icons.search, color: Color(0xFF94A3B8), size: 18),
+                            const Icon(Icons.search, color: AdminUi.muted, size: 18),
                             const SizedBox(width: 8),
                             Expanded(
                               child: TextField(
@@ -3310,7 +2635,7 @@ class _AdminScreenState extends State<AdminScreen> {
                                 style: const TextStyle(color: Colors.white, fontSize: 13),
                                 decoration: const InputDecoration(
                                   hintText: 'Tìm theo mã PAY, mã đơn BK, khách, mã ngân hàng...',
-                                  hintStyle: TextStyle(color: Color(0xFF64748B), fontSize: 13),
+                                  hintStyle: TextStyle(color: AdminUi.faint, fontSize: 13),
                                   border: InputBorder.none,
                                   isDense: true,
                                   contentPadding: EdgeInsets.symmetric(vertical: 10),
@@ -3320,7 +2645,7 @@ class _AdminScreenState extends State<AdminScreen> {
                             if (_searchPaymentQuery.isNotEmpty)
                               GestureDetector(
                                 onTap: () => setState(() => _searchPaymentQuery = ''),
-                                child: const Icon(Icons.close, color: Color(0xFF94A3B8), size: 16),
+                                child: const Icon(Icons.close, color: AdminUi.muted, size: 16),
                               ),
                           ],
                         ),
@@ -3332,7 +2657,7 @@ class _AdminScreenState extends State<AdminScreen> {
                       icon: const Icon(Icons.receipt_long, size: 16),
                       label: const Text('Tạo Phiếu Thu', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5)),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF10B981),
+                        backgroundColor: AdminUi.accent,
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
@@ -3348,11 +2673,10 @@ class _AdminScreenState extends State<AdminScreen> {
                     children: [
                       _buildGenericChip('Tất cả (${_payments.length})', 'all', _selectedPaymentMethod, (v) => setState(() => _selectedPaymentMethod = v)),
                       const SizedBox(width: 6),
-                      _buildGenericChip('VietQR Pro', 'VietQR', _selectedPaymentMethod, (v) => setState(() => _selectedPaymentMethod = v)),
+                      _buildGenericChip('Chuyển khoản', 'VietQR', _selectedPaymentMethod, (v) => setState(() => _selectedPaymentMethod = v)),
                       const SizedBox(width: 6),
                       _buildGenericChip('Ví MoMo', 'MoMo', _selectedPaymentMethod, (v) => setState(() => _selectedPaymentMethod = v)),
                       const SizedBox(width: 6),
-                      _buildGenericChip('Tiền Mặt', 'Tiền mặt', _selectedPaymentMethod, (v) => setState(() => _selectedPaymentMethod = v)),
                     ],
                   ),
                 ),
@@ -3368,9 +2692,9 @@ class _AdminScreenState extends State<AdminScreen> {
               alignment: Alignment.center,
               child: const Column(
                 children: [
-                  Icon(Icons.credit_card_off, color: Color(0xFF64748B), size: 48),
+                  Icon(Icons.credit_card_off, color: AdminUi.faint, size: 48),
                   SizedBox(height: 12),
-                  Text('Không tìm thấy giao dịch nào', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 14)),
+                  Text('Không tìm thấy giao dịch nào', style: TextStyle(color: AdminUi.muted, fontSize: 14)),
                 ],
               ),
             )
@@ -3383,9 +2707,9 @@ class _AdminScreenState extends State<AdminScreen> {
               itemBuilder: (ctx, i) {
                 final p = filtered[i];
 
-                Color statusColor = const Color(0xFF10B981); // Success
-                if (p.status == 'Đang xử lý') statusColor = const Color(0xFFFBBF24);
-                else if (p.status == 'Đã hoàn tiền') statusColor = const Color(0xFFEF4444);
+                Color statusColor = AdminUi.accent; // Success
+                if (p.status == 'Đang xử lý') statusColor = AdminUi.warn;
+                else if (p.status == 'Đã hoàn tiền') statusColor = AdminUi.danger;
 
                 IconData methodIcon = Icons.qr_code;
                 if (p.method.contains('MoMo')) methodIcon = Icons.account_balance_wallet_outlined;
@@ -3394,20 +2718,9 @@ class _AdminScreenState extends State<AdminScreen> {
                 return Container(
                   padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF0F1F35), Color(0xFF0A1628)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
+                    color: AdminUi.surface,
                     borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: const Color(0xFF1E3A5F).withOpacity(0.5)),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.2),
-                        blurRadius: 10,
-                        offset: const Offset(0, 3),
-                      ),
-                    ],
+                    border: Border.all(color: AdminUi.border.withOpacity(0.5)),
                   ),
                   child: Row(
                     children: [
@@ -3416,11 +2729,11 @@ class _AdminScreenState extends State<AdminScreen> {
                         width: 42,
                         height: 42,
                         decoration: BoxDecoration(
-                          color: const Color(0xFF0F172A),
+                          color: AdminUi.bg,
                           borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: const Color(0xFF334155)),
+                          border: Border.all(color: AdminUi.border),
                         ),
-                        child: Icon(methodIcon, color: const Color(0xFF38BDF8), size: 20),
+                        child: Icon(methodIcon, color: AdminUi.info, size: 20),
                       ),
                       const SizedBox(width: 12),
 
@@ -3433,16 +2746,16 @@ class _AdminScreenState extends State<AdminScreen> {
                               children: [
                                 Text(
                                   p.id,
-                                  style: const TextStyle(color: Color(0xFF38BDF8), fontWeight: FontWeight.bold, fontSize: 13.5),
+                                  style: const TextStyle(color: AdminUi.info, fontWeight: FontWeight.bold, fontSize: 13.5),
                                 ),
                                 const SizedBox(width: 8),
                                 Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                   decoration: BoxDecoration(
-                                    color: const Color(0xFF334155),
+                                    color: AdminUi.border,
                                     borderRadius: BorderRadius.circular(4),
                                   ),
-                                  child: Text('Đơn ${p.bookingId}', style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 10.5)),
+                                  child: Text('Đơn ${p.bookingId}', style: const TextStyle(color: AdminUi.muted, fontSize: 10.5)),
                                 ),
                               ],
                             ),
@@ -3454,7 +2767,7 @@ class _AdminScreenState extends State<AdminScreen> {
                             const SizedBox(height: 2),
                             Text(
                               '${p.time} • Ref: ${p.bankRef}',
-                              style: const TextStyle(color: Color(0xFF64748B), fontSize: 11),
+                              style: const TextStyle(color: AdminUi.faint, fontSize: 11),
                             ),
                           ],
                         ),
@@ -3466,7 +2779,7 @@ class _AdminScreenState extends State<AdminScreen> {
                         children: [
                           Text(
                             p.amount,
-                            style: const TextStyle(color: Color(0xFF10B981), fontWeight: FontWeight.bold, fontSize: 15),
+                            style: const TextStyle(color: AdminUi.accent, fontWeight: FontWeight.bold, fontSize: 15),
                           ),
                           const SizedBox(height: 4),
                           Container(
@@ -3487,8 +2800,8 @@ class _AdminScreenState extends State<AdminScreen> {
 
                       // Actions
                       PopupMenuButton<String>(
-                        icon: const Icon(Icons.more_vert, color: Color(0xFF94A3B8), size: 20),
-                        color: const Color(0xFF0B1424),
+                        icon: const Icon(Icons.more_vert, color: AdminUi.muted, size: 20),
+                        color: AdminUi.surface,
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                         onSelected: (action) {
                           if (action == 'success') {
@@ -3508,7 +2821,7 @@ class _AdminScreenState extends State<AdminScreen> {
                             value: 'receipt',
                             child: Row(
                               children: [
-                                Icon(Icons.receipt_outlined, color: Color(0xFF38BDF8), size: 16),
+                                Icon(Icons.receipt_outlined, color: AdminUi.info, size: 16),
                                 SizedBox(width: 8),
                                 Text('Xem biên lai', style: TextStyle(color: Colors.white, fontSize: 13)),
                               ],
@@ -3519,7 +2832,7 @@ class _AdminScreenState extends State<AdminScreen> {
                               value: 'success',
                               child: Row(
                                 children: [
-                                  Icon(Icons.check_circle, color: Color(0xFF10B981), size: 16),
+                                  Icon(Icons.check_circle, color: AdminUi.accent, size: 16),
                                   SizedBox(width: 8),
                                   Text('Đánh dấu thành công', style: TextStyle(color: Colors.white, fontSize: 13)),
                                 ],
@@ -3530,9 +2843,9 @@ class _AdminScreenState extends State<AdminScreen> {
                               value: 'refund',
                               child: Row(
                                 children: [
-                                  Icon(Icons.replay, color: Color(0xFFEF4444), size: 16),
+                                  Icon(Icons.replay, color: AdminUi.danger, size: 16),
                                   SizedBox(width: 8),
-                                  Text('Hoàn tiền giao dịch', style: TextStyle(color: Color(0xFFEF4444), fontSize: 13)),
+                                  Text('Hoàn tiền giao dịch', style: TextStyle(color: AdminUi.danger, fontSize: 13)),
                                 ],
                               ),
                             ),
@@ -3561,23 +2874,23 @@ class _AdminScreenState extends State<AdminScreen> {
           decoration: BoxDecoration(
             gradient: selected
                 ? const LinearGradient(
-                    colors: [Color(0xFF10B981), Color(0xFF059669)],
+                    colors: [AdminUi.accent, AdminUi.accent],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   )
                 : const LinearGradient(
-                    colors: [Color(0xFF0F203C), Color(0xFF070E1B)],
+                    colors: [AdminUi.surfaceAlt, AdminUi.sidebar],
                   ),
             borderRadius: BorderRadius.circular(10),
             border: Border.all(
               color: selected
-                  ? const Color(0xFF34D399)
-                  : const Color(0xFF1E3A5F).withOpacity(0.6),
+                  ? AdminUi.accent
+                  : AdminUi.border.withOpacity(0.6),
             ),
             boxShadow: selected
                 ? [
                     BoxShadow(
-                      color: const Color(0xFF10B981).withOpacity(0.35),
+                      color: AdminUi.accent.withOpacity(0.35),
                       blurRadius: 8,
                       offset: const Offset(0, 2),
                     ),
@@ -3587,7 +2900,7 @@ class _AdminScreenState extends State<AdminScreen> {
           child: Text(
             label,
             style: TextStyle(
-              color: selected ? Colors.white : const Color(0xFF94A3B8),
+              color: selected ? Colors.white : AdminUi.muted,
               fontSize: 12.5,
               fontWeight: selected ? FontWeight.bold : FontWeight.w500,
             ),
@@ -3613,11 +2926,11 @@ class _AdminScreenState extends State<AdminScreen> {
       builder: (ctx) => StatefulBuilder(
         builder: (ctx2, setDialogState) {
           return AlertDialog(
-            backgroundColor: const Color(0xFF0B1424),
+            backgroundColor: AdminUi.surface,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             title: Row(
               children: [
-                Icon(isEdit ? Icons.edit : Icons.person_add, color: const Color(0xFF10B981)),
+                Icon(isEdit ? Icons.edit : Icons.person_add, color: AdminUi.accent),
                 const SizedBox(width: 8),
                 Text(
                   isEdit ? 'Chỉnh Sửa Khách Hàng' : 'Thêm Khách Hàng Mới',
@@ -3643,26 +2956,26 @@ class _AdminScreenState extends State<AdminScreen> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text('Môn Yêu Thích', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12)),
+                              const Text('Môn Yêu Thích', style: TextStyle(color: AdminUi.muted, fontSize: 12)),
                               const SizedBox(height: 6),
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 10),
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFF0F172A),
+                                  color: AdminUi.bg,
                                   borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(color: const Color(0xFF334155)),
+                                  border: Border.all(color: AdminUi.border),
                                 ),
                                 child: DropdownButtonHideUnderline(
                                   child: DropdownButton<String>(
                                     value: selectedSport,
                                     isExpanded: true,
-                                    dropdownColor: const Color(0xFF0F172A),
+                                    dropdownColor: AdminUi.bg,
                                     style: const TextStyle(color: Colors.white, fontSize: 13),
                                     items: const [
-                                      DropdownMenuItem(value: 'Pickleball', child: Text('🏓 Pickleball')),
-                                      DropdownMenuItem(value: 'Cầu lông', child: Text('🏸 Cầu lông')),
-                                      DropdownMenuItem(value: 'Bóng đá', child: Text('⚽ Bóng đá')),
-                                      DropdownMenuItem(value: 'Tennis', child: Text('🎾 Tennis')),
+                                      DropdownMenuItem(value: 'Pickleball', child: Text('Pickleball')),
+                                      DropdownMenuItem(value: 'Cầu lông', child: Text('Cầu lông')),
+                                      DropdownMenuItem(value: 'Bóng đá', child: Text('Bóng đá')),
+                                      DropdownMenuItem(value: 'Tennis', child: Text('Tennis')),
                                     ],
                                     onChanged: (val) {
                                       if (val != null) setDialogState(() => selectedSport = val);
@@ -3678,26 +2991,26 @@ class _AdminScreenState extends State<AdminScreen> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text('Hạng Hội Viên', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12)),
+                              const Text('Hạng Hội Viên', style: TextStyle(color: AdminUi.muted, fontSize: 12)),
                               const SizedBox(height: 6),
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 10),
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFF0F172A),
+                                  color: AdminUi.bg,
                                   borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(color: const Color(0xFF334155)),
+                                  border: Border.all(color: AdminUi.border),
                                 ),
                                 child: DropdownButtonHideUnderline(
                                   child: DropdownButton<String>(
                                     value: selectedRank,
                                     isExpanded: true,
-                                    dropdownColor: const Color(0xFF0F172A),
+                                    dropdownColor: AdminUi.bg,
                                     style: const TextStyle(color: Colors.white, fontSize: 13),
                                     items: const [
-                                      DropdownMenuItem(value: 'VIP Kim Cương', child: Text('💎 VIP Kim Cương')),
-                                      DropdownMenuItem(value: 'VIP Vàng', child: Text('👑 VIP Vàng')),
-                                      DropdownMenuItem(value: 'Bạc', child: Text('🥈 Bạc')),
-                                      DropdownMenuItem(value: 'Đồng', child: Text('🥉 Đồng')),
+                                      DropdownMenuItem(value: 'VIP Kim Cương', child: Text('VIP Kim Cương')),
+                                      DropdownMenuItem(value: 'VIP Vàng', child: Text('VIP Vàng')),
+                                      DropdownMenuItem(value: 'Bạc', child: Text('Bạc')),
+                                      DropdownMenuItem(value: 'Đồng', child: Text('Đồng')),
                                     ],
                                     onChanged: (val) {
                                       if (val != null) setDialogState(() => selectedRank = val);
@@ -3717,7 +3030,7 @@ class _AdminScreenState extends State<AdminScreen> {
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(ctx),
-                child: const Text('Hủy', style: TextStyle(color: Color(0xFF94A3B8))),
+                child: const Text('Hủy', style: TextStyle(color: AdminUi.muted)),
               ),
               ElevatedButton(
                 onPressed: () {
@@ -3751,7 +3064,7 @@ class _AdminScreenState extends State<AdminScreen> {
                   Navigator.pop(ctx);
                 },
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF10B981),
+                  backgroundColor: AdminUi.accent,
                   foregroundColor: Colors.white,
                 ),
                 child: Text(isEdit ? 'Lưu Thay Đổi' : 'Thêm Mới'),
@@ -3764,10 +3077,10 @@ class _AdminScreenState extends State<AdminScreen> {
   }
 
   void _openAddPaymentDialog() {
-    final bkCtrl = TextEditingController(text: 'BK-1035');
-    final custCtrl = TextEditingController(text: 'Nguyễn Văn Khách');
-    final amountCtrl = TextEditingController(text: '250.000đ');
-    final refCtrl = TextEditingController(text: 'POS-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}');
+    final bkCtrl = TextEditingController();
+    final custCtrl = TextEditingController();
+    final amountCtrl = TextEditingController();
+    final refCtrl = TextEditingController();
     String selectedMethod = 'VietQR Pro';
 
     showDialog(
@@ -3775,11 +3088,11 @@ class _AdminScreenState extends State<AdminScreen> {
       builder: (ctx) => StatefulBuilder(
         builder: (ctx2, setDialogState) {
           return AlertDialog(
-            backgroundColor: const Color(0xFF0B1424),
+            backgroundColor: AdminUi.surface,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             title: const Row(
               children: [
-                Icon(Icons.add_card, color: Color(0xFF10B981)),
+                Icon(Icons.add_card, color: AdminUi.accent),
                 SizedBox(width: 8),
                 Text('Tạo Phiếu Thu / Thu Ngân', style: TextStyle(color: Colors.white, fontSize: 16)),
               ],
@@ -3790,37 +3103,36 @@ class _AdminScreenState extends State<AdminScreen> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    _dialogTextField('Mã Đơn Đặt Sân', bkCtrl, 'VD: BK-1029'),
+                    _dialogTextField('Mã Đơn Đặt Sân *', bkCtrl, 'VD: BK-123456'),
                     const SizedBox(height: 12),
-                    _dialogTextField('Tên Khách Hàng', custCtrl, 'VD: Trần Văn B'),
+                    _dialogTextField('Tên Khách Hàng *', custCtrl, 'VD: Trần Văn B'),
                     const SizedBox(height: 12),
-                    _dialogTextField('Số Tiền Thu', amountCtrl, 'VD: 300.000đ'),
+                    _dialogTextField('Số Tiền Đã Nhận *', amountCtrl, 'VD: 300.000đ'),
                     const SizedBox(height: 12),
-                    _dialogTextField('Mã Tham Chiếu / Ghi Chú', refCtrl, 'VD: MBB-12345'),
+                    _dialogTextField('Mã Giao Dịch Ngân Hàng', refCtrl, 'Mã tham chiếu trên sao kê'),
                     const SizedBox(height: 12),
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('Phương Thức Thanh Toán', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12)),
+                        const Text('Phương Thức Thanh Toán', style: TextStyle(color: AdminUi.muted, fontSize: 12)),
                         const SizedBox(height: 6),
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 10),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF0F172A),
+                            color: AdminUi.bg,
                             borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: const Color(0xFF334155)),
+                            border: Border.all(color: AdminUi.border),
                           ),
                           child: DropdownButtonHideUnderline(
                             child: DropdownButton<String>(
                               value: selectedMethod,
                               isExpanded: true,
-                              dropdownColor: const Color(0xFF0F172A),
+                              dropdownColor: AdminUi.bg,
                               style: const TextStyle(color: Colors.white, fontSize: 13),
                               items: const [
-                                DropdownMenuItem(value: 'VietQR Pro', child: Text('📱 Chuyển khoản VietQR Pro')),
-                                DropdownMenuItem(value: 'Ví MoMo', child: Text('👛 Ví MoMo')),
-                                DropdownMenuItem(value: 'VNPay QR', child: Text('💳 VNPay QR')),
-                                DropdownMenuItem(value: 'Tiền mặt', child: Text('💵 Tiền mặt tại quầy')),
+                                DropdownMenuItem(value: 'VietQR Pro', child: Text('Chuyển khoản ngân hàng (VietQR)')),
+                                DropdownMenuItem(value: 'Ví MoMo', child: Text('Ví MoMo')),
+                                DropdownMenuItem(value: 'VNPay QR', child: Text('VNPay QR')),
                               ],
                               onChanged: (val) {
                                 if (val != null) setDialogState(() => selectedMethod = val);
@@ -3837,19 +3149,24 @@ class _AdminScreenState extends State<AdminScreen> {
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(ctx),
-                child: const Text('Hủy', style: TextStyle(color: Color(0xFF94A3B8))),
+                child: const Text('Hủy', style: TextStyle(color: AdminUi.muted)),
               ),
               ElevatedButton(
                 onPressed: () {
+                  if (bkCtrl.text.trim().isEmpty || custCtrl.text.trim().isEmpty || AdminStats.parseMoney(amountCtrl.text) <= 0) {
+                    _showToast('Nhập mã đơn, tên khách và số tiền đã nhận!', isError: true);
+                    return;
+                  }
+                  final now = DateTime.now();
                   final newPay = PaymentItem(
-                    id: 'PAY-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}',
-                    bookingId: bkCtrl.text.trim().isEmpty ? 'BK-MANUAL' : bkCtrl.text.trim(),
-                    customer: custCtrl.text.trim().isEmpty ? 'Khách lẻ' : custCtrl.text.trim(),
-                    amount: amountCtrl.text.trim().isEmpty ? '0đ' : amountCtrl.text.trim(),
+                    id: 'PAY-${now.millisecondsSinceEpoch.toString().substring(7)}',
+                    bookingId: bkCtrl.text.trim(),
+                    customer: custCtrl.text.trim(),
+                    amount: amountCtrl.text.trim(),
                     method: selectedMethod,
-                    time: '01/11/2026 10:45',
+                    time: '${BookingSlots.formatDate(now)} ${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}',
                     status: 'Thành công',
-                    bankRef: refCtrl.text.trim().isEmpty ? 'N/A' : refCtrl.text.trim(),
+                    bankRef: refCtrl.text.trim(),
                   );
                   setState(() => _payments.insert(0, newPay));
                   FirestoreService.addPayment(newPay);
@@ -3857,7 +3174,7 @@ class _AdminScreenState extends State<AdminScreen> {
                   Navigator.pop(ctx);
                 },
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF10B981),
+                  backgroundColor: AdminUi.accent,
                   foregroundColor: Colors.white,
                 ),
                 child: const Text('Xác Nhận Thu Tiền'),
@@ -3873,11 +3190,11 @@ class _AdminScreenState extends State<AdminScreen> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF0B1424),
+        backgroundColor: AdminUi.surface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Row(
           children: [
-            Icon(Icons.receipt, color: Color(0xFF38BDF8)),
+            Icon(Icons.receipt, color: AdminUi.info),
             SizedBox(width: 8),
             Text('Biên Lai Thanh Toán', style: TextStyle(color: Colors.white, fontSize: 16)),
           ],
@@ -3890,18 +3207,18 @@ class _AdminScreenState extends State<AdminScreen> {
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF0F172A),
+                  color: AdminUi.bg,
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFF334155)),
+                  border: Border.all(color: AdminUi.border),
                 ),
                 child: Column(
                   children: [
-                    const Text('ALOBOOKING - XÁC NHẬN THANH TOÁN', style: TextStyle(color: Color(0xFF10B981), fontWeight: FontWeight.bold, fontSize: 13)),
+                    const Text('ALOBOOKING - XÁC NHẬN THANH TOÁN', style: TextStyle(color: AdminUi.accent, fontWeight: FontWeight.bold, fontSize: 13)),
                     const SizedBox(height: 12),
                     Text(p.amount, style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 4),
-                    Text(p.status, style: const TextStyle(color: Color(0xFF10B981), fontSize: 12, fontWeight: FontWeight.bold)),
-                    const Divider(color: Color(0xFF334155), height: 24),
+                    Text(p.status, style: const TextStyle(color: AdminUi.accent, fontSize: 12, fontWeight: FontWeight.bold)),
+                    const Divider(color: AdminUi.border, height: 24),
                     _receiptRow('Mã GD:', p.id),
                     _receiptRow('Mã Đơn:', p.bookingId),
                     _receiptRow('Khách Hàng:', p.customer),
@@ -3917,7 +3234,7 @@ class _AdminScreenState extends State<AdminScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Đóng', style: TextStyle(color: Color(0xFF94A3B8))),
+            child: const Text('Đóng', style: TextStyle(color: AdminUi.muted)),
           ),
           ElevatedButton.icon(
             onPressed: () {
@@ -3927,7 +3244,7 @@ class _AdminScreenState extends State<AdminScreen> {
             icon: const Icon(Icons.print, size: 16),
             label: const Text('In / Gửi Biên Lai'),
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF38BDF8),
+              backgroundColor: AdminUi.info,
               foregroundColor: Colors.white,
             ),
           ),
@@ -3942,7 +3259,7 @@ class _AdminScreenState extends State<AdminScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12)),
+          Text(label, style: const TextStyle(color: AdminUi.muted, fontSize: 12)),
           Text(value, style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600)),
         ],
       ),
@@ -3968,6 +3285,7 @@ class _AdminScreenState extends State<AdminScreen> {
     final addressCtrl = TextEditingController(text: existing?.address ?? '');
     final priceCtrl = TextEditingController(text: existing?.price ?? '120k - 220k/h');
     final hoursCtrl = TextEditingController(text: existing?.hours ?? '06:00 – 23:00');
+    final courtsCtrl = TextEditingController(text: (existing?.courts ?? Venue.defaultCourtCount(selectedType)).toString());
     final ratingCtrl = TextEditingController(text: existing?.rating.toString() ?? '4.8');
     final tagsCtrl = TextEditingController(
         text: existing?.tags.join(', ') ?? 'Mái che cao, Đèn LED, Thảm Yonex, Chỗ đỗ xe');
@@ -3982,11 +3300,11 @@ class _AdminScreenState extends State<AdminScreen> {
       builder: (ctx) => StatefulBuilder(
         builder: (ctx2, setDialogState) {
           return AlertDialog(
-            backgroundColor: const Color(0xFF0B1424),
+            backgroundColor: AdminUi.surface,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             title: Row(
               children: [
-                Icon(isEdit ? Icons.edit : Icons.add_circle, color: const Color(0xFF10B981)),
+                Icon(isEdit ? Icons.edit : Icons.add_circle, color: AdminUi.accent),
                 const SizedBox(width: 8),
                 Text(isEdit ? 'Chỉnh Sửa Sân Thể Thao' : 'Thêm Sân Thể Thao Mới',
                     style: const TextStyle(color: Colors.white, fontSize: 16)),
@@ -4008,20 +3326,20 @@ class _AdminScreenState extends State<AdminScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               const Text('Môn Thể Thao *',
-                                  style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12)),
+                                  style: TextStyle(color: AdminUi.muted, fontSize: 12)),
                               const SizedBox(height: 4),
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 10),
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFF0F172A),
+                                  color: AdminUi.bg,
                                   borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(color: const Color(0xFF334155)),
+                                  border: Border.all(color: AdminUi.border),
                                 ),
                                 child: DropdownButtonHideUnderline(
                                   child: DropdownButton<String>(
                                     value: selectedType,
                                     isExpanded: true,
-                                    dropdownColor: const Color(0xFF0B1424),
+                                    dropdownColor: AdminUi.surface,
                                     style: const TextStyle(color: Colors.white, fontSize: 13),
                                     items: const [
                                       DropdownMenuItem(value: 'pickleball', child: Text('Pickleball')),
@@ -4035,6 +3353,7 @@ class _AdminScreenState extends State<AdminScreen> {
                                         selectedType = val ?? 'pickleball';
                                         final list = _sampleImages[selectedType] ?? _sampleImages['pickleball']!;
                                         imageCtrl.text = list[0];
+                                        if (!isEdit) courtsCtrl.text = Venue.defaultCourtCount(selectedType).toString();
                                       });
                                     },
                                   ),
@@ -4049,22 +3368,22 @@ class _AdminScreenState extends State<AdminScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               const Text('Quận Huyện *',
-                                  style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12)),
+                                  style: TextStyle(color: AdminUi.muted, fontSize: 12)),
                               const SizedBox(height: 4),
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 10),
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFF0F172A),
+                                  color: AdminUi.bg,
                                   borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(color: const Color(0xFF334155)),
+                                  border: Border.all(color: AdminUi.border),
                                 ),
                                 child: DropdownButtonHideUnderline(
                                   child: DropdownButton<String>(
                                     value: selectedDist,
                                     isExpanded: true,
-                                    dropdownColor: const Color(0xFF0B1424),
+                                    dropdownColor: AdminUi.surface,
                                     style: const TextStyle(color: Colors.white, fontSize: 13),
-                                    items: _districts
+                                    items: {..._districts, selectedDist}
                                         .map((d) => DropdownMenuItem(value: d, child: Text(d)))
                                         .toList(),
                                     onChanged: (val) {
@@ -4096,21 +3415,23 @@ class _AdminScreenState extends State<AdminScreen> {
                       ],
                     ),
                     const SizedBox(height: 12),
+                    _dialogTextField('Số Sân Con Trong Cụm (1–30)', courtsCtrl, 'VD: 8'),
+                    const SizedBox(height: 12),
                     _dialogTextField('Tiện Ích & Tags', tagsCtrl, 'Mái che cao, Đèn LED, Thảm Yonex'),
                     const SizedBox(height: 12),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         const Text('URL Hình Ảnh Sân Thể Thao',
-                            style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12)),
+                            style: TextStyle(color: AdminUi.muted, fontSize: 12)),
                         TextButton(
                           onPressed: () {
                             final list = _sampleImages[selectedType] ?? _sampleImages['pickleball']!;
                             final next = list[math.Random().nextInt(list.length)];
                             setDialogState(() => imageCtrl.text = next);
                           },
-                          child: const Text('🎨 Chọn ảnh mẫu đẹp',
-                              style: TextStyle(color: Color(0xFF34D399), fontSize: 11)),
+                          child: const Text('Chọn ảnh mẫu đẹp',
+                              style: TextStyle(color: AdminUi.accent, fontSize: 11)),
                         ),
                       ],
                     ),
@@ -4122,7 +3443,7 @@ class _AdminScreenState extends State<AdminScreen> {
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(ctx),
-                child: const Text('Hủy', style: TextStyle(color: Color(0xFF94A3B8))),
+                child: const Text('Hủy', style: TextStyle(color: AdminUi.muted)),
               ),
               ElevatedButton(
                 onPressed: () async {
@@ -4132,23 +3453,23 @@ class _AdminScreenState extends State<AdminScreen> {
                   }
 
                   final tags = tagsCtrl.text.split(',').map((t) => t.trim()).filter((t) => t.isNotEmpty).toList();
+                  final courtCount = (int.tryParse(courtsCtrl.text.trim()) ?? Venue.defaultCourtCount(selectedType)).clamp(1, 30);
 
                   if (isEdit) {
-                    final updated = Venue(
-                      id: existing.id,
+                    // copyWith giữ nguyên chủ sân, trạng thái duyệt và các trường khác của sân
+                    final updated = existing.copyWith(
                       name: nameCtrl.text.trim(),
                       type: selectedType,
                       district: selectedDist,
-                      distance: existing.distance,
                       address: addressCtrl.text.trim(),
                       hours: hoursCtrl.text.trim(),
                       tags: tags.isNotEmpty ? tags : ['Đơn ngày'],
-                      rating: double.tryParse(ratingCtrl.text) ?? 4.8,
+                      rating: double.tryParse(ratingCtrl.text) ?? existing.rating,
                       price: priceCtrl.text.trim(),
                       lat: lat,
                       lng: lng,
                       image: imageCtrl.text.trim(),
-                      logo: existing.logo,
+                      courtCount: courtCount,
                     );
                     await FirestoreService.updateVenue(updated);
                     setState(() {
@@ -4173,6 +3494,7 @@ class _AdminScreenState extends State<AdminScreen> {
                       lng: lng,
                       image: imageCtrl.text.trim(),
                       logo: 'https://ui-avatars.com/api/?name=PB&background=10b981&color=fff&size=40&bold=true',
+                      courtCount: courtCount,
                     );
                     await FirestoreService.addVenue(created);
                     setState(() {
@@ -4184,7 +3506,7 @@ class _AdminScreenState extends State<AdminScreen> {
                   Navigator.pop(ctx);
                 },
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF10B981),
+                  backgroundColor: AdminUi.accent,
                   foregroundColor: Colors.white,
                 ),
                 child: Text(isEdit ? 'Lưu Thay Đổi' : 'Thêm Mới'),
@@ -4201,21 +3523,21 @@ class _AdminScreenState extends State<AdminScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (label.isNotEmpty) ...[
-          Text(label, style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12)),
+          Text(label, style: const TextStyle(color: AdminUi.muted, fontSize: 12)),
           const SizedBox(height: 4),
         ],
         Container(
           decoration: BoxDecoration(
-            color: const Color(0xFF0F172A),
+            color: AdminUi.bg,
             borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: const Color(0xFF334155)),
+            border: Border.all(color: AdminUi.border),
           ),
           child: TextField(
             controller: ctrl,
             style: const TextStyle(color: Colors.white, fontSize: 13),
             decoration: InputDecoration(
               hintText: hint,
-              hintStyle: const TextStyle(color: Color(0xFF64748B), fontSize: 12),
+              hintStyle: const TextStyle(color: AdminUi.faint, fontSize: 12),
               border: InputBorder.none,
               contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
               isDense: true,
@@ -4231,23 +3553,23 @@ class _AdminScreenState extends State<AdminScreen> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF0B1424),
+        backgroundColor: AdminUi.surface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Row(
           children: [
-            Icon(Icons.warning_amber_rounded, color: Color(0xFFEF4444)),
+            Icon(Icons.warning_amber_rounded, color: AdminUi.danger),
             SizedBox(width: 8),
             Text('Xác Nhận Xóa Sân', style: TextStyle(color: Colors.white, fontSize: 16)),
           ],
         ),
         content: Text(
           'Bạn có chắc chắn muốn xóa sân "${v.name}" (#${v.id}) khỏi hệ thống?\nHành động này không thể hoàn tác.',
-          style: const TextStyle(color: Color(0xFFCBD5E1), fontSize: 13, height: 1.5),
+          style: const TextStyle(color: AdminUi.muted, fontSize: 13, height: 1.5),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Hủy', style: TextStyle(color: Color(0xFF94A3B8))),
+            child: const Text('Hủy', style: TextStyle(color: AdminUi.muted)),
           ),
           ElevatedButton(
             onPressed: () async {
@@ -4257,7 +3579,7 @@ class _AdminScreenState extends State<AdminScreen> {
               _showToast('Đã xóa sân "${v.name}" thành công!', isError: true);
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFEF4444),
+              backgroundColor: AdminUi.danger,
               foregroundColor: Colors.white,
             ),
             child: const Text('Xác Nhận Xóa'),
@@ -4272,7 +3594,7 @@ class _AdminScreenState extends State<AdminScreen> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF0B1424),
+        backgroundColor: AdminUi.surface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         contentPadding: EdgeInsets.zero,
         content: SizedBox(
@@ -4301,10 +3623,10 @@ class _AdminScreenState extends State<AdminScreen> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(v.type.toUpperCase(),
-                            style: const TextStyle(color: Color(0xFF10B981), fontWeight: FontWeight.bold, fontSize: 11)),
+                            style: const TextStyle(color: AdminUi.accent, fontWeight: FontWeight.bold, fontSize: 11)),
                         Row(
                           children: [
-                            const Icon(Icons.star, color: Color(0xFFF59E0B), size: 14),
+                            const Icon(Icons.star, color: AdminUi.warn, size: 14),
                             Text(' ${v.rating} / 5.0', style: const TextStyle(color: Colors.white, fontSize: 12)),
                           ],
                         ),
@@ -4314,17 +3636,17 @@ class _AdminScreenState extends State<AdminScreen> {
                     Text(v.name,
                         style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 17)),
                     const SizedBox(height: 4),
-                    Text(v.address, style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12)),
+                    Text(v.address, style: const TextStyle(color: AdminUi.muted, fontSize: 12)),
                     const SizedBox(height: 12),
                     Row(
                       children: [
-                        const Icon(Icons.access_time, color: Color(0xFF64748B), size: 14),
+                        const Icon(Icons.access_time, color: AdminUi.faint, size: 14),
                         const SizedBox(width: 4),
                         Text(v.hours, style: const TextStyle(color: Colors.white70, fontSize: 12)),
                         const SizedBox(width: 16),
-                        const Icon(Icons.payments_outlined, color: Color(0xFF10B981), size: 14),
+                        const Icon(Icons.payments_outlined, color: AdminUi.accent, size: 14),
                         const SizedBox(width: 4),
-                        Text(v.price, style: const TextStyle(color: Color(0xFF10B981), fontWeight: FontWeight.bold, fontSize: 12)),
+                        Text(v.price, style: const TextStyle(color: AdminUi.accent, fontWeight: FontWeight.bold, fontSize: 12)),
                       ],
                     ),
                     const SizedBox(height: 12),
@@ -4335,11 +3657,11 @@ class _AdminScreenState extends State<AdminScreen> {
                         return Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF0F172A),
+                            color: AdminUi.bg,
                             borderRadius: BorderRadius.circular(6),
-                            border: Border.all(color: const Color(0xFF334155)),
+                            border: Border.all(color: AdminUi.border),
                           ),
-                          child: Text('✓ $t', style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 11)),
+                          child: Text('$t', style: const TextStyle(color: AdminUi.muted, fontSize: 11)),
                         );
                       }).toList(),
                     ),
@@ -4352,14 +3674,14 @@ class _AdminScreenState extends State<AdminScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Đóng', style: TextStyle(color: Color(0xFF94A3B8))),
+            child: const Text('Đóng', style: TextStyle(color: AdminUi.muted)),
           ),
           ElevatedButton.icon(
             onPressed: () {
               Navigator.pop(ctx);
               _openEditVenueDialog(v);
             },
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF10B981)),
+            style: ElevatedButton.styleFrom(backgroundColor: AdminUi.accent),
             icon: const Icon(Icons.edit, size: 16),
             label: const Text('Chỉnh Sửa'),
           ),
@@ -4372,17 +3694,18 @@ class _AdminScreenState extends State<AdminScreen> {
   void _openAddWalkinBookingDialog() {
     final custCtrl = TextEditingController();
     final phoneCtrl = TextEditingController();
-    String venueName = _venues.isNotEmpty ? _venues[0].name : 'Pickleball Cổng B Ga Hà Nội';
-    final amountCtrl = TextEditingController(text: '200,000đ');
-    final timeCtrl = TextEditingController(text: '18:00 - 19:30');
-    final dateCtrl = TextEditingController(text: '31/10/2026');
+    String venueName = _venues.isNotEmpty ? _venues[0].name : '';
+    final amountCtrl = TextEditingController();
+    final timeCtrl = TextEditingController();
+    final dateCtrl = TextEditingController(text: BookingSlots.formatDate(DateTime.now()));
+    final courtCtrl = TextEditingController(text: '1');
 
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF0B1424),
+        backgroundColor: AdminUi.surface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Đặt Sân Tại Quầy', style: TextStyle(color: Colors.white, fontSize: 16)),
+        title: const Text('Đặt Sân Hộ Khách (đã nhận chuyển khoản)', style: TextStyle(color: Colors.white, fontSize: 16)),
         content: SizedBox(
           width: 400,
           child: Column(
@@ -4392,35 +3715,48 @@ class _AdminScreenState extends State<AdminScreen> {
               const SizedBox(height: 10),
               _dialogTextField('Số Điện Thoại *', phoneCtrl, '0901234567'),
               const SizedBox(height: 10),
-              _dialogTextField('Khung Giờ', timeCtrl, '18:00 - 19:30'),
+              _dialogTextField('Ngày Đặt (dd/MM/yyyy)', dateCtrl, '17/11/2026'),
               const SizedBox(height: 10),
-              _dialogTextField('Tổng Tiền (VNĐ)', amountCtrl, '200,000đ'),
+              _dialogTextField('Khung Giờ *', timeCtrl, '18:00 - 19:00'),
+              const SizedBox(height: 10),
+              _dialogTextField('Sân Số', courtCtrl, '1'),
+              const SizedBox(height: 10),
+              _dialogTextField('Tổng Tiền Đã Chuyển Khoản *', amountCtrl, '200.000 đ'),
             ],
           ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Hủy', style: TextStyle(color: Color(0xFF94A3B8))),
+            child: const Text('Hủy', style: TextStyle(color: AdminUi.muted)),
           ),
           ElevatedButton(
             onPressed: () async {
-              if (custCtrl.text.trim().isEmpty || phoneCtrl.text.trim().isEmpty) {
-                _showToast('Vui lòng điền đủ thông tin!', isError: true);
+              if (custCtrl.text.trim().isEmpty ||
+                  phoneCtrl.text.trim().isEmpty ||
+                  timeCtrl.text.trim().isEmpty ||
+                  venueName.isEmpty ||
+                  AdminStats.parseMoney(amountCtrl.text) <= 0 ||
+                  BookingSlots.parseDate(dateCtrl.text) == null ||
+                  BookingSlots.parseRanges(timeCtrl.text).isEmpty) {
+                _showToast('Nhập đủ tên, số điện thoại, ngày (dd/MM/yyyy), khung giờ (18:00 - 19:00) và số tiền!', isError: true);
                 return;
               }
+              final venue = _venues.firstWhere((v) => v.name == venueName);
+              final courtNo = (int.tryParse(courtCtrl.text.trim()) ?? 1).clamp(1, venue.courts);
+              final fieldName = '${Venue.courtLabel(venue.type)} $courtNo';
               final bookingId = 'BK-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
               final newBooking = BookingItem(
                 id: bookingId,
                 customer: custCtrl.text.trim(),
                 phone: phoneCtrl.text.trim(),
                 venueName: venueName,
-                field: 'Sân #1',
+                field: fieldName,
                 time: timeCtrl.text.trim(),
                 date: dateCtrl.text.trim(),
                 amount: amountCtrl.text.trim(),
                 status: 'Đã xác nhận',
-                paymentMethod: 'Tiền mặt tại quầy',
+                paymentMethod: 'Chuyển khoản VietQR',
               );
               await FirestoreService.createBooking(
                 customer: newBooking.customer,
@@ -4431,12 +3767,15 @@ class _AdminScreenState extends State<AdminScreen> {
                 date: newBooking.date,
                 amount: newBooking.amount,
                 paymentMethod: newBooking.paymentMethod,
+                ownerId: _venues.where((v) => v.name == newBooking.venueName).map((v) => v.ownerId).firstOrNull ?? 'admin_super_01',
+                status: 'Đã xác nhận', // quản trị viên chỉ tạo đơn này sau khi đã nhận chuyển khoản
+                paid: true,
               );
               setState(() => _bookings.insert(0, newBooking));
               Navigator.pop(ctx);
               _showToast('Đã tạo đơn đặt sân tại quầy $bookingId thành công!');
             },
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF10B981)),
+            style: ElevatedButton.styleFrom(backgroundColor: AdminUi.accent),
             child: const Text('Xác Nhận Đặt'),
           ),
         ],
@@ -4455,87 +3794,6 @@ class _AdminScreenState extends State<AdminScreen> {
 // ==========================================
 // CUSTOM PAINTERS FOR CHARTS
 // ==========================================
-class RevenueLineChartPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final gridPaint = Paint()
-      ..color = const Color(0xFF334155).withOpacity(0.4)
-      ..strokeWidth = 1;
-
-    // Draw horizontal grid lines
-    for (int i = 0; i <= 4; i++) {
-      final y = size.height * (i / 4);
-      canvas.drawLine(Offset(0, y), Offset(size.width, y), gridPaint);
-    }
-
-    // Actual Data points
-    final actual = [0.25, 0.45, 0.38, 0.65, 0.58, 0.85, 0.78];
-    // Forecast Data points
-    final forecast = [0.22, 0.42, 0.40, 0.60, 0.55, 0.92, 0.88];
-
-    final actualPath = Path();
-    final forecastPath = Path();
-
-    final stepX = size.width / (actual.length - 1);
-
-    for (int i = 0; i < actual.length; i++) {
-      final x = i * stepX;
-      final yActual = size.height - (actual[i] * size.height);
-      final yForecast = size.height - (forecast[i] * size.height);
-
-      if (i == 0) {
-        actualPath.moveTo(x, yActual);
-        forecastPath.moveTo(x, yForecast);
-      } else {
-        actualPath.lineTo(x, yActual);
-        forecastPath.lineTo(x, yForecast);
-      }
-    }
-
-    // Fill actual area
-    final fillPath = Path.from(actualPath)
-      ..lineTo(size.width, size.height)
-      ..lineTo(0, size.height)
-      ..close();
-
-    final fillPaint = Paint()
-      ..shader = LinearGradient(
-        colors: [const Color(0xFF6366F1).withOpacity(0.35), const Color(0xFF6366F1).withOpacity(0.0)],
-        begin: Alignment.topCenter,
-        end: Alignment.bottomCenter,
-      ).createShader(Rect.fromLTWH(0, 0, size.width, size.height));
-
-    canvas.drawPath(fillPath, fillPaint);
-
-    // Draw actual line
-    final actualPaint = Paint()
-      ..color = const Color(0xFF818CF8)
-      ..strokeWidth = 3
-      ..style = PaintingStyle.stroke;
-    canvas.drawPath(actualPath, actualPaint);
-
-    // Draw forecast dashed line
-    final forecastPaint = Paint()
-      ..color = const Color(0xFF10B981)
-      ..strokeWidth = 2
-      ..style = PaintingStyle.stroke;
-    canvas.drawPath(forecastPath, forecastPaint);
-
-    // Draw points on actual
-    final dotPaint = Paint()..color = const Color(0xFF818CF8);
-    final dotWhite = Paint()..color = Colors.white;
-    for (int i = 0; i < actual.length; i++) {
-      final x = i * stepX;
-      final y = size.height - (actual[i] * size.height);
-      canvas.drawCircle(Offset(x, y), 4, dotPaint);
-      canvas.drawCircle(Offset(x, y), 2, dotWhite);
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
-
 class DonutChartPainter extends CustomPainter {
   final List<double> slices;
   final List<Color> colors;
@@ -4567,7 +3825,8 @@ class DonutChartPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  bool shouldRepaint(covariant DonutChartPainter oldDelegate) =>
+      oldDelegate.slices != slices || oldDelegate.colors != colors;
 }
 
 extension _IterableExt<T> on Iterable<T> {

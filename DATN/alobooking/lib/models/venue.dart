@@ -18,6 +18,12 @@ class Venue {
   final String approvalStatus; // 'approved' | 'pending' | 'rejected'
   final String rejectReason;
 
+  /// Số sân con của cụm (0 = chưa khai báo, dùng mặc định theo môn).
+  final int courtCount;
+
+  /// Nguồn dữ liệu của cụm sân: '' = do chủ sân/admin nhập; 'osm' = nhập từ OpenStreetMap.
+  final String source;
+
   Venue({
     required this.id,
     required this.name,
@@ -37,7 +43,58 @@ class Venue {
     this.ownerName = 'Hệ Thống Alobooking',
     this.approvalStatus = 'approved',
     this.rejectReason = '',
+    this.courtCount = 0,
+    this.source = '',
   });
+
+  /// Số sân con mặc định cho một cụm sân theo môn, dùng khi chủ sân chưa khai báo số sân thật.
+  static int defaultCourtCount(String type) {
+    switch (type) {
+      case 'badminton':
+        return 8;
+      case 'pickleball':
+        return 6;
+      case 'football':
+        return 4;
+      case 'tennis':
+        return 4;
+      case 'basketball':
+        return 2;
+      default:
+        return 4;
+    }
+  }
+
+  /// Số sân con dùng để dựng sơ đồ đặt sân.
+  int get courts => courtCount > 0 ? courtCount : defaultCourtCount(type);
+
+  /// Tên gọi một sân con theo môn: "Cầu lông 1", "Pickleball 2", "Sân bóng 3"...
+  static String courtLabel(String type) {
+    switch (type) {
+      case 'badminton':
+        return 'Cầu lông';
+      case 'pickleball':
+        return 'Pickleball';
+      case 'football':
+        return 'Sân bóng';
+      case 'tennis':
+        return 'Tennis';
+      case 'basketball':
+        return 'Bóng rổ';
+      default:
+        return 'Sân';
+    }
+  }
+
+  List<String> get courtNames => [for (var i = 1; i <= courts; i++) '${courtLabel(type)} $i'];
+
+  /// Giá có dạng "100k - 200k/h" thì mới đặt online được; "Liên hệ" hay để trống thì chưa niêm yết giá.
+  bool get hasListedPrice => RegExp(r'\d+\s*k\s*-\s*\d+\s*k', caseSensitive: false).hasMatch(price);
+
+  bool get fromOpenStreetMap => source == 'osm';
+
+  /// Điểm đánh giá để hiển thị: chưa có đánh giá thì ghi "Mới" thay vì số giả.
+  String get ratingLabel => rating > 0 ? rating.toStringAsFixed(1) : 'Mới';
 
   bool get isApproved => approvalStatus == 'approved';
   bool get isPending => approvalStatus == 'pending';
@@ -62,6 +119,8 @@ class Venue {
     String? ownerName,
     String? approvalStatus,
     String? rejectReason,
+    int? courtCount,
+    String? source,
   }) {
     return Venue(
       id: id ?? this.id,
@@ -82,6 +141,8 @@ class Venue {
       ownerName: ownerName ?? this.ownerName,
       approvalStatus: approvalStatus ?? this.approvalStatus,
       rejectReason: rejectReason ?? this.rejectReason,
+      courtCount: courtCount ?? this.courtCount,
+      source: source ?? this.source,
     );
   }
 
@@ -105,6 +166,8 @@ class Venue {
       ownerName: json['ownerName'] ?? 'Hệ Thống Alobooking',
       approvalStatus: json['approvalStatus'] ?? 'approved',
       rejectReason: json['rejectReason'] ?? '',
+      courtCount: (json['courtCount'] as num?)?.toInt() ?? 0,
+      source: json['source'] ?? '',
     );
   }
 
@@ -128,6 +191,8 @@ class Venue {
       'ownerName': ownerName,
       'approvalStatus': approvalStatus,
       'rejectReason': rejectReason,
+      'courtCount': courtCount,
+      'source': source,
     };
   }
 }

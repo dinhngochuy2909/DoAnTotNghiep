@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/venue.dart';
 import '../services/auth_service.dart';
+import '../models/notification_item.dart';
 import '../services/firestore_service.dart';
 import 'booked_screen.dart';
 import 'explore_screen.dart';
@@ -17,7 +18,7 @@ class AccountScreen extends StatefulWidget {
 }
 
 class _AccountScreenState extends State<AccountScreen> {
-  String _selectedMenu = 'whats_new'; // 'whats_new' | 'groups' | 'classes' | 'memberships' | 'settings' | 'about' | 'terms'
+  String _selectedMenu = 'settings';
 
   // Cá nhân hóa thông tin người chơi
   String _preferredDistrict = 'Đống Đa';
@@ -127,7 +128,11 @@ class _AccountScreenState extends State<AccountScreen> {
   }
 
   void _showNotificationsDialog() async {
-    final notifs = await FirestoreService.getNotifications();
+    final me = AuthService.currentUser;
+    final ids = <String>{if (me != null) me.uid, if (me != null && me.isAdmin) 'admin_super_01'};
+    final notifs = me == null || AuthService.isGuest
+        ? <NotificationItem>[]
+        : (await FirestoreService.getNotifications()).where((n) => ids.contains(n.userId)).toList();
     if (!mounted) return;
 
     showDialog(
@@ -162,82 +167,6 @@ class _AccountScreenState extends State<AccountScreen> {
                     );
                   },
                 ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Đóng'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showVouchersDialog() {
-    final vouchers = [
-      {'code': 'ALOBO50', 'desc': 'Giảm 50k cho đơn đặt sân đầu tiên', 'exp': 'HSD: 31/12/2026'},
-      {'code': 'GIOPHUCVU', 'desc': 'Giảm 20% khi đặt sân khung giờ vàng (17h-20h)', 'exp': 'HSD: 15/11/2026'},
-      {'code': 'PICKLEBALLPRO', 'desc': 'Tặng 1 buổi trải nghiệm thảm Pickleball miễn phí', 'exp': 'HSD: 30/11/2026'},
-    ];
-
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Row(
-          children: [
-            Icon(Icons.card_giftcard, color: Color(0xFFEA580C)),
-            SizedBox(width: 8),
-            Text('Kho ưu đãi & Voucher', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-          ],
-        ),
-        content: SizedBox(
-          width: 440,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: vouchers
-                .map((v) => Container(
-                      margin: const EdgeInsets.only(bottom: 10),
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFFF7ED),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: const Color(0xFFFDBA74)),
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.confirmation_number_outlined, color: Color(0xFFEA580C)),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(v['code']!, style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFFC2410C))),
-                                Text(v['desc']!, style: const TextStyle(fontSize: 12, color: Color(0xFF431407))),
-                                Text(v['exp']!, style: const TextStyle(fontSize: 10.5, color: Colors.grey)),
-                              ],
-                            ),
-                          ),
-                          ElevatedButton(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFFEA580C),
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                              minimumSize: Size.zero,
-                            ),
-                            onPressed: () {
-                              Navigator.pop(ctx);
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text('Đã áp dụng mã ${v['code']}!')),
-                              );
-                            },
-                            child: const Text('Dùng ngay', style: TextStyle(fontSize: 11)),
-                          ),
-                        ],
-                      ),
-                    ))
-                .toList(),
-          ),
         ),
         actions: [
           TextButton(
@@ -380,10 +309,6 @@ class _AccountScreenState extends State<AccountScreen> {
                         Navigator.push(context, MaterialPageRoute(builder: (_) => BookedScreen(allVenues: widget.venues)));
                       }),
                       _quickActionButton(Icons.notifications_outlined, 'Thông báo', _showNotificationsDialog),
-                      _quickActionButton(Icons.school_outlined, 'Khoá học', () {
-                        setState(() => _selectedMenu = 'classes');
-                      }),
-                      _quickActionButton(Icons.card_giftcard, 'Ưu đãi', _showVouchersDialog),
                     ],
                   ),
                 ),
@@ -394,25 +319,16 @@ class _AccountScreenState extends State<AccountScreen> {
                     padding: const EdgeInsets.symmetric(vertical: 8),
                     children: [
                       _menuSectionHeader('Hoạt động'),
-                      _menuTile('Nhóm của tôi', Icons.groups_outlined, 'groups'),
-                      _menuTile('Danh sách lịch học', Icons.school_outlined, 'classes'),
-                      _menuTile('Gói hội viên', Icons.workspace_premium_outlined, 'memberships'),
+                      _menuTile('Lịch đã đặt', Icons.event_note_outlined, 'bookings'),
+                      _menuTile('Thông báo', Icons.notifications_outlined, 'notifications'),
 
                       const SizedBox(height: 10),
                       _menuSectionHeader('Hệ thống'),
-                      _menuTile('Cài đặt', Icons.settings_outlined, 'settings'),
-                      _menuTile('Thông tin phiên bản', Icons.info_outline, 'about'),
-                      _menuTile('Điều khoản và chính sách', Icons.shield_outlined, 'terms'),
-                      _menuTile('Ứng dụng có gì mới', Icons.newspaper_outlined, 'whats_new', isHighlighted: true),
+                      _menuTile('Tài khoản', Icons.person_outline, 'settings', isHighlighted: true),
                     ],
                   ),
                 ),
 
-                // Version at bottom
-                const Padding(
-                  padding: EdgeInsets.all(12.0),
-                  child: Text('Thông tin phiên bản: 2.10.5', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 11)),
-                ),
               ],
             ),
           ),
@@ -500,280 +416,89 @@ class _AccountScreenState extends State<AccountScreen> {
       ),
       trailing: const Icon(Icons.chevron_right, size: 16, color: Color(0xFF94A3B8)),
       tileColor: isSelected ? const Color(0xFFDCFCE7) : Colors.transparent,
-      onTap: () => setState(() => _selectedMenu = key),
+      onTap: () {
+        if (key == 'bookings') {
+          Navigator.push(context, MaterialPageRoute(builder: (_) => BookedScreen(allVenues: widget.venues)));
+        } else if (key == 'notifications') {
+          _showNotificationsDialog();
+        } else {
+          setState(() => _selectedMenu = key);
+        }
+      },
     );
   }
 
-  Widget _buildRightPaneContent() {
-    if (_selectedMenu == 'whats_new') {
-      return _buildWhatsNewDocument();
-    } else if (_selectedMenu == 'groups') {
-      return _buildGroupsContent();
-    } else if (_selectedMenu == 'classes') {
-      return _buildClassesContent();
-    } else if (_selectedMenu == 'memberships') {
-      return _buildMembershipsContent();
-    } else {
-      return _buildGenericSettingsContent();
-    }
-  }
+  Widget _buildRightPaneContent() => _buildGenericSettingsContent();
 
-  // Khớp 100% với tài liệu và nội dung trong bức ảnh của người dùng
-  Widget _buildWhatsNewDocument() {
-    return Scaffold(
-      backgroundColor: const Color(0xFF065F46),
-      appBar: AppBar(
-        backgroundColor: const Color(0xFF065F46),
-        foregroundColor: Colors.white,
-        elevation: 0,
-        centerTitle: true,
-        title: const Text('Ứng dụng có gì mới', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Tiêu đề chính
-            const Text(
-              '🚀 ALOBO USER – Cập nhật mới & Gợi ý tính năng quan trọng',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 19,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 12),
-
-            // Tag phiên bản
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.12),
-                borderRadius: BorderRadius.circular(6),
-                border: Border.all(color: Colors.white.withOpacity(0.2)),
-              ),
-              child: const Text(
-                '🗂️ [Phiên bản mới nhất: 2.8.4 | Phát hành: 12/01/2026]',
-                style: TextStyle(color: Color(0xFF86EFAC), fontSize: 12.5, fontWeight: FontWeight.w600),
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            // Lời mở đầu
-            const Text(
-              'ALOBO mang đến một bước nâng cấp lớn về trải nghiệm người chơi – cá nhân hóa – giao diện, giúp bạn tìm sân nhanh hơn, chơi đúng gu hơn và kết nối thể thao dễ dàng hơn.\n👉 Cùng xem những điểm mới trong 2.8.4 và nhắc lại các tính năng hay từ các phiên bản cũ nhé!',
-              style: TextStyle(color: Colors.white70, fontSize: 13.5, height: 1.5),
-            ),
-            const SizedBox(height: 24),
-            const Divider(color: Colors.white24),
-            const SizedBox(height: 20),
-
-            // Section 1: MỚI TRONG PHIÊN BẢN 2.8.4
-            const Text(
-              '🔥 MỚI TRONG PHIÊN BẢN 2.8.4 – TRẢI NGHIỆM HOÀN TOÀN MỚI',
-              style: TextStyle(
-                color: Color(0xFFFDE047), // Bright yellow
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            // Subsection: Newsfeed & Tab Khám phá
-            const Row(
-              children: [
-                Icon(Icons.newspaper, color: Colors.white, size: 18),
-                SizedBox(width: 8),
-                Text('Newsfeed & Tab Khám phá', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15)),
-              ],
-            ),
-            const SizedBox(height: 8),
-            _bulletPoint('Giao diện ứng dụng được thiết kế lại, menu & navbar mới hiện đại hơn.'),
-            _bulletPoint('Bổ sung tab Khám phá – nơi bạn dễ dàng xem:'),
-            Padding(
-              padding: const EdgeInsets.only(left: 20, top: 4, bottom: 6),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _subBullet('📣 Bài đăng từ chủ sân'),
-                  _subBullet('⏳ Ưu đãi sân trống / giờ trống (Flash sale giờ vàng)'),
-                  _subBullet('🔄 Pass sân / pass lịch (Cộng đồng nhượng lại lịch đặt)'),
-                  _subBullet('🎟️ Ưu đãi sự kiện vãng lai – ghép đội – xé vé'),
-                ],
-              ),
-            ),
-            _bulletPoint('Lợi ích:\n👉 Không cần tìm kiếm thủ công – ưu đãi & sân phù hợp sẽ tự tìm đến bạn.'),
-
-            const SizedBox(height: 24),
-
-            // Subsection: Cá nhân hóa trải nghiệm người chơi
-            const Row(
-              children: [
-                Icon(Icons.person_pin, color: Colors.white, size: 18),
-                SizedBox(width: 8),
-                Text('Cá nhân hóa trải nghiệm người chơi', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15)),
-              ],
-            ),
-            const SizedBox(height: 8),
-            _bulletPoint('Thêm Walkthrough hướng dẫn sử dụng cho người dùng mới.'),
-            _bulletPoint('Cho phép bạn cập nhật thông tin cá nhân hóa:'),
-            Padding(
-              padding: const EdgeInsets.only(left: 20, top: 4, bottom: 6),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _subBullet('📍 Khu vực thường chơi: $_preferredDistrict'),
-                  _subBullet('🏸 Môn thể thao yêu thích: $_favoriteSport'),
-                  _subBullet('🏆 Trình độ chơi: $_skillLevel'),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 16),
-            ElevatedButton.icon(
-              onPressed: _showPersonalizationDialog,
-              icon: const Icon(Icons.edit, size: 16),
-              label: const Text('Cập Nhật Gu Thể Thao Của Bạn Ngay'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF10B981),
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-              ),
-            ),
-            const SizedBox(height: 30),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _bulletPoint(String text) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('• ', style: TextStyle(color: Colors.white70, fontSize: 14)),
-          Expanded(child: Text(text, style: const TextStyle(color: Colors.white70, fontSize: 13, height: 1.4))),
-        ],
-      ),
-    );
-  }
-
-  Widget _subBullet(String text) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2.5),
-      child: Text(text, style: const TextStyle(color: Color(0xFF86EFAC), fontSize: 12.5, fontWeight: FontWeight.w500)),
-    );
-  }
-
-  Widget _buildGroupsContent() {
-    return Center(
-      child: Container(
-        padding: const EdgeInsets.all(24),
-        margin: const EdgeInsets.all(24),
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16)),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.groups, size: 50, color: Color(0xFF15803D)),
-            const SizedBox(height: 12),
-            const Text('Hội Nhóm Thể Thao Của Tôi', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-            const SizedBox(height: 8),
-            const Text('Bạn đang tham gia: CLB Pickleball Hà Nội Pro (18 thành viên) & CLB Cầu Lông Đống Đa.', textAlign: TextAlign.center, style: TextStyle(color: Colors.grey)),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Đang kết nối danh sách nhóm...'))),
-              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF15803D), foregroundColor: Colors.white),
-              child: const Text('Tạo Nhóm Mới / Ghép Đội'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildClassesContent() {
-    return Center(
-      child: Container(
-        padding: const EdgeInsets.all(24),
-        margin: const EdgeInsets.all(24),
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16)),
-        child: const Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.school, size: 50, color: Color(0xFF0284C7)),
-            SizedBox(height: 12),
-            Text('Danh Sách Khoá Học & Lịch Tập', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-            SizedBox(height: 8),
-            Text('Khoá học đang theo dõi: Lớp Pickleball Cơ Bản & Chiến Thuật Đôi (Thứ 3, 5 hàng tuần tại Ga Hà Nội).', textAlign: TextAlign.center, style: TextStyle(color: Colors.grey)),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildMembershipsContent() {
-    return Center(
-      child: Container(
-        padding: const EdgeInsets.all(24),
-        margin: const EdgeInsets.all(24),
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16)),
-        child: const Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.workspace_premium, size: 50, color: Color(0xFFF59E0B)),
-            SizedBox(height: 12),
-            Text('Gói Hội Viên Của Bạn', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-            SizedBox(height: 8),
-            Text('Bạn đang sở hữu thẻ VIP Vàng: Giảm 15% tất cả đơn đặt sân giờ vàng & miễn phí gửi xe.', textAlign: TextAlign.center, style: TextStyle(color: Colors.grey)),
-          ],
-        ),
-      ),
-    );
-  }
 
   Widget _buildGenericSettingsContent() {
+    final u = AuthService.currentUser;
+    final loggedIn = u != null && !AuthService.isGuest;
+    Widget line(IconData icon, String label, String value) => Padding(
+          padding: const EdgeInsets.symmetric(vertical: 6),
+          child: Row(
+            children: [
+              Icon(icon, size: 18, color: const Color(0xFF15803D)),
+              const SizedBox(width: 10),
+              SizedBox(width: 90, child: Text(label, style: const TextStyle(color: Color(0xFF64748B), fontSize: 13))),
+              Expanded(
+                child: Text(value.isEmpty ? 'Chưa cập nhật' : value,
+                    style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5)),
+              ),
+            ],
+          ),
+        );
     return Center(
       child: Container(
+        width: 460,
         padding: const EdgeInsets.all(24),
         margin: const EdgeInsets.all(24),
         decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16)),
         child: Column(
           mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Icon(Icons.settings, size: 50, color: Color(0xFF64748B)),
+            const Text('Tài khoản', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
             const SizedBox(height: 12),
-            const Text('Cài Đặt Hệ Thống & Tài Khoản', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-            const SizedBox(height: 8),
-            const Text('Quản lý thông báo, đổi mật khẩu và liên kết tài khoản bảo mật.', style: TextStyle(color: Colors.grey)),
-            const SizedBox(height: 16),
-            ElevatedButton.icon(
-              onPressed: () {
-                AuthService.logout();
-                Navigator.of(context).pushAndRemoveUntil(
-                  MaterialPageRoute(builder: (_) => const LoginScreen()),
-                  (route) => false,
-                );
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFEF4444).withOpacity(0.12),
-                foregroundColor: const Color(0xFFEF4444),
-                side: const BorderSide(color: Color(0xFFEF4444)),
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                elevation: 0,
+            if (loggedIn) ...[
+              line(Icons.person_outline, 'Họ tên', u.fullName),
+              line(Icons.email_outlined, 'Email', u.email),
+              line(Icons.phone_outlined, 'Điện thoại', u.phone),
+              const SizedBox(height: 16),
+              ElevatedButton.icon(
+                onPressed: () {
+                  AuthService.logout();
+                  Navigator.of(context).pushAndRemoveUntil(
+                    MaterialPageRoute(builder: (_) => const LoginScreen()),
+                    (route) => false,
+                  );
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFEF4444).withValues(alpha: 0.12),
+                  foregroundColor: const Color(0xFFEF4444),
+                  side: const BorderSide(color: Color(0xFFEF4444)),
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  elevation: 0,
+                ),
+                icon: const Icon(Icons.logout_rounded, size: 18),
+                label: const Text('Đăng xuất', style: TextStyle(fontWeight: FontWeight.bold)),
               ),
-              icon: const Icon(Icons.logout_rounded, size: 18),
-              label: const Text('Đăng Xuất Tài Khoản', style: TextStyle(fontWeight: FontWeight.bold)),
-            ),
+            ] else ...[
+              const Text('Bạn chưa đăng nhập. Đăng nhập để đặt sân và xem lịch sử đặt sân.',
+                  style: TextStyle(color: Color(0xFF64748B))),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LoginScreen())),
+                child: const Text('Đăng nhập'),
+              ),
+            ],
           ],
         ),
       ),
     );
   }
+
 
   Widget _bottomNavItem(IconData icon, String label, VoidCallback onTap, {bool isActive = false}) {
     return InkWell(

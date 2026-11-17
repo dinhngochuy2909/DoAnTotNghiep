@@ -4,7 +4,6 @@ import '../models/venue.dart';
 import '../models/customer.dart';
 import '../models/payment.dart';
 import '../models/notification_item.dart';
-import '../data/venues_data.dart';
 
 class BookingItem {
   final String id;
@@ -19,6 +18,9 @@ class BookingItem {
   final String paymentMethod;
   final DateTime createdAt;
 
+  /// uid tài khoản đã đặt (rỗng với đơn cũ hoặc đơn tại quầy)
+  final String userId;
+
   BookingItem({
     required this.id,
     required this.customer,
@@ -31,7 +33,18 @@ class BookingItem {
     required this.status,
     required this.paymentMethod,
     DateTime? createdAt,
+    this.userId = '',
   }) : createdAt = createdAt ?? DateTime.now();
+
+  /// Đơn này có phải của tài khoản (uid, số điện thoại, tên) không.
+  /// Ưu tiên uid; đơn cũ chưa có uid thì khớp theo số điện thoại, thiếu số thì khớp theo tên.
+  bool belongsTo({required String uid, required String phone, required String name}) {
+    if (userId.isNotEmpty) return userId == uid;
+    String digits(String s) => s.replaceAll(RegExp(r'[^0-9]'), '');
+    final up = digits(phone), bp = digits(this.phone);
+    if (up.isNotEmpty && bp.isNotEmpty) return up == bp;
+    return customer.trim().toLowerCase() == name.trim().toLowerCase();
+  }
 
   factory BookingItem.fromFirestoreFields(String docId, Map<String, dynamic> fields) {
     return BookingItem(
@@ -46,12 +59,87 @@ class BookingItem {
       status: fields['status']?['stringValue'] ?? 'Chờ xác nhận',
       paymentMethod: fields['paymentMethod']?['stringValue'] ?? 'Chuyển khoản QR',
       createdAt: DateTime.tryParse(fields['createdAt']?['stringValue'] ?? '') ?? DateTime.now(),
+      userId: fields['userId']?['stringValue'] ?? '',
     );
   }
 }
 
+/// Đánh giá của khách đã chơi tại một sân.
+class ReviewItem {
+  final String id;
+  final int venueId;
+  final String userId;
+  final String userName;
+  final int stars; // 1..5
+  final String comment;
+  final DateTime createdAt;
+
+  ReviewItem({
+    required this.id,
+    required this.venueId,
+    required this.userId,
+    required this.userName,
+    required this.stars,
+    required this.comment,
+    DateTime? createdAt,
+  }) : createdAt = createdAt ?? DateTime.now();
+
+  factory ReviewItem.fromFirestoreFields(String docId, Map<String, dynamic> f) {
+    String v(String k) => (f[k]?['stringValue'] ?? '').toString();
+    int n(String k) => int.tryParse((f[k]?['integerValue'] ?? f[k]?['stringValue'] ?? '0').toString()) ?? 0;
+    return ReviewItem(
+      id: docId,
+      venueId: n('venueId'),
+      userId: v('userId'),
+      userName: v('userName'),
+      stars: n('stars').clamp(1, 5),
+      comment: v('comment'),
+      createdAt: DateTime.tryParse(v('createdAt')) ?? DateTime.now(),
+    );
+  }
+
+  Map<String, dynamic> toFirestoreFields() => {
+        'venueId': {'integerValue': venueId.toString()},
+        'userId': {'stringValue': userId},
+        'userName': {'stringValue': userName},
+        'stars': {'integerValue': stars.toString()},
+        'comment': {'stringValue': comment},
+        'createdAt': {'stringValue': createdAt.toIso8601String()},
+      };
+}
+
 class FirestoreService {
   static const String projectId = 'alobooking-b2484';
+
+  /// true nếu một lần tải gần nhất từ Firestore thất bại (mất mạng/lỗi máy chủ).
+  /// Giao diện dùng cờ này để báo lỗi rõ ràng thay vì hiển thị dữ liệu mẫu.
+  static bool lastLoadFailed = false;
+
+  /// Liệt kê toàn bộ tài liệu của một collection (có phân trang).
+  static Future<({bool ok, List<Map<String, dynamic>> docs})> _listDocs(String collection, {int pageSize = 300}) async {
+    final docs = <Map<String, dynamic>>[];
+    String? pageToken;
+    try {
+      do {
+        final q = pageToken != null && pageToken.isNotEmpty ? '&pageToken=$pageToken' : '';
+        final res = await http.get(Uri.parse('$baseUrl/$collection?pageSize=$pageSize$q'));
+        if (res.statusCode != 200) {
+          // 404/rỗng được coi là collection chưa có dữ liệu, các lỗi khác là lỗi tải
+          if (res.statusCode == 404) return (ok: true, docs: docs);
+          lastLoadFailed = true;
+          return (ok: false, docs: docs);
+        }
+        final data = json.decode(res.body);
+        final list = data['documents'] as List<dynamic>?;
+        if (list != null) docs.addAll(list.cast<Map<String, dynamic>>());
+        pageToken = data['nextPageToken'] as String?;
+      } while (pageToken != null && pageToken.isNotEmpty);
+      return (ok: true, docs: docs);
+    } catch (_) {
+      lastLoadFailed = true;
+      return (ok: false, docs: docs);
+    }
+  }
   static const String baseUrl =
       'https://firestore.googleapis.com/v1/projects/$projectId/databases/(default)/documents';
 
@@ -86,10 +174,13 @@ class FirestoreService {
                   distance: fields?['distance']?['stringValue'] ?? '1.0km',
                   address: fields?['address']?['stringValue'] ?? '',
                   hours: fields?['hours']?['stringValue'] ?? '05:00 – 23:00',
-                  tags: (fields?['tags']?['arrayValue']?['values'] as List<dynamic>?)
-                          ?.map((v) => v['stringValue']?.toString() ?? '')
-                          .toList() ??
-                      ['Đơn ngày'],
+                  // Có trường tags nhưng mảng rỗng nghĩa là sân chưa khai báo tiện ích: giữ rỗng, không tự thêm
+                  tags: fields?['tags'] == null
+                      ? ['Đơn ngày']
+                      : ((fields?['tags']?['arrayValue']?['values'] as List<dynamic>?)
+                              ?.map((v) => v['stringValue']?.toString() ?? '')
+                              .toList() ??
+                          <String>[]),
                   rating: double.tryParse(
                           fields?['rating']?['doubleValue']?.toString() ?? '4.8') ??
                       4.8,
@@ -106,12 +197,15 @@ class FirestoreService {
                   ownerName: fields?['ownerName']?['stringValue'] ?? 'Hệ Thống Alobooking',
                   approvalStatus: fields?['approvalStatus']?['stringValue'] ?? 'approved',
                   rejectReason: fields?['rejectReason']?['stringValue'] ?? '',
+                  courtCount: int.tryParse((fields?['courtCount']?['integerValue'] ?? '0').toString()) ?? 0,
+                  source: fields?['source']?['stringValue'] ?? '',
                 ));
               }
             }
           }
           pageToken = data['nextPageToken'] as String?;
         } else {
+          if (response.statusCode != 404) lastLoadFailed = true;
           break;
         }
       } while (pageToken != null && pageToken.isNotEmpty);
@@ -121,9 +215,9 @@ class FirestoreService {
         return allVenues;
       }
     } catch (e) {
-      // Fallback local data
+      lastLoadFailed = true;
     }
-    return sampleVenues;
+    return <Venue>[];
   }
 
   /// Thêm sân thể thao mới lên Firestore
@@ -154,6 +248,8 @@ class FirestoreService {
           'ownerName': {'stringValue': venue.ownerName},
           'approvalStatus': {'stringValue': venue.approvalStatus},
           'rejectReason': {'stringValue': venue.rejectReason},
+          'courtCount': {'integerValue': venue.courtCount.toString()},
+          'source': {'stringValue': venue.source},
         }
       };
 
@@ -196,6 +292,8 @@ class FirestoreService {
           'ownerName': {'stringValue': venue.ownerName},
           'approvalStatus': {'stringValue': venue.approvalStatus},
           'rejectReason': {'stringValue': venue.rejectReason},
+          'courtCount': {'integerValue': venue.courtCount.toString()},
+          'source': {'stringValue': venue.source},
         }
       };
 
@@ -272,6 +370,7 @@ class FirestoreService {
           }
           pageToken = data['nextPageToken'] as String?;
         } else {
+          if (response.statusCode != 404) lastLoadFailed = true;
           break;
         }
       } while (pageToken != null && pageToken.isNotEmpty);
@@ -281,9 +380,9 @@ class FirestoreService {
         return allBookings;
       }
     } catch (e) {
-      // Fallback
+      lastLoadFailed = true;
     }
-    return _defaultBookings;
+    return <BookingItem>[];
   }
 
   /// Cập nhật trạng thái đơn đặt sân
@@ -314,10 +413,15 @@ class FirestoreService {
     required String time,
     required String date,
     required String amount,
-    String paymentMethod = 'Chuyển khoản QR',
+    String paymentMethod = 'Chuyển khoản VietQR',
+    String ownerId = 'admin_super_01',
+    String status = 'Chờ xác nhận',
+    bool paid = false,
+    String userId = '',
+    String? id,
   }) async {
     try {
-      final bookingId = 'BK-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
+      final bookingId = id ?? 'BK-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
       final payload = {
         'fields': {
           'id': {'stringValue': bookingId},
@@ -328,9 +432,10 @@ class FirestoreService {
           'time': {'stringValue': time},
           'date': {'stringValue': date},
           'amount': {'stringValue': amount},
-          'status': {'stringValue': 'Chờ xác nhận'},
+          'status': {'stringValue': status},
           'paymentMethod': {'stringValue': paymentMethod},
           'createdAt': {'stringValue': DateTime.now().toIso8601String()},
+          if (userId.isNotEmpty) 'userId': {'stringValue': userId},
         }
       };
 
@@ -342,7 +447,8 @@ class FirestoreService {
 
       final isSuccess = response.statusCode == 200 || response.statusCode == 201;
       if (isSuccess) {
-        // Tự động sinh phiếu thu thanh toán đồng bộ lên Firestore
+        // Phiếu thu ở trạng thái "Đang xử lý": chỉ chuyển "Thành công" khi chủ sân/admin xác nhận đã nhận tiền.
+        // (Không có cổng thanh toán nên không được tự khẳng định đã thanh toán.)
         final payId = 'PAY-${DateTime.now().millisecondsSinceEpoch.toString().substring(6)}';
         final newPayment = PaymentItem(
           id: payId,
@@ -351,20 +457,20 @@ class FirestoreService {
           amount: amount,
           method: paymentMethod,
           time: '$date $time',
-          status: 'Thành công',
-          bankRef: 'MBB-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}',
+          status: paid ? 'Thành công' : 'Đang xử lý',
+          bankRef: '',
         );
-        addPayment(newPayment);
+        await addPayment(newPayment);
 
-        // Tự động gửi thông báo thời gian thực lên Firestore
+        // Thông báo cho chủ sân của cụm sân được đặt
         final notif = NotificationItem(
           id: 'NOTIF-${DateTime.now().millisecondsSinceEpoch.toString().substring(6)}',
-          userId: 'owner_chuan_01',
-          title: 'Đơn đặt sân mới: $bookingId 🎾',
+          userId: ownerId,
+          title: 'Đơn đặt sân mới: $bookingId',
           message: 'Khách hàng $customer vừa đặt sân $venueName ($field - $time ngày $date).',
           type: 'booking',
         );
-        addNotification(notif);
+        await addNotification(notif);
       }
 
       return isSuccess;
@@ -373,246 +479,154 @@ class FirestoreService {
     }
   }
 
-  static final List<BookingItem> _defaultBookings = [
-    BookingItem(
-      id: 'BK-1029',
-      customer: 'Nguyễn Văn An',
-      phone: '0901234567',
-      venueName: 'Pickleball Cổng B Ga Hà Nội',
-      field: 'Sân #2',
-      time: '18:00 - 19:30',
-      date: '31/10/2026',
-      amount: '220,000đ',
-      status: 'Chờ xác nhận',
-      paymentMethod: 'Chuyển khoản VietQR',
-    ),
-    BookingItem(
-      id: 'BK-1030',
-      customer: 'Trần Thị Bích',
-      phone: '0912345678',
-      venueName: 'Phúc Long Pickleball & Badminton',
-      field: 'Sân Cầu Lông #3',
-      time: '19:30 - 21:00',
-      date: '31/10/2026',
-      amount: '180,000đ',
-      status: 'Đã xác nhận',
-      paymentMethod: 'Ví MoMo',
-    ),
-    BookingItem(
-      id: 'BK-1031',
-      customer: 'Lê Hoàng Nam',
-      phone: '0987654321',
-      venueName: 'Sân Bóng Đá Mini Nam Từ Liêm',
-      field: 'Sân 7 người VIP',
-      time: '17:00 - 18:30',
-      date: '01/11/2026',
-      amount: '450,000đ',
-      status: 'Hoàn thành',
-      paymentMethod: 'Tiền mặt',
-    ),
-    BookingItem(
-      id: 'BK-1032',
-      customer: 'Phạm Minh Đức',
-      phone: '0933445566',
-      venueName: 'City Pickleball Chùa Bộc',
-      field: 'Sân #1',
-      time: '20:00 - 21:30',
-      date: '01/11/2026',
-      amount: '200,000đ',
-      status: 'Chờ xác nhận',
-      paymentMethod: 'Chuyển khoản VietQR',
-    ),
-  ];
 
   // ==========================================
   // KHÁCH HÀNG (CUSTOMERS)
   // ==========================================
-  static final List<CustomerItem> _defaultCustomers = [
-    CustomerItem(
-      id: 'CUST-01',
-      name: 'Nguyễn Văn An',
-      phone: '0901234567',
-      email: 'an.nguyen@gmail.com',
-      bookingsCount: 18,
-      totalSpent: '4.250.000đ',
-      favoriteSport: 'Pickleball',
-      rank: 'VIP Vàng',
-      status: 'Hoạt động',
-      joinDate: '12/03/2026',
-    ),
-    CustomerItem(
-      id: 'CUST-02',
-      name: 'Trần Thị Bích',
-      phone: '0912345678',
-      email: 'bich.tran@gmail.com',
-      bookingsCount: 12,
-      totalSpent: '2.800.000đ',
-      favoriteSport: 'Cầu lông',
-      rank: 'Bạc',
-      status: 'Hoạt động',
-      joinDate: '24/04/2026',
-    ),
-    CustomerItem(
-      id: 'CUST-03',
-      name: 'Lê Hoàng Nam',
-      phone: '0987654321',
-      email: 'nam.le@yahoo.com',
-      bookingsCount: 25,
-      totalSpent: '7.600.000đ',
-      favoriteSport: 'Bóng đá',
-      rank: 'VIP Kim Cương',
-      status: 'Hoạt động',
-      joinDate: '05/01/2026',
-    ),
-    CustomerItem(
-      id: 'CUST-04',
-      name: 'Phạm Minh Đức',
-      phone: '0933445566',
-      email: 'duc.pham@outlook.com',
-      bookingsCount: 8,
-      totalSpent: '1.600.000đ',
-      favoriteSport: 'Pickleball',
-      rank: 'Đồng',
-      status: 'Hoạt động',
-      joinDate: '15/06/2026',
-    ),
-    CustomerItem(
-      id: 'CUST-05',
-      name: 'Hoàng Anh Tuấn',
-      phone: '0977889900',
-      email: 'tuan.hoang@gmail.com',
-      bookingsCount: 15,
-      totalSpent: '5.200.000đ',
-      favoriteSport: 'Tennis',
-      rank: 'VIP Vàng',
-      status: 'Hoạt động',
-      joinDate: '20/02/2026',
-    ),
-    CustomerItem(
-      id: 'CUST-06',
-      name: 'Đỗ Thùy Trang',
-      phone: '0944556677',
-      email: 'trang.do@gmail.com',
-      bookingsCount: 4,
-      totalSpent: '920.000đ',
-      favoriteSport: 'Cầu lông',
-      rank: 'Đồng',
-      status: 'Tạm khóa',
-      joinDate: '10/08/2026',
-    ),
-  ];
 
+  /// Danh sách khách hàng: lấy từ collection `users` (vai trò customer).
+  /// Số lượt đặt và tổng chi tiêu được tính từ đơn đặt thật bằng [enrichCustomers].
   static Future<List<CustomerItem>> getCustomers() async {
-    return List.from(_defaultCustomers);
+    final r = await _listDocs('users');
+    final out = <CustomerItem>[];
+    for (final doc in r.docs) {
+      final id = (doc['name'] as String).split('/').last;
+      final f = (doc['fields'] as Map<String, dynamic>?) ?? {};
+      String v(String k) => (f[k]?['stringValue'] ?? '').toString();
+      if (v('role') != 'customer') continue;
+      final name = v('displayName').isNotEmpty ? v('displayName') : v('fullName');
+      final rank = v('rank');
+      out.add(CustomerItem(
+        id: id,
+        name: name.isEmpty ? 'Chưa cập nhật tên' : name,
+        phone: v('phone'),
+        email: v('email'),
+        favoriteSport: v('favoriteSport').isEmpty ? '—' : v('favoriteSport'),
+        rank: rank.isEmpty
+            ? 'Đồng'
+            : (rank == 'Kim Cương' || rank == 'Vàng' ? 'VIP $rank' : rank),
+        status: v('status').isEmpty ? 'Hoạt động' : v('status'),
+        joinDate: _fmtDate(v('createdAt')),
+      ));
+    }
+    return out;
   }
 
-  static void addCustomer(CustomerItem customer) {
-    _defaultCustomers.insert(0, customer);
+  static String _fmtDate(String iso) {
+    final d = DateTime.tryParse(iso);
+    if (d == null) return '';
+    return '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
   }
 
-  static void updateCustomer(CustomerItem customer) {
-    final idx = _defaultCustomers.indexWhere((c) => c.id == customer.id);
-    if (idx != -1) {
-      _defaultCustomers[idx] = customer;
+  static int _moneyToInt(String s) {
+    final digits = s.replaceAll(RegExp(r'[^0-9]'), '');
+    return digits.isEmpty ? 0 : int.parse(digits);
+  }
+
+  static String _fmtMoney(int n) {
+    final s = n.toString();
+    final b = StringBuffer();
+    for (var i = 0; i < s.length; i++) {
+      if (i > 0 && (s.length - i) % 3 == 0) b.write('.');
+      b.write(s[i]);
+    }
+    return '${b}đ';
+  }
+
+  /// Gán số lượt đặt và tổng chi tiêu thật cho từng khách (khớp theo số điện thoại, nếu thiếu thì theo tên).
+  /// Chỉ tính đơn không hủy; tổng chi tiêu chỉ gồm đơn đã xác nhận/hoàn thành.
+  static List<CustomerItem> enrichCustomers(List<CustomerItem> customers, List<BookingItem> bookings) {
+    String digits(String s) => s.replaceAll(RegExp(r'[^0-9]'), '');
+    for (final c in customers) {
+      final cp = digits(c.phone);
+      var count = 0;
+      var spent = 0;
+      for (final b in bookings) {
+        final bp = digits(b.phone);
+        final match = (cp.isNotEmpty && bp == cp) ||
+            ((cp.isEmpty || bp.isEmpty) && b.customer.trim().toLowerCase() == c.name.trim().toLowerCase());
+        if (!match) continue;
+        final st = b.status.toLowerCase();
+        if (st.contains('hủy')) continue;
+        count++;
+        if (!st.contains('chờ')) spent += _moneyToInt(b.amount);
+      }
+      c.bookingsCount = count;
+      c.totalSpent = _fmtMoney(spent);
+    }
+    return customers;
+  }
+
+  static Map<String, dynamic> _customerFields(CustomerItem c) => {
+        'displayName': {'stringValue': c.name},
+        'phone': {'stringValue': c.phone},
+        'email': {'stringValue': c.email},
+        'favoriteSport': {'stringValue': c.favoriteSport},
+        'rank': {'stringValue': c.rank.replaceFirst('VIP ', '')},
+        'status': {'stringValue': c.status},
+      };
+
+  /// Thêm hồ sơ khách (ví dụ khách đặt tại quầy). Không có mật khẩu nên không đăng nhập được.
+  static Future<bool> addCustomer(CustomerItem customer) async {
+    try {
+      final fields = _customerFields(customer)
+        ..['role'] = {'stringValue': 'customer'}
+        ..['uid'] = {'stringValue': customer.id}
+        ..['createdAt'] = {'stringValue': DateTime.now().toIso8601String()}
+        ..['createdBy'] = {'stringValue': 'admin'};
+      final res = await http.post(
+        Uri.parse('$baseUrl/users?documentId=${Uri.encodeComponent(customer.id)}'),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({'fields': fields}),
+      );
+      return res.statusCode == 200 || res.statusCode == 201;
+    } catch (_) {
+      return false;
     }
   }
 
-  static void deleteCustomer(String id) {
-    _defaultCustomers.removeWhere((c) => c.id == id);
+  static Future<bool> updateCustomer(CustomerItem customer) async {
+    try {
+      final fields = _customerFields(customer);
+      final mask = fields.keys.map((k) => 'updateMask.fieldPaths=$k').join('&');
+      final res = await http.patch(
+        Uri.parse('$baseUrl/users/${Uri.encodeComponent(customer.id)}?$mask'),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({'fields': fields}),
+      );
+      return res.statusCode == 200;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  static Future<bool> deleteCustomer(String id) async {
+    try {
+      final res = await http.delete(Uri.parse('$baseUrl/users/${Uri.encodeComponent(id)}'));
+      return res.statusCode == 200;
+    } catch (_) {
+      return false;
+    }
   }
 
   // ==========================================
   // THANH TOÁN (PAYMENTS)
   // ==========================================
-  static final List<PaymentItem> _defaultPayments = [
-    PaymentItem(
-      id: 'PAY-8921',
-      bookingId: 'BK-1029',
-      customer: 'Nguyễn Văn An',
-      amount: '220.000đ',
-      method: 'VietQR Pro',
-      time: '31/10/2026 18:02',
-      status: 'Thành công',
-      bankRef: 'MBB-8491823',
-    ),
-    PaymentItem(
-      id: 'PAY-8922',
-      bookingId: 'BK-1030',
-      customer: 'Trần Thị Bích',
-      amount: '180.000đ',
-      method: 'Ví MoMo',
-      time: '31/10/2026 19:15',
-      status: 'Thành công',
-      bankRef: 'MOMO-910248',
-    ),
-    PaymentItem(
-      id: 'PAY-8923',
-      bookingId: 'BK-1031',
-      customer: 'Lê Hoàng Nam',
-      amount: '450.000đ',
-      method: 'Tiền mặt',
-      time: '31/10/2026 16:55',
-      status: 'Thành công',
-      bankRef: 'CASH-POS-01',
-    ),
-    PaymentItem(
-      id: 'PAY-8924',
-      bookingId: 'BK-1032',
-      customer: 'Phạm Minh Đức',
-      amount: '200.000đ',
-      method: 'VietQR Pro',
-      time: '31/10/2026 19:50',
-      status: 'Đang xử lý',
-      bankRef: 'VCB-Pending',
-    ),
-    PaymentItem(
-      id: 'PAY-8925',
-      bookingId: 'BK-1033',
-      customer: 'Hoàng Anh Tuấn',
-      amount: '350.000đ',
-      method: 'VNPay QR',
-      time: '30/10/2026 21:10',
-      status: 'Thành công',
-      bankRef: 'VNPAY-38190',
-    ),
-    PaymentItem(
-      id: 'PAY-8926',
-      bookingId: 'BK-1034',
-      customer: 'Đỗ Thùy Trang',
-      amount: '240.000đ',
-      method: 'VietQR Pro',
-      time: '29/10/2026 17:30',
-      status: 'Đã hoàn tiền',
-      bankRef: 'REFUND-8201',
-    ),
-  ];
 
   /// Lấy danh sách giao dịch thanh toán từ Firestore
   static Future<List<PaymentItem>> getPayments() async {
-    try {
-      final response = await http.get(Uri.parse('$baseUrl/payments?pageSize=100'));
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        final documents = data['documents'] as List<dynamic>?;
-        if (documents != null && documents.isNotEmpty) {
-          final List<PaymentItem> list = [];
-          for (final doc in documents) {
-            final name = (doc['name'] as String).split('/').last;
-            final fields = doc['fields'] as Map<String, dynamic>;
-            list.add(PaymentItem.fromFirestoreFields(name, fields));
-          }
-          if (list.isNotEmpty) {
-            return list;
-          }
-        }
-      }
-    } catch (_) {}
-    return List.from(_defaultPayments);
+    final r = await _listDocs('payments', pageSize: 100);
+    final list = <PaymentItem>[];
+    for (final doc in r.docs) {
+      final name = (doc['name'] as String).split('/').last;
+      final fields = doc['fields'] as Map<String, dynamic>;
+      list.add(PaymentItem.fromFirestoreFields(name, fields));
+    }
+    return list;
   }
 
   /// Thêm giao dịch thanh toán mới lên Firestore
   static Future<bool> addPayment(PaymentItem payment) async {
-    _defaultPayments.insert(0, payment);
     try {
       final docId = payment.id;
       final payload = {'fields': payment.toFirestoreFields()};
@@ -627,12 +641,22 @@ class FirestoreService {
     }
   }
 
+  /// Xác nhận đơn = đã nhận được tiền chuyển khoản: đổi trạng thái đơn sang "Đã xác nhận"
+  /// và đối soát (chuyển "Thành công") các phiếu thu đang "Đang xử lý" của đơn đó.
+  static Future<bool> confirmBooking(String bookingId) async {
+    final ok = await updateBookingStatus(bookingId, 'Đã xác nhận');
+    if (!ok) return false;
+    final payments = await getPayments();
+    for (final p in payments) {
+      if (p.bookingId == bookingId && p.status.toLowerCase().contains('xử lý')) {
+        await updatePaymentStatus(p.id, 'Thành công');
+      }
+    }
+    return true;
+  }
+
   /// Cập nhật trạng thái thanh toán trên Firestore
   static Future<bool> updatePaymentStatus(String id, String newStatus) async {
-    final idx = _defaultPayments.indexWhere((p) => p.id == id);
-    if (idx != -1) {
-      _defaultPayments[idx] = _defaultPayments[idx].copyWith(status: newStatus);
-    }
     try {
       final payload = {
         'fields': {
@@ -651,52 +675,52 @@ class FirestoreService {
   }
 
   // ==========================================
+  // ĐÁNH GIÁ SÂN (REVIEWS)
+  // ==========================================
+  static Future<List<ReviewItem>> getReviews(int venueId) async {
+    final r = await _listDocs('reviews');
+    final list = <ReviewItem>[];
+    for (final doc in r.docs) {
+      final id = (doc['name'] as String).split('/').last;
+      final item = ReviewItem.fromFirestoreFields(id, (doc['fields'] as Map<String, dynamic>?) ?? {});
+      if (item.venueId == venueId) list.add(item);
+    }
+    list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    return list;
+  }
+
+  static Future<bool> addReview(ReviewItem review) async {
+    try {
+      final res = await http.post(
+        Uri.parse('$baseUrl/reviews?documentId=${Uri.encodeComponent(review.id)}'),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({'fields': review.toFirestoreFields()}),
+      );
+      return res.statusCode == 200 || res.statusCode == 201;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  // ==========================================
   // THÔNG BÁO HỆ THỐNG (NOTIFICATIONS)
   // ==========================================
-  static final List<NotificationItem> _defaultNotifications = [
-    NotificationItem(
-      id: 'NOTIF-001',
-      userId: 'owner_chuan_01',
-      title: 'Sân đã được phê duyệt 🎉',
-      message: 'Cụm sân Pickleball Ga Hà Nội đã được Super Admin phê duyệt và đưa lên hệ thống mở bán.',
-      type: 'venue_approval',
-    ),
-    NotificationItem(
-      id: 'NOTIF-002',
-      userId: 'owner_chuan_01',
-      title: 'Thanh toán thành công 💰',
-      message: 'Đơn đặt sân BK-1029 đã được thanh toán 220.000đ qua VietQR Pro.',
-      type: 'payment',
-    ),
-  ];
 
   /// Lấy danh sách thông báo từ Firestore
   static Future<List<NotificationItem>> getNotifications([String? userId]) async {
-    try {
-      final response = await http.get(Uri.parse('$baseUrl/notifications?pageSize=50'));
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        final documents = data['documents'] as List<dynamic>?;
-        if (documents != null && documents.isNotEmpty) {
-          final List<NotificationItem> list = [];
-          for (final doc in documents) {
-            final name = (doc['name'] as String).split('/').last;
-            final fields = doc['fields'] as Map<String, dynamic>;
-            list.add(NotificationItem.fromFirestoreFields(name, fields));
-          }
-          if (list.isNotEmpty) {
-            list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-            return list;
-          }
-        }
-      }
-    } catch (_) {}
-    return List.from(_defaultNotifications);
+    final r = await _listDocs('notifications', pageSize: 50);
+    final list = <NotificationItem>[];
+    for (final doc in r.docs) {
+      final name = (doc['name'] as String).split('/').last;
+      final fields = doc['fields'] as Map<String, dynamic>;
+      list.add(NotificationItem.fromFirestoreFields(name, fields));
+    }
+    list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    return list;
   }
 
   /// Gửi thông báo mới lên Firestore
   static Future<bool> addNotification(NotificationItem item) async {
-    _defaultNotifications.insert(0, item);
     try {
       final docId = item.id;
       final payload = {'fields': item.toFirestoreFields()};
@@ -713,10 +737,6 @@ class FirestoreService {
 
   /// Đánh dấu thông báo đã đọc
   static Future<bool> markNotificationAsRead(String notifId) async {
-    final idx = _defaultNotifications.indexWhere((n) => n.id == notifId);
-    if (idx != -1) {
-      _defaultNotifications[idx].isRead = true;
-    }
     try {
       final payload = {
         'fields': {

@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 import '../models/venue.dart';
-import '../data/venues_data.dart';
 import '../services/firestore_service.dart';
 import '../services/auth_service.dart';
-import '../widgets/booking_bottom_sheet.dart';
+import '../services/admin_stats.dart';
 import '../widgets/app_footer.dart';
 import 'login_screen.dart';
 import 'booked_screen.dart';
@@ -18,8 +17,6 @@ import 'visual_booking_screen.dart';
 import 'account_screen.dart';
 import '../widgets/venue_image_view.dart';
 import '../services/image_picker_service.dart';
-import 'chatbot_screen.dart';
-import '../widgets/floating_chat_button.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -92,11 +89,22 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _loadVenues() async {
     setState(() => _isLoading = true);
+    FirestoreService.lastLoadFailed = false;
     final venues = await FirestoreService.getVenues();
+    if (!mounted) return;
     setState(() {
-      _allVenues = venues.isNotEmpty ? venues : sampleVenues;
+      _allVenues = venues;
       _isLoading = false;
     });
+    if (venues.isEmpty && FirestoreService.lastLoadFailed) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Không tải được danh sách sân. Kiểm tra kết nối mạng rồi thử lại.'),
+          action: SnackBarAction(label: 'Thử lại', onPressed: _loadVenues),
+          duration: const Duration(seconds: 8),
+        ),
+      );
+    }
   }
 
   String _vietnameseDate() {
@@ -186,10 +194,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 Expanded(
                   child: Column(
                     children: [
-                      // ===== 0. THANH CHUYỂN NHANH VAI TRÒ TEST (ROLE SWITCHER - CHỈ HIỂN THỊ TRÊN DESKTOP) =====
-                      if (isDesktop)
-                        _buildRoleModeBar(),
-
                       // ===== 1. TOP EMERALD GREEN HEADER =====
                       _buildTopHeader(),
 
@@ -258,161 +262,6 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
       bottomNavigationBar: (_isAdmin && isDesktop) ? null : _buildBottomNav(),
-    );
-  }
-
-  // ==========================================
-  // 0. THANH ĐIỀU HƯỚNG VAI TRÒ TEST NHANH (ROLE BAR)
-  // ==========================================
-  Widget _buildRoleModeBar() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
-      decoration: const BoxDecoration(
-        color: Color(0xFF0F172A), // Slate black bar
-        border: Border(bottom: BorderSide(color: Color(0xFF334155), width: 1)),
-      ),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
-          children: [
-            const Icon(Icons.tune, color: Color(0xFF38BDF8), size: 16),
-            const SizedBox(width: 8),
-            const Text(
-              'CHẾ ĐỘ TRẢI NGHIỆM:',
-              style: TextStyle(
-                color: Color(0xFF94A3B8),
-                fontSize: 11,
-                fontWeight: FontWeight.bold,
-                letterSpacing: 0.5,
-              ),
-            ),
-            const SizedBox(width: 12),
-
-            // 1. Chế độ Chủ Sân
-            _buildRolePill(
-              label: '🏟️ CHỦ SÂN (Thêm / Sửa / Xóa Sân Của Mình)',
-              isActive: _isOwner,
-              activeBgColor: const Color(0xFF16A34A),
-              onTap: () {
-                setState(() {
-                  AuthService.switchToOwner();
-                });
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('✅ Đã kích hoạt Chế độ Chủ Sân! Bạn có quyền Thêm, Sửa, Xóa các sân của mình.'),
-                    backgroundColor: Color(0xFF16A34A),
-                    duration: Duration(seconds: 2),
-                  ),
-                );
-              },
-            ),
-            if (_isOwner) ...[
-              const SizedBox(width: 8),
-              ElevatedButton.icon(
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => OwnerScreen(initialVenues: _allVenues, initialTabIndex: 0),
-                    ),
-                  );
-                },
-                icon: const Icon(Icons.open_in_new, size: 14),
-                label: const Text('👉 MỞ QUẢN LÝ SÂN CỦA TÔI', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF0284C7),
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                  elevation: 1,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                ),
-              ),
-            ],
-            const SizedBox(width: 8),
-
-            // 2. Chế độ Super Admin
-            _buildRolePill(
-              label: '👑 SUPER ADMIN (Kiểm Duyệt Sân)',
-              isActive: _isAdmin,
-              activeBgColor: const Color(0xFF0284C7),
-              onTap: () {
-                setState(() {
-                  AuthService.switchToAdmin();
-                });
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => AdminScreen(initialVenues: _allVenues)),
-                );
-              },
-            ),
-            const SizedBox(width: 8),
-
-            // 3. Chế độ Khách hàng thường
-            _buildRolePill(
-              label: '👤 KHÁCH HÀNG (Chỉ xem sân đã duyệt)',
-              isActive: !_isOwner && !_isAdmin,
-              activeBgColor: const Color(0xFF64748B),
-              onTap: () {
-                setState(() {
-                  AuthService.switchToCustomer();
-                });
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('ℹ️ Đã chuyển sang Khách Hàng: Chỉ xem và đặt các sân đã được Admin duyệt.'),
-                    backgroundColor: Color(0xFF475569),
-                    duration: Duration(seconds: 2),
-                  ),
-                );
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildRolePill({
-    required String label,
-    required bool isActive,
-    required Color activeBgColor,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(20),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-        decoration: BoxDecoration(
-          color: isActive ? activeBgColor : const Color(0xFF1E293B),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: isActive ? Colors.white70 : const Color(0xFF475569),
-            width: isActive ? 1.5 : 1,
-          ),
-          boxShadow: isActive
-              ? [BoxShadow(color: activeBgColor.withOpacity(0.4), blurRadius: 6, offset: const Offset(0, 2))]
-              : null,
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (isActive) ...[
-              const Icon(Icons.check_circle, color: Colors.white, size: 13),
-              const SizedBox(width: 5),
-            ],
-            Text(
-              label,
-              style: TextStyle(
-                color: isActive ? Colors.white : const Color(0xFFCBD5E1),
-                fontSize: 11,
-                fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 
@@ -1980,7 +1829,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     const Icon(Icons.star, color: Color(0xFFF59E0B), size: 13),
                     const SizedBox(width: 2),
                     Text(
-                      venue.rating > 0 ? venue.rating.toStringAsFixed(1) : '5.0',
+                      venue.ratingLabel,
                       style: const TextStyle(
                         color: Color(0xFF0F172A),
                         fontSize: 11,
@@ -2019,7 +1868,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     const Icon(Icons.place, size: 12.5, color: Color(0xFFEF4444)),
                     const SizedBox(width: 2),
                     Text(
-                      '${venue.distance} · ',
+                      venue.distance.isEmpty ? '' : '${venue.distance} · ',
                       style: const TextStyle(
                         color: Color(0xFFEF4444),
                         fontSize: 11,
@@ -3392,13 +3241,13 @@ class _HomeScreenState extends State<HomeScreen> {
                                     const Text('Quận / Huyện *', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12)),
                                     const SizedBox(height: 6),
                                     DropdownButtonFormField<String>(
-                                      value: _districts.contains(selectedDistrict) ? selectedDistrict : _districts.first,
+                                      value: selectedDistrict,
                                       decoration: InputDecoration(
                                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                                         contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                                         isDense: true,
                                       ),
-                                      items: _districts
+                                      items: {..._districts, selectedDistrict}
                                           .map((d) => DropdownMenuItem(value: d, child: Text(d)))
                                           .toList(),
                                       onChanged: (val) {
@@ -3857,11 +3706,10 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Container(
           width: 600,
           padding: const EdgeInsets.all(22),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
+          child: FutureBuilder<List<BookingItem>>(
+            future: FirestoreService.getBookings(),
+            builder: (context, snap) {
+              final header = Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   const Row(
@@ -3880,57 +3728,114 @@ class _HomeScreenState extends State<HomeScreen> {
                     splashRadius: 18,
                   ),
                 ],
-              ),
-              const Divider(height: 20),
-              // 4 KPI Stats
-              Row(
-                children: [
-                  Expanded(child: _buildMetricTile('Doanh thu tháng', '128.5 Tr', const Color(0xFF10B981))),
-                  const SizedBox(width: 8),
-                  Expanded(child: _buildMetricTile('Lượt đặt sân', '342 lượt', const Color(0xFF38BDF8))),
-                  const SizedBox(width: 8),
-                  Expanded(child: _buildMetricTile('Tỷ lệ lấp đầy', '88.5%', const Color(0xFFFBBF24))),
-                  const SizedBox(width: 8),
-                  Expanded(child: _buildMetricTile('Đánh giá TB', '4.85 ★', const Color(0xFFA855F7))),
-                ],
-              ),
-              const SizedBox(height: 16),
-              const Text('Tỷ trọng môn thể thao được đặt nhiều nhất:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-              const SizedBox(height: 10),
-              _buildSportPercentBar('🏸 Cầu lông', 0.45, '45% (154 lượt)', const Color(0xFF10B981)),
-              const SizedBox(height: 8),
-              _buildSportPercentBar('🏓 Pickleball', 0.30, '30% (102 lượt)', const Color(0xFF38BDF8)),
-              const SizedBox(height: 8),
-              _buildSportPercentBar('⚽ Bóng đá', 0.15, '15% (52 lượt)', const Color(0xFFFBBF24)),
-              const SizedBox(height: 8),
-              _buildSportPercentBar('🎾 Tennis', 0.10, '10% (34 lượt)', const Color(0xFFA855F7)),
-              const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF8FAFC),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: const Color(0xFFE2E8F0)),
-                ),
-                child: const Row(
+              );
+              if (!snap.hasData) {
+                return Column(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.access_time_filled, color: Color(0xFF10B981), size: 18),
-                    SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Khung giờ vàng đông khách nhất: 17:00 – 21:30 các ngày trong tuần (Tỷ lệ lấp đầy 95%).',
-                        style: TextStyle(fontSize: 11, color: Color(0xFF334155)),
+                    header,
+                    const Divider(height: 20),
+                    const SizedBox(height: 120, child: Center(child: CircularProgressIndicator(color: Color(0xFF10B981)))),
+                  ],
+                );
+              }
+
+              // Số liệu thật: admin xem toàn hệ thống, chủ sân chỉ xem các sân của mình
+              final venues = _isAdmin ? _allVenues : _allVenues.where(_isMyVenue).toList();
+              final names = venues.map((v) => v.name.trim().toLowerCase()).toSet();
+              final bookings = snap.data!
+                  .where((b) => _isAdmin || names.contains(b.venueName.trim().toLowerCase()))
+                  .toList();
+              final st = AdminStats.compute(bookings: bookings, venues: venues, period: AdminPeriod.month);
+              final rated = venues.where((v) => v.rating > 0).toList();
+              final avgRating = rated.isEmpty ? null : rated.fold<double>(0, (a, v) => a + v.rating) / rated.length;
+              final sports = st.revenueBySport.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
+              final totalRev = sports.fold<int>(0, (a, e) => a + e.value);
+              final peak = st.slots.fold<SlotShare?>(null, (m, e) => (m == null || e.orders > m.orders) ? e : m);
+              const colors = [Color(0xFF10B981), Color(0xFF38BDF8), Color(0xFFFBBF24), Color(0xFFA855F7), Color(0xFFEC4899)];
+
+              return SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    header,
+                    const Divider(height: 20),
+                    Text('30 ngày qua • ${bookings.length} đơn đặt sân trong dữ liệu',
+                        style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Expanded(child: _buildMetricTile('Doanh thu', AdminStats.fmtCompact(st.revenue), const Color(0xFF10B981))),
+                        const SizedBox(width: 8),
+                        Expanded(child: _buildMetricTile('Đơn đặt sân', '${st.orders}', const Color(0xFF38BDF8))),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: _buildMetricTile(
+                            'Tỷ lệ hủy',
+                            st.cancelRate == null ? '—' : '${(st.cancelRate! * 100).toStringAsFixed(1)}%',
+                            const Color(0xFFFBBF24),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: _buildMetricTile(
+                            'Đánh giá TB',
+                            avgRating == null ? '—' : '${avgRating.toStringAsFixed(2)} ★',
+                            const Color(0xFFA855F7),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    const Text('Tỷ trọng doanh thu theo môn:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                    const SizedBox(height: 10),
+                    if (totalRev == 0)
+                      const Text('Chưa có doanh thu (đơn đã xác nhận) trong 30 ngày qua.',
+                          style: TextStyle(fontSize: 12, color: Color(0xFF64748B)))
+                    else
+                      for (var k = 0; k < sports.length; k++) ...[
+                        if (k > 0) const SizedBox(height: 8),
+                        _buildSportPercentBar(
+                          sports[k].key,
+                          sports[k].value / totalRev,
+                          '${(sports[k].value / totalRev * 100).round()}% (${AdminStats.fmtCompact(sports[k].value)})',
+                          colors[k % colors.length],
+                        ),
+                      ],
+                    const SizedBox(height: 16),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.access_time_filled, color: Color(0xFF10B981), size: 18),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              (peak == null || peak.orders == 0)
+                                  ? 'Chưa có đơn đặt sân trong 30 ngày qua.'
+                                  : 'Khung giờ nhiều đơn nhất: ${peak.label} (${peak.orders} đơn).',
+                              style: const TextStyle(fontSize: 11, color: Color(0xFF334155)),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
                 ),
-              ),
-            ],
+              );
+            },
           ),
         ),
       ),
     );
   }
+
 
   Widget _buildMetricTile(String label, String value, Color color) {
     return Container(
@@ -4114,7 +4019,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                             children: [
                                               InkWell(
                                                 onTap: () async {
-                                                  await FirestoreService.updateBookingStatus(item.id, 'Đã xác nhận');
+                                                  await FirestoreService.confirmBooking(item.id);
                                                   setDialogState(() {
                                                     item.status = 'Đã xác nhận';
                                                   });

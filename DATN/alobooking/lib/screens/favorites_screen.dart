@@ -178,7 +178,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                       const Icon(Icons.star, size: 12, color: Color(0xFFF59E0B)),
                       const SizedBox(width: 3),
                       Text(
-                        venue.rating.toString(),
+                        venue.ratingLabel,
                         style: const TextStyle(
                             fontSize: 12, color: Color(0xFF64748B)),
                       ),

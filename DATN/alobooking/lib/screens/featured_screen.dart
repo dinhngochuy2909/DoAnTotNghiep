@@ -1,7 +1,6 @@
 import '../widgets/venue_image_view.dart';
 import 'package:flutter/material.dart';
 import '../models/venue.dart';
-import '../widgets/booking_bottom_sheet.dart';
 import 'visual_booking_screen.dart';
 
 /// Màn hình NỔI BẬT — top sân được đặt nhiều nhất, ưu đãi đặc biệt
@@ -30,7 +29,6 @@ class FeaturedScreen extends StatelessWidget {
       body: CustomScrollView(
         slivers: [
           // Hot deals banner
-          SliverToBoxAdapter(child: _buildHotDealsBanner()),
           // Top ranked title
           const SliverToBoxAdapter(
             child: Padding(
@@ -52,84 +50,6 @@ class FeaturedScreen extends StatelessWidget {
             ),
           ),
           const SliverToBoxAdapter(child: SizedBox(height: 20)),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildHotDealsBanner() {
-    return Container(
-      margin: const EdgeInsets.all(16),
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
-        gradient: const LinearGradient(
-          colors: [Color(0xFFDC2626), Color(0xFFF97316)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.25),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Text(
-                    '🔥 HOT DEAL',
-                    style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold),
-                  ),
-                ),
-                const SizedBox(height: 10),
-                const Text(
-                  'Đặt sân giờ vàng\ntiết kiệm đến 30%!',
-                  style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      height: 1.3),
-                ),
-                const SizedBox(height: 6),
-                const Text(
-                  '16:00 – 18:00 mỗi ngày trong tuần',
-                  style:
-                      TextStyle(color: Colors.white70, fontSize: 12),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 16),
-          Column(
-            children: [
-              const Icon(Icons.local_fire_department,
-                  color: Colors.white, size: 48),
-              const SizedBox(height: 4),
-              Text(
-                '-30%',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 20,
-                  fontWeight: FontWeight.w900,
-                  shadows: [
-                    Shadow(
-                        color: Colors.black26,
-                        blurRadius: 4,
-                        offset: const Offset(0, 2))
-                  ],
-                ),
-              ),
-            ],
-          ),
         ],
       ),
     );
@@ -237,7 +157,7 @@ class FeaturedScreen extends StatelessWidget {
                             size: 12, color: Color(0xFFF59E0B)),
                         const SizedBox(width: 3),
                         Text(
-                          venue.rating.toStringAsFixed(1),
+                          venue.ratingLabel,
                           style: const TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.bold,

@@ -1,8 +1,13 @@
 import 'package:flutter/material.dart';
+import '../models/user.dart';
 import '../models/venue.dart';
 import '../services/auth_service.dart';
+import '../services/booking_slots.dart';
+import '../services/firestore_service.dart';
+import 'login_screen.dart';
+import 'visual_booking_screen.dart';
 
-/// Màn hình SÂN ĐÃ ĐẶT — lịch sử và danh sách đặt sân của người dùng
+/// Màn hình SÂN ĐÃ ĐẶT: lịch đặt thật của tài khoản đang đăng nhập (đọc từ Firestore).
 class BookedScreen extends StatefulWidget {
   final List<Venue> allVenues;
   const BookedScreen({super.key, this.allVenues = const []});
@@ -11,72 +16,21 @@ class BookedScreen extends StatefulWidget {
   State<BookedScreen> createState() => _BookedScreenState();
 }
 
-class _BookedScreenState extends State<BookedScreen>
-    with SingleTickerProviderStateMixin {
-  late TabController _tabController;
+enum _BookingState { pending, upcoming, completed, cancelled }
 
-  final List<Map<String, dynamic>> _bookings = [
-    {
-      'id': 'BK-20261028-01',
-      'venueName': 'Sân Cầu Lông Long Viên',
-      'type': 'badminton',
-      'date': '28/10/2026',
-      'slot': '17:00 - 19:00',
-      'price': '150.000đ',
-      'status': 'upcoming',
-      'field': 'Sân số 2',
-      'address': 'Ba Đình, Hà Nội',
-    },
-    {
-      'id': 'BK-20261025-02',
-      'venueName': 'Sân Pickleball Sunrise',
-      'type': 'pickleball',
-      'date': '25/10/2026',
-      'slot': '07:00 - 09:00',
-      'price': '180.000đ',
-      'status': 'completed',
-      'field': 'Sân số 1',
-      'address': 'Quận 7, TP.HCM',
-    },
-    {
-      'id': 'BK-20261020-03',
-      'venueName': 'Sân Bóng Đá Mini Ba Đình',
-      'type': 'football',
-      'date': '20/10/2026',
-      'slot': '19:00 - 21:00',
-      'price': '350.000đ',
-      'status': 'completed',
-      'field': 'Sân cỏ nhân tạo A',
-      'address': 'Ba Đình, Hà Nội',
-    },
-    {
-      'id': 'BK-20261030-04',
-      'venueName': 'Sân Tennis Vạn Phúc',
-      'type': 'tennis',
-      'date': '30/10/2026',
-      'slot': '08:00 - 09:30',
-      'price': '330.000đ',
-      'status': 'upcoming',
-      'field': 'Sân C (Mặt cứng)',
-      'address': 'Ba Đình, Hà Nội',
-    },
-    {
-      'id': 'BK-20261015-05',
-      'venueName': 'Sân Cầu Lông Bình Lợi',
-      'type': 'badminton',
-      'date': '15/10/2026',
-      'slot': '18:00 - 19:30',
-      'price': '135.000đ',
-      'status': 'cancelled',
-      'field': 'Sân số 5',
-      'address': 'Bình Thạnh, TP.HCM',
-    },
-  ];
+class _BookedScreenState extends State<BookedScreen> with SingleTickerProviderStateMixin {
+  late TabController _tabController;
+  List<BookingItem> _mine = [];
+  List<Venue> _venues = [];
+  bool _loading = true;
+  bool _failed = false;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 4, vsync: this);
+    _venues = widget.allVenues;
+    _load();
   }
 
   @override
@@ -85,17 +39,88 @@ class _BookedScreenState extends State<BookedScreen>
     super.dispose();
   }
 
-  List<Map<String, dynamic>> _filteredList(int tabIndex) {
-    if (AuthService.isGuest) return [];
-    switch (tabIndex) {
+  static String _digits(String s) => s.replaceAll(RegExp(r'[^0-9]'), '');
+
+  /// Đơn của tài khoản này: ưu tiên uid, đơn cũ chưa có uid thì khớp theo số điện thoại (hoặc tên).
+  bool _isMine(BookingItem b, AppUser u) {
+    if (b.userId.isNotEmpty) return b.userId == u.uid;
+    final up = _digits(u.phone), bp = _digits(b.phone);
+    if (up.isNotEmpty && bp.isNotEmpty) return up == bp;
+    return b.customer.trim().toLowerCase() == u.fullName.trim().toLowerCase();
+  }
+
+  Future<void> _load() async {
+    final user = AuthService.currentUser;
+    if (user == null || AuthService.isGuest) {
+      setState(() => _loading = false);
+      return;
+    }
+    setState(() {
+      _loading = true;
+      _failed = false;
+    });
+    FirestoreService.lastLoadFailed = false;
+    final results = await Future.wait<Object?>([
+      FirestoreService.getBookings(),
+      if (_venues.isEmpty) FirestoreService.getVenues(),
+    ]);
+    if (!mounted) return;
+    final all = results[0] as List<BookingItem>;
+    setState(() {
+      if (results.length > 1) _venues = results[1] as List<Venue>;
+      _mine = all.where((b) => _isMine(b, user)).toList()
+        ..sort((a, b) => (_start(b) ?? b.createdAt).compareTo(_start(a) ?? a.createdAt));
+      _failed = FirestoreService.lastLoadFailed;
+      _loading = false;
+    });
+  }
+
+  DateTime? _start(BookingItem b) {
+    final d = BookingSlots.parseDate(b.date);
+    if (d == null) return null;
+    final r = BookingSlots.parseRanges(b.time);
+    final m = r.isEmpty ? 0 : r.first.$1;
+    return DateTime(d.year, d.month, d.day, m ~/ 60, m % 60);
+  }
+
+  DateTime? _end(BookingItem b) {
+    final d = BookingSlots.parseDate(b.date);
+    if (d == null) return null;
+    final r = BookingSlots.parseRanges(b.time);
+    final m = r.isEmpty ? 24 * 60 : r.last.$2;
+    return DateTime(d.year, d.month, d.day, 0, 0).add(Duration(minutes: m));
+  }
+
+  _BookingState _stateOf(BookingItem b) {
+    if (BookingSlots.isCancelled(b.status)) return _BookingState.cancelled;
+    final st = b.status.toLowerCase();
+    final end = _end(b);
+    if (st.contains('hoàn thành') || (end != null && end.isBefore(DateTime.now()))) return _BookingState.completed;
+    if (st.contains('chờ')) return _BookingState.pending;
+    return _BookingState.upcoming;
+  }
+
+  Venue? _venueOf(BookingItem b) {
+    final n = b.venueName.trim().toLowerCase();
+    for (final v in _venues) {
+      if (v.name.trim().toLowerCase() == n) return v;
+    }
+    return null;
+  }
+
+  List<BookingItem> _filteredList(int tab) {
+    switch (tab) {
       case 1:
-        return _bookings.where((b) => b['status'] == 'upcoming').toList();
+        return _mine.where((b) {
+          final s = _stateOf(b);
+          return s == _BookingState.upcoming || s == _BookingState.pending;
+        }).toList();
       case 2:
-        return _bookings.where((b) => b['status'] == 'completed').toList();
+        return _mine.where((b) => _stateOf(b) == _BookingState.completed).toList();
       case 3:
-        return _bookings.where((b) => b['status'] == 'cancelled').toList();
+        return _mine.where((b) => _stateOf(b) == _BookingState.cancelled).toList();
       default:
-        return _bookings;
+        return _mine;
     }
   }
 
@@ -119,7 +144,6 @@ class _BookedScreenState extends State<BookedScreen>
       case 'football':
         return Icons.sports_soccer;
       case 'tennis':
-        return Icons.sports_tennis;
       case 'pickleball':
         return Icons.sports_tennis;
       case 'basketball':
@@ -129,52 +153,46 @@ class _BookedScreenState extends State<BookedScreen>
     }
   }
 
-  Widget _buildStatusBadge(String status) {
+  Widget _buildStatusBadge(_BookingState status) {
     Color bg;
     Color fg;
     String text;
     IconData icon;
-
     switch (status) {
-      case 'upcoming':
+      case _BookingState.pending:
+        bg = const Color(0xFFFEF3C7);
+        fg = const Color(0xFFB45309);
+        text = 'Chờ xác nhận';
+        icon = Icons.hourglass_top_rounded;
+        break;
+      case _BookingState.upcoming:
         bg = const Color(0xFFDCFCE7);
         fg = const Color(0xFF15803D);
-        text = 'Sắp diễn ra';
+        text = 'Đã xác nhận';
         icon = Icons.schedule_rounded;
         break;
-      case 'completed':
+      case _BookingState.completed:
         bg = const Color(0xFFEFF6FF);
         fg = const Color(0xFF1D4ED8);
         text = 'Đã hoàn thành';
         icon = Icons.check_circle_outline_rounded;
         break;
-      default:
+      case _BookingState.cancelled:
         bg = const Color(0xFFFEE2E2);
         fg = const Color(0xFFB91C1C);
         text = 'Đã hủy';
         icon = Icons.cancel_outlined;
         break;
     }
-
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-      decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(20),
-      ),
+      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(20)),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(icon, size: 12, color: fg),
           const SizedBox(width: 4),
-          Text(
-            text,
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
-              color: fg,
-            ),
-          ),
+          Text(text, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: fg)),
         ],
       ),
     );
@@ -188,10 +206,14 @@ class _BookedScreenState extends State<BookedScreen>
         backgroundColor: const Color(0xFF15803D),
         foregroundColor: Colors.white,
         elevation: 0,
-        title: const Text(
-          'Lịch sử đặt sân',
-          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18),
-        ),
+        title: const Text('Lịch sử đặt sân', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18)),
+        actions: [
+          IconButton(
+            tooltip: 'Tải lại',
+            icon: const Icon(Icons.refresh_rounded),
+            onPressed: _loading ? null : _load,
+          ),
+        ],
         bottom: TabBar(
           controller: _tabController,
           indicatorColor: Colors.white,
@@ -207,21 +229,18 @@ class _BookedScreenState extends State<BookedScreen>
           ],
         ),
       ),
-      body: TabBarView(
-        controller: _tabController,
-        children: [
-          _buildBookingList(_filteredList(0)),
-          _buildBookingList(_filteredList(1)),
-          _buildBookingList(_filteredList(2)),
-          _buildBookingList(_filteredList(3)),
-        ],
-      ),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator(color: Color(0xFF16A34A)))
+          : TabBarView(
+              controller: _tabController,
+              children: [for (var i = 0; i < 4; i++) _buildBookingList(_filteredList(i))],
+            ),
     );
   }
 
-  Widget _buildBookingList(List<Map<String, dynamic>> items) {
+  Widget _buildBookingList(List<BookingItem> items) {
     if (items.isEmpty) {
-      final isGuest = AuthService.isGuest;
+      final loggedOut = AuthService.isGuest;
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(24),
@@ -231,68 +250,72 @@ class _BookedScreenState extends State<BookedScreen>
               Container(
                 padding: const EdgeInsets.all(18),
                 decoration: BoxDecoration(
-                  color: isGuest ? const Color(0xFFFEF3C7) : const Color(0xFFF1F5F9),
+                  color: loggedOut ? const Color(0xFFFEF3C7) : const Color(0xFFF1F5F9),
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
-                  isGuest ? Icons.visibility_outlined : Icons.event_busy_rounded,
+                  loggedOut ? Icons.lock_outline_rounded : (_failed ? Icons.wifi_off_rounded : Icons.event_busy_rounded),
                   size: 48,
-                  color: isGuest ? const Color(0xFFD97706) : Colors.grey.shade400,
+                  color: loggedOut ? const Color(0xFFD97706) : Colors.grey.shade400,
                 ),
               ),
               const SizedBox(height: 16),
               Text(
-                isGuest ? 'Chế độ Khách xem sân' : 'Chưa có lịch đặt sân nào',
+                loggedOut
+                    ? 'Đăng nhập để xem lịch đặt sân'
+                    : (_failed ? 'Chưa tải được lịch đặt sân' : 'Chưa có lịch đặt sân nào'),
                 style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
               ),
               const SizedBox(height: 6),
               Text(
-                isGuest
-                    ? 'Tài khoản của bạn chỉ có quyền xem sân, không thể đặt và lưu lịch đặt sân. Vui lòng chuyển sang tài khoản Khách Hàng để đặt sân.'
-                    : 'Các lịch đặt sân của bạn sẽ xuất hiện tại đây',
+                loggedOut
+                    ? 'Lịch đặt sân được lưu theo tài khoản của bạn.'
+                    : (_failed ? 'Kiểm tra kết nối mạng rồi bấm tải lại.' : 'Các lịch đặt sân của bạn sẽ xuất hiện tại đây.'),
                 textAlign: TextAlign.center,
                 style: const TextStyle(fontSize: 13, color: Color(0xFF64748B), height: 1.4),
               ),
-              if (isGuest) ...[
-                const SizedBox(height: 18),
+              const SizedBox(height: 18),
+              if (loggedOut)
                 ElevatedButton.icon(
-                  onPressed: () {
-                    AuthService.switchToCustomer();
-                    setState(() {});
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Đã chuyển sang tài khoản Khách Hàng (User)!'),
-                        backgroundColor: Color(0xFF16A34A),
-                      ),
-                    );
-                  },
-                  icon: const Icon(Icons.switch_account, size: 16),
-                  label: const Text('Đổi sang tài khoản Khách Hàng', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                  onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LoginScreen())),
+                  icon: const Icon(Icons.login_rounded, size: 16),
+                  label: const Text('Đăng nhập', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF16A34A),
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                   ),
+                )
+              else if (_failed)
+                OutlinedButton.icon(
+                  onPressed: _load,
+                  icon: const Icon(Icons.refresh_rounded, size: 16),
+                  label: const Text('Tải lại'),
                 ),
-              ],
             ],
           ),
         ),
       );
     }
 
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: items.length,
-      itemBuilder: (ctx, i) => _buildBookingCard(items[i]),
+    return RefreshIndicator(
+      onRefresh: _load,
+      child: ListView.builder(
+        padding: const EdgeInsets.all(16),
+        itemCount: items.length,
+        itemBuilder: (ctx, i) => _buildBookingCard(items[i]),
+      ),
     );
   }
 
-  Widget _buildBookingCard(Map<String, dynamic> b) {
-    final color = _typeColor(b['type'] as String);
-    final icon = _typeIcon(b['type'] as String);
-    final isUpcoming = b['status'] == 'upcoming';
+  Widget _buildBookingCard(BookingItem b) {
+    final venue = _venueOf(b);
+    final type = venue?.type ?? 'badminton';
+    final color = _typeColor(type);
+    final state = _stateOf(b);
+    final canCancel = (state == _BookingState.upcoming || state == _BookingState.pending) &&
+        (_start(b)?.isAfter(DateTime.now()) ?? false);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
@@ -300,30 +323,19 @@ class _BookedScreenState extends State<BookedScreen>
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: const Color(0xFFE2E8F0)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
-          ),
-        ],
       ),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Top row: Type Icon + Name + Status Badge
             Row(
               children: [
                 Container(
                   width: 40,
                   height: 40,
-                  decoration: BoxDecoration(
-                    color: color.withOpacity(0.12),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Icon(icon, color: color, size: 22),
+                  decoration: BoxDecoration(color: color.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(10)),
+                  child: Icon(_typeIcon(type), color: color, size: 22),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -331,127 +343,67 @@ class _BookedScreenState extends State<BookedScreen>
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        b['venueName'] as String,
-                        style: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                          color: Color(0xFF0F172A),
-                        ),
+                        b.venueName,
+                        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
                       const SizedBox(height: 2),
-                      Text(
-                        b['field'] as String,
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: color,
-                        ),
-                      ),
+                      Text(b.field, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: color)),
                     ],
                   ),
                 ),
-                _buildStatusBadge(b['status'] as String),
+                _buildStatusBadge(state),
               ],
             ),
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 12),
-              child: Divider(height: 1, color: Color(0xFFF1F5F9)),
-            ),
-
-            // Middle rows: Date, Slot, Address
+            const Padding(padding: EdgeInsets.symmetric(vertical: 12), child: Divider(height: 1, color: Color(0xFFF1F5F9))),
             Row(
               children: [
-                Expanded(
-                  child: _buildInfoItem(
-                    Icons.calendar_today_outlined,
-                    'Ngày',
-                    b['date'] as String,
-                  ),
-                ),
-                Expanded(
-                  child: _buildInfoItem(
-                    Icons.access_time_rounded,
-                    'Khung giờ',
-                    b['slot'] as String,
-                  ),
-                ),
+                Expanded(child: _buildInfoItem(Icons.calendar_today_outlined, 'Ngày', b.date)),
+                Expanded(child: _buildInfoItem(Icons.access_time_rounded, 'Khung giờ', b.time)),
               ],
             ),
+            if (venue != null && venue.address.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              _buildInfoItem(Icons.location_on_outlined, 'Địa chỉ', venue.address),
+            ],
             const SizedBox(height: 8),
-            _buildInfoItem(
-              Icons.location_on_outlined,
-              'Địa chỉ',
-              b['address'] as String,
-            ),
-
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 12),
-              child: Divider(height: 1, color: Color(0xFFF1F5F9)),
-            ),
-
-            // Bottom row: Price + Actions
+            _buildInfoItem(Icons.payments_outlined, 'Thanh toán', b.paymentMethod),
+            const Padding(padding: EdgeInsets.symmetric(vertical: 12), child: Divider(height: 1, color: Color(0xFFF1F5F9))),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'Tổng tiền',
-                      style: TextStyle(fontSize: 11, color: Color(0xFF64748B)),
-                    ),
-                    Text(
-                      b['price'] as String,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w800,
-                        color: Color(0xFF16A34A),
-                      ),
-                    ),
+                    const Text('Tổng tiền', style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                    Text(b.amount,
+                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Color(0xFF16A34A))),
                   ],
                 ),
-                if (isUpcoming)
+                if (canCancel)
                   OutlinedButton(
                     onPressed: () => _showCancelDialog(b),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: const Color(0xFFEF4444),
                       side: const BorderSide(color: Color(0xFFFCA5A5)),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                     ),
-                    child: const Text(
-                      'Hủy đặt sân',
-                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
-                    ),
+                    child: const Text('Hủy đặt sân', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
                   )
-                else
+                else if (venue != null && (state == _BookingState.completed || state == _BookingState.cancelled))
                   ElevatedButton(
-                    onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Đang tạo yêu cầu đặt lại sân...'),
-                          backgroundColor: Color(0xFF16A34A),
-                          duration: Duration(seconds: 1),
-                        ),
-                      );
-                    },
+                    onPressed: () =>
+                        Navigator.push(context, MaterialPageRoute(builder: (_) => VisualBookingScreen(venue: venue))),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF16A34A),
                       foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                       elevation: 0,
                     ),
-                    child: const Text(
-                      'Đặt lại sân',
-                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
-                    ),
+                    child: const Text('Đặt lại sân', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
                   ),
               ],
             ),
@@ -466,18 +418,11 @@ class _BookedScreenState extends State<BookedScreen>
       children: [
         Icon(icon, size: 14, color: const Color(0xFF64748B)),
         const SizedBox(width: 5),
-        Text(
-          '$label: ',
-          style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
-        ),
+        Text('$label: ', style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
         Expanded(
           child: Text(
             value,
-            style: const TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: Color(0xFF0F172A),
-            ),
+            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF0F172A)),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
@@ -486,17 +431,15 @@ class _BookedScreenState extends State<BookedScreen>
     );
   }
 
-  void _showCancelDialog(Map<String, dynamic> b) {
+  void _showCancelDialog(BookingItem b) {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text(
-          'Xác nhận hủy đặt sân',
-          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 17),
-        ),
+        title: const Text('Xác nhận hủy đặt sân', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 17)),
         content: Text(
-          'Bạn có chắc chắn muốn hủy lượt đặt tại "${b['venueName']}" vào lúc ${b['slot']} ngày ${b['date']} không? Phí cọc sẽ được hoàn theo chính sách hoàn tiền.',
+          'Hủy lượt đặt tại "${b.venueName}" lúc ${b.time} ngày ${b.date}? '
+          'Đơn sẽ chuyển sang "Đã hủy". Việc hoàn tiền (nếu có) do chủ sân xử lý theo chính sách của sân.',
           style: const TextStyle(fontSize: 13, color: Color(0xFF475569), height: 1.4),
         ),
         actions: [
@@ -505,15 +448,15 @@ class _BookedScreenState extends State<BookedScreen>
             child: const Text('Giữ lại', style: TextStyle(color: Color(0xFF64748B))),
           ),
           ElevatedButton(
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(ctx);
-              setState(() {
-                b['status'] = 'cancelled';
-              });
+              final ok = await FirestoreService.updateBookingStatus(b.id, 'Đã hủy');
+              if (!mounted) return;
+              if (ok) setState(() => b.status = 'Đã hủy');
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Đã hủy lịch đặt sân thành công'),
-                  backgroundColor: Color(0xFF16A34A),
+                SnackBar(
+                  content: Text(ok ? 'Đã hủy lịch đặt sân' : 'Chưa hủy được, vui lòng thử lại'),
+                  backgroundColor: ok ? const Color(0xFF16A34A) : const Color(0xFFEF4444),
                 ),
               );
             },
