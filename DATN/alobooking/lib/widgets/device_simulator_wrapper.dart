@@ -47,10 +47,9 @@ class _DeviceSimulatorWrapperState extends State<DeviceSimulatorWrapper> {
       return Stack(
         children: [
           widget.child,
-          const Positioned(
-            bottom: 24,
-            right: 16,
-            child: FloatingChatButton(),
+          // Nút chat kéo thả được trên toàn màn hình điện thoại
+          const Positioned.fill(
+            child: FloatingChatButton(defaultRight: 16, defaultBottom: 86),
           ),
         ],
       );
@@ -62,11 +61,9 @@ class _DeviceSimulatorWrapperState extends State<DeviceSimulatorWrapper> {
         children: [
           widget.child,
 
-          // Nút nổi ChatBot AI dự báo nhu cầu đặt sân ở góc phải
-          const Positioned(
-            bottom: 86,
-            right: 24,
-            child: FloatingChatButton(),
+          // Nút nổi ChatBot AI dự báo nhu cầu đặt sân (mặc định ở góc phải, kéo thả được khắp màn hình)
+          const Positioned.fill(
+            child: FloatingChatButton(defaultRight: 24, defaultBottom: 86),
           ),
 
           // Nút nổi ở góc dưới bên phải để bật lại chế độ Xem iPhone 18
@@ -410,11 +407,9 @@ class _DeviceSimulatorWrapperState extends State<DeviceSimulatorWrapper> {
                                     ),
                                   ),
 
-                                // Nút ChatBot AI nổi trong khung điện thoại
-                                const Positioned(
-                                  bottom: 24,
-                                  right: 14,
-                                  child: FloatingChatButton(),
+                                // Nút ChatBot AI nổi trong khung điện thoại (kéo thả được trong khung)
+                                const Positioned.fill(
+                                  child: FloatingChatButton(defaultRight: 14, defaultBottom: 86),
                                 ),
                               ],
                             ),
@@ -432,6 +427,48 @@ class _DeviceSimulatorWrapperState extends State<DeviceSimulatorWrapper> {
     );
   }
 
+  /// Nút chọn một mẫu máy (thay cho DropdownButton vì thanh này không có Navigator/Overlay)
+  Widget _buildDeviceChip(DeviceType dev) {
+    final selected = dev == _selectedDevice;
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: '${dev.name} (${dev.width.toInt()} x ${dev.height.toInt()})',
+      child: InkWell(
+        key: ValueKey('device-${dev.name}'),
+        onTap: () => setState(() => _selectedDevice = dev),
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+          decoration: BoxDecoration(
+            color: selected ? const Color(0xFF065F46) : const Color(0xFF1E293B),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: selected ? const Color(0xFF10B981) : const Color(0xFF334155)),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                dev == DeviceType.ipadPro ? Icons.tablet_mac : Icons.phone_iphone,
+                size: 14,
+                color: selected ? const Color(0xFF6EE7B7) : const Color(0xFF94A3B8),
+              ),
+              const SizedBox(width: 5),
+              Text(
+                dev.name,
+                style: TextStyle(
+                  color: selected ? Colors.white : const Color(0xFFCBD5E1),
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   /// Thanh điều khiển trên máy tính
   Widget _buildTopControlBar() {
     return Container(
@@ -440,10 +477,17 @@ class _DeviceSimulatorWrapperState extends State<DeviceSimulatorWrapper> {
         color: Color(0xFF0F172A),
         border: Border(bottom: BorderSide(color: Color(0xFF1E293B), width: 1.5)),
       ),
-      child: Row(
+      // Dùng Wrap để thanh tự xuống dòng khi cửa sổ hẹp. Thanh này nằm ngoài Navigator của ứng dụng
+      // (MaterialApp.builder) nên KHÔNG có Overlay/Navigator: không dùng Tooltip, DropdownButton, PopupMenu ở đây.
+      child: Wrap(
+        alignment: WrapAlignment.spaceBetween,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        spacing: 12,
+        runSpacing: 8,
         children: [
           // Logo & Tên chế độ
           Row(
+            mainAxisSize: MainAxisSize.min,
             children: [
               Container(
                 padding: const EdgeInsets.all(7),
@@ -494,59 +538,31 @@ class _DeviceSimulatorWrapperState extends State<DeviceSimulatorWrapper> {
             ],
           ),
 
-          const Spacer(),
-
-          // Chọn mẫu điện thoại (iPhone 18 Pro Max / iPhone 18 / Samsung S25 / iPad)
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
-            decoration: BoxDecoration(
-              color: const Color(0xFF1E293B),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: const Color(0xFF334155)),
-            ),
-            child: DropdownButtonHideUnderline(
-              child: DropdownButton<DeviceType>(
-                value: _selectedDevice,
-                dropdownColor: const Color(0xFF1E293B),
-                icon: const Icon(Icons.arrow_drop_down, color: Color(0xFF94A3B8)),
-                style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
-                items: DeviceType.values.map((dev) {
-                  return DropdownMenuItem<DeviceType>(
-                    value: dev,
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          dev == DeviceType.ipadPro ? Icons.tablet_mac : Icons.phone_iphone,
-                          size: 15,
-                          color: const Color(0xFF34D399),
-                        ),
-                        const SizedBox(width: 6),
-                        Text('${dev.name} (${dev.width.toInt()} x ${dev.height.toInt()})'),
-                      ],
-                    ),
-                  );
-                }).toList(),
-                onChanged: (val) {
-                  if (val != null) setState(() => _selectedDevice = val);
-                },
-              ),
-            ),
+          // Chọn mẫu điện thoại (iPhone 18 Pro Max / iPhone 18 / Samsung S25 / iPad): dãy nút chọn, không cần Overlay
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              for (final dev in DeviceType.values) ...[
+                _buildDeviceChip(dev),
+                const SizedBox(width: 6),
+              ],
+            ],
           ),
-          const SizedBox(width: 8),
 
           // Nút Xoay Màn Hình (Rotate)
-          IconButton(
-            onPressed: () => setState(() => _isLandscape = !_isLandscape),
-            icon: Icon(
-              Icons.screen_rotation,
-              color: _isLandscape ? const Color(0xFF34D399) : const Color(0xFF94A3B8),
-              size: 20,
+          Semantics(
+            button: true,
+            label: _isLandscape ? 'Chuyển về màn hình dọc' : 'Xoay màn hình ngang',
+            child: IconButton(
+              onPressed: () => setState(() => _isLandscape = !_isLandscape),
+              icon: Icon(
+                Icons.screen_rotation,
+                color: _isLandscape ? const Color(0xFF34D399) : const Color(0xFF94A3B8),
+                size: 20,
+              ),
+              splashRadius: 20,
             ),
-            tooltip: _isLandscape ? 'Chuyển về màn hình dọc' : 'Xoay màn hình ngang',
-            splashRadius: 20,
           ),
-          const SizedBox(width: 8),
 
           // Nút Chuyển Về Bản Desktop Máy Tính
           ElevatedButton.icon(

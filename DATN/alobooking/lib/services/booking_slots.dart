@@ -102,13 +102,24 @@ class BookingSlots {
     return out;
   }
 
-  /// Giá một giờ: khung thường lấy giá thấp, khung vàng (từ 17h) lấy giá cao
-  /// trong khoảng giá của sân ("80k - 160k/h"). Trả về đồng.
+  /// Ca giờ vàng: 16:00 – 22:00 (các giờ bắt đầu từ 16 đến 21). Ngoài ca này tính giá thường.
+  static const int goldenStartHour = 16;
+  static const int goldenEndHour = 22;
+  static const String goldenLabel = '16:00 – 22:00';
+
+  /// Giờ bắt đầu [hour] có thuộc ca giờ vàng không.
+  static bool isGolden(int hour) => hour >= goldenStartHour && hour < goldenEndHour;
+
+  /// Giá một giờ: ngoài ca vàng lấy giá thấp, trong ca vàng (16:00 – 22:00) lấy giá cao
+  /// trong khoảng giá của sân ("80k - 100k/h"). Trả về đồng.
   static int priceForHour(Venue v, int hour) {
     final m = RegExp(r'(\d+)\s*k\s*-\s*(\d+)\s*k').firstMatch(v.price.toLowerCase());
     if (m == null) return 150000;
-    final low = int.parse(m.group(1)!) * 1000;
-    final high = int.parse(m.group(2)!) * 1000;
-    return hour >= 17 ? high : low;
+    final a = int.parse(m.group(1)!) * 1000;
+    final b = int.parse(m.group(2)!) * 1000;
+    // Chủ sân nhập ngược ("160k - 80k") vẫn cho giờ vàng là mức cao hơn
+    final low = a < b ? a : b;
+    final high = a < b ? b : a;
+    return isGolden(hour) ? high : low;
   }
 }

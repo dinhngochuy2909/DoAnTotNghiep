@@ -122,7 +122,7 @@ class FeaturedScreen extends StatelessWidget {
                 width: 70,
                 height: 80,
                 child: VenueImageView(
-                  imageUrl: venue.image,
+                  imageUrl: venue.displayImage,
                   fit: BoxFit.cover,
                 ),
               ),

@@ -183,14 +183,58 @@ class _AccountScreenState extends State<AccountScreen> {
     final user = AuthService.currentUser;
     final userName = user?.fullName.isNotEmpty == true ? user!.fullName : 'Khách vãng lai';
     final userEmail = user?.email.isNotEmpty == true ? user!.email : 'Chưa đăng nhập tài khoản';
+    // Điện thoại / cửa sổ hẹp: thanh bên rộng 320 + khung nội dung không đủ chỗ, dồn thành một cột cuộn
+    final narrow = MediaQuery.of(context).size.width < 760;
 
     return Scaffold(
       backgroundColor: const Color(0xFF065F46), // Dark green background like screenshot
-      body: Row(
-        children: [
-          // ─── LEFT SIDEBAR (MÀU TRẮNG + XANH CHUẨN SCREENSHOT) ───
-          Container(
-            width: 320,
+      body: narrow
+          ? _buildSidebar(userName, userEmail, narrow: true)
+          : Row(
+              children: [
+                _buildSidebar(userName, userEmail, narrow: false),
+
+                // ─── RIGHT CONTENT PANE (HIỂN THỊ CHUẨN XÁC NỘI DUNG ỨNG DỤNG CÓ GÌ MỚI) ───
+                Expanded(
+                  child: Container(
+                    color: const Color(0xFF065F46), // Dark green background from screenshot
+                    child: _buildRightPaneContent(),
+                  ),
+                ),
+              ],
+            ),
+
+      // Bottom Navigation Bar
+      bottomNavigationBar: Container(
+        height: 60,
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          border: Border(top: BorderSide(color: Color(0xFFE2E8F0), width: 1)),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          children: [
+            _bottomNavItem(Icons.home_outlined, 'Trang chủ', () => Navigator.pop(context)),
+            _bottomNavItem(Icons.location_on_outlined, 'Bản đồ', () {
+              Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => MapScreen(venues: widget.venues)));
+            }),
+            _bottomNavItemCenter(Icons.article_outlined, 'Khám phá', () {
+              Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => ExploreScreen(venues: widget.venues)));
+            }),
+            _bottomNavItem(Icons.local_fire_department_outlined, 'Nổi bật', () {
+              Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => FeaturedScreen(venues: widget.venues)));
+            }),
+            _bottomNavItem(Icons.person, 'Tài khoản', () {}, isActive: true),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Thanh bên (hồ sơ, lối tắt, menu). Màn hình hẹp (điện thoại) dùng một cột cuộn full chiều rộng.
+  Widget _buildSidebar(String userName, String userEmail, {required bool narrow}) {
+    return Container(
+            width: narrow ? null : 320,
             color: const Color(0xFFF8FAFC),
             child: Column(
               children: [
@@ -315,7 +359,10 @@ class _AccountScreenState extends State<AccountScreen> {
 
                 // Scrollable Menu List
                 Expanded(
-                  child: ListView(
+                  // Material trong suốt nằm TRÊN lớp màu nền của Container, để màu chọn/hiệu ứng chạm của ListTile hiện ra
+                  child: Material(
+                    type: MaterialType.transparency,
+                    child: ListView(
                     padding: const EdgeInsets.symmetric(vertical: 8),
                     children: [
                       _menuSectionHeader('Hoạt động'),
@@ -325,49 +372,16 @@ class _AccountScreenState extends State<AccountScreen> {
                       const SizedBox(height: 10),
                       _menuSectionHeader('Hệ thống'),
                       _menuTile('Tài khoản', Icons.person_outline, 'settings', isHighlighted: true),
+                      // Màn hình hẹp không có khung bên phải: hiện thẻ tài khoản ngay dưới menu
+                      if (narrow) _buildGenericSettingsContent(narrow: true),
                     ],
+                    ),
                   ),
                 ),
 
               ],
             ),
-          ),
-
-          // ─── RIGHT CONTENT PANE (HIỂN THỊ CHUẨN XÁC NỘI DUNG ỨNG DỤNG CÓ GÌ MỚI) ───
-          Expanded(
-            child: Container(
-              color: const Color(0xFF065F46), // Dark green background from screenshot
-              child: _buildRightPaneContent(),
-            ),
-          ),
-        ],
-      ),
-
-      // Bottom Navigation Bar
-      bottomNavigationBar: Container(
-        height: 60,
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          border: Border(top: BorderSide(color: Color(0xFFE2E8F0), width: 1)),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
-          children: [
-            _bottomNavItem(Icons.home_outlined, 'Trang chủ', () => Navigator.pop(context)),
-            _bottomNavItem(Icons.location_on_outlined, 'Bản đồ', () {
-              Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => MapScreen(venues: widget.venues)));
-            }),
-            _bottomNavItemCenter(Icons.article_outlined, 'Khám phá', () {
-              Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => ExploreScreen(venues: widget.venues)));
-            }),
-            _bottomNavItem(Icons.local_fire_department_outlined, 'Nổi bật', () {
-              Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => FeaturedScreen(venues: widget.venues)));
-            }),
-            _bottomNavItem(Icons.person, 'Tài khoản', () {}, isActive: true),
-          ],
-        ),
-      ),
-    );
+          );
   }
 
   Widget _quickActionButton(IconData icon, String label, VoidCallback onTap) {
@@ -431,7 +445,7 @@ class _AccountScreenState extends State<AccountScreen> {
   Widget _buildRightPaneContent() => _buildGenericSettingsContent();
 
 
-  Widget _buildGenericSettingsContent() {
+  Widget _buildGenericSettingsContent({bool narrow = false}) {
     final u = AuthService.currentUser;
     final loggedIn = u != null && !AuthService.isGuest;
     Widget line(IconData icon, String label, String value) => Padding(
@@ -450,10 +464,15 @@ class _AccountScreenState extends State<AccountScreen> {
         );
     return Center(
       child: Container(
-        width: 460,
-        padding: const EdgeInsets.all(24),
-        margin: const EdgeInsets.all(24),
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16)),
+        // Máy tính: thẻ rộng 460 giữa khung xanh; điện thoại: thẻ chiếm hết chiều rộng còn lại
+        width: narrow ? double.infinity : 460,
+        padding: EdgeInsets.all(narrow ? 16 : 24),
+        margin: EdgeInsets.all(narrow ? 12 : 24),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: narrow ? Border.all(color: const Color(0xFFE2E8F0)) : null,
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,

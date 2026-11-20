@@ -135,7 +135,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
               width: 100,
               height: 100,
               child: VenueImageView(
-                imageUrl: venue.image,
+                imageUrl: venue.displayImage,
                 fit: BoxFit.cover,
               ),
             ),

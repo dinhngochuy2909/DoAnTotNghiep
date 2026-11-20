@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../data/venue_photos.dart';
 import '../models/venue.dart';
 import '../services/firestore_service.dart';
 import '../services/auth_service.dart';
@@ -55,31 +56,8 @@ class _HomeScreenState extends State<HomeScreen> {
     'Hoàng Mai', 'Long Biên', 'Gia Lâm', 'Đông Anh', 'Thanh Trì', 'Hoài Đức'
   ];
 
-  final Map<String, List<String>> _sampleImages = {
-    'pickleball': [
-      'https://images.unsplash.com/photo-1622279457486-62dcc4a431d6?w=600&h=320&fit=crop&q=80',
-      'https://images.unsplash.com/photo-1554068865-24cecd4e34b8?w=600&h=320&fit=crop&q=80',
-      'https://images.unsplash.com/photo-1612872087720-bb876e2e67d1?w=600&h=320&fit=crop&q=80',
-    ],
-    'badminton': [
-      'https://images.unsplash.com/photo-1521537634581-0dced2fee2ef?w=600&h=320&fit=crop&q=80',
-      'https://images.unsplash.com/photo-1626224583764-f87db24ac4ea?w=600&h=320&fit=crop&q=80',
-      'https://images.unsplash.com/photo-1544698310-74ea9d1c8258?w=600&h=320&fit=crop&q=80',
-    ],
-    'football': [
-      'https://images.unsplash.com/photo-1529900241451-93b9423c9604?w=600&h=320&fit=crop&q=80',
-      'https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=600&h=320&fit=crop&q=80',
-      'https://images.unsplash.com/photo-1508098682722-e99c43a406b2?w=600&h=320&fit=crop&q=80',
-    ],
-    'tennis': [
-      'https://images.unsplash.com/photo-1554068865-24cecd4e34b8?w=600&h=320&fit=crop&q=80',
-      'https://images.unsplash.com/photo-1595435934249-5df7ed86e1c0?w=600&h=320&fit=crop&q=80',
-    ],
-    'basketball': [
-      'https://images.unsplash.com/photo-1519861531473-9200262188bf?w=600&h=320&fit=crop&q=80',
-      'https://images.unsplash.com/photo-1546519638-68e109498ffc?w=600&h=320&fit=crop&q=80',
-    ],
-  };
+  // Kho ảnh minh họa theo môn (đã duyệt đúng môn), xem lib/data/venue_photos.dart
+  final Map<String, List<String>> _sampleImages = VenuePhotos.bySport;
 
   @override
   void initState() {
@@ -1570,7 +1548,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     width: double.infinity,
                     height: double.infinity,
                     child: VenueImageView(
-                      imageUrl: venue.image,
+                      imageUrl: venue.displayImage,
                       fit: BoxFit.cover,
                     ),
                   ),
@@ -3079,8 +3057,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final imageCtrl = TextEditingController(
       text: isEdit
           ? existingVenue.image
-          : (_sampleImages['badminton']?.first ??
-              'https://images.unsplash.com/photo-1521537634581-0dced2fee2ef?w=600&h=320&fit=crop&q=80'),
+          : VenuePhotos.pick('badminton', 0),
     );
 
     String selectedType = isEdit ? existingVenue.type : 'badminton';
@@ -3471,7 +3448,10 @@ class _HomeScreenState extends State<HomeScreen> {
                           const SizedBox(height: 10),
 
                           // Chọn ảnh mẫu nhanh 1-chạm
-                          Row(
+                          // Wrap thay cho Row: kho ảnh mẫu có hàng chục ảnh nên phải xuống dòng
+                          Wrap(
+                            runSpacing: 4,
+                            crossAxisAlignment: WrapCrossAlignment.center,
                             children: [
                               const Text('Hoặc chọn mẫu: ', style: TextStyle(color: Color(0xFF64748B), fontSize: 11.5, fontWeight: FontWeight.w500)),
                               ...sportPresets.asMap().entries.map((entry) {
@@ -3574,7 +3554,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             lng: isEdit ? existingVenue.lng : 105.8542,
                             image: imageCtrl.text.trim().isNotEmpty
                                 ? imageCtrl.text.trim()
-                                : 'https://images.unsplash.com/photo-1521537634581-0dced2fee2ef?w=600&h=320&fit=crop&q=80',
+                                : VenuePhotos.pick(selectedType, 0), // chưa nhập ảnh: dùng ảnh minh họa đúng môn
                             logo: isEdit
                                 ? existingVenue.logo
                                 : 'https://images.unsplash.com/photo-1554068865-24cecd4e34b8?w=100&h=100&fit=crop&q=80',

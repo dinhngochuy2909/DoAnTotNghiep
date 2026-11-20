@@ -654,7 +654,7 @@ Bạn cần tìm sân nào?''';
                   height: 100,
                   width: 236,
                   child: VenueImageView(
-                    imageUrl: venue.image,
+                    imageUrl: venue.displayImage,
                     fit: BoxFit.cover,
                     width: 236,
                     height: 100,

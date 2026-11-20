@@ -27,6 +27,7 @@ class _MapScreenState extends State<MapScreen> {
     {'key': 'pickleball', 'label': 'Pickleball', 'emoji': '🏓', 'icon': Icons.sports_tennis},
     {'key': 'football', 'label': 'Bóng đá', 'emoji': '⚽', 'icon': Icons.sports_soccer},
     {'key': 'tennis', 'label': 'Tennis', 'emoji': '🎾', 'icon': Icons.sports_tennis},
+    {'key': 'basketball', 'label': 'Bóng rổ', 'emoji': '🏀', 'icon': Icons.sports_basketball},
   ];
 
   double _calculateDistanceKm(double lat1, double lon1, double lat2, double lon2) {
@@ -468,7 +469,7 @@ class _MapScreenState extends State<MapScreen> {
                   child: Stack(
                     children: [
                       VenueImageView(
-                        imageUrl: v.image,
+                        imageUrl: v.displayImage,
                         width: 80,
                         height: 80,
                         fit: BoxFit.cover,

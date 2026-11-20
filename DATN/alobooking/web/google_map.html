@@ -8,6 +8,8 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body, html { width: 100%; height: 100%; overflow: hidden; font-family: 'Be Vietnam Pro', -apple-system, sans-serif; background: #e2e8f0; }
@@ -207,6 +209,7 @@
       <button class="filter-chip" id="chip_pickleball" onclick="filterSport('pickleball')">🏓 Pickleball</button>
       <button class="filter-chip" id="chip_football" onclick="filterSport('football')">⚽ Bóng đá</button>
       <button class="filter-chip" id="chip_tennis" onclick="filterSport('tennis')">🎾 Tennis</button>
+      <button class="filter-chip" id="chip_basketball" onclick="filterSport('basketball')">🏀 Bóng rổ</button>
     </div>
 
     <div class="city-toggle">
@@ -223,17 +226,46 @@
 
   <div class="venue-count-badge">
     <div class="venue-count-dot"></div>
-    <span id="venueCountText">70 sân thể thao khả dụng</span>
+    <span id="venueCountText">Đang tải danh sách sân…</span>
   </div>
 
   <!-- Leaflet JS Backup -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+
+  <!-- Gom nhóm ghim cho Google Maps -->
+  <script src="https://unpkg.com/@googlemaps/markerclusterer@2.5.3/dist/index.min.js"></script>
 
   <!-- Google Maps JS SDK with Alobo Key -->
   <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAVQaPl9AQLUrqb8OryDjJqXGUjakkdaT8&libraries=places,geometry&callback=initGoogleMap" async defer></script>
 
   <script>
-    var venuesData = [{"id": 1, "name": "Pickleball Cổng B Ga Hà Nội", "type": "pickleball", "district": "Đống Đa", "distance": "271.5m", "address": "1 P. Trần Quý Cáp, Văn Chương, Đống Đa, Hà Nội", "hours": "05:00 – 24:00", "tags": ["Đơn ngày", "Sự kiện", "ALOBO Partner"], "rating": 4.9, "price": "120k - 220k/h", "lat": 21.0245, "lng": 105.8412, "image": "https://images.unsplash.com/photo-1622279457486-62dcc4a431d6?w=600&h=320&fit=crop&q=80", "logo": "https://ui-avatars.com/api/?name=PB&background=facc15&color=000&size=40&bold=true", "amenities": ["Bãi đỗ ô tô", "Căng tin", "Tắm nóng lạnh", "Cho thuê vợt", "Đèn LED chống chói"], "totalCourts": 6}, {"id": 2, "name": "Phúc Long Pickleball 460 Trần Quý Cáp", "type": "pickleball", "district": "Đống Đa", "distance": "288.4m", "address": "460 Trần Quý Cáp, Văn Miếu, Đống Đa, Hà Nội", "hours": "05:00 – 24:00", "tags": ["Đơn ngày", "Cố định", "ALOBO Booking"], "rating": 4.8, "price": "80k - 200k/h", "lat": 21.026, "lng": 105.8385, "image": "https://images.unsplash.com/photo-1554068865-24cecd4e34b8?w=600&h=320&fit=crop&q=80", "logo": "https://ui-avatars.com/api/?name=PL&background=064e3b&color=fff&size=40&bold=true", "amenities": ["Bãi gửi xe", "Wifi miễn phí", "Nước uống", "Tủ đồ cá nhân"], "totalCourts": 4}, {"id": 3, "name": "Phúc Long Badminton 460 Trần Quý Cáp", "type": "badminton", "district": "Đống Đa", "distance": "300.3m", "address": "460 Trần Quý Cáp, Văn Miếu, Đống Đa, Hà Nội", "hours": "05:00 – 23:30", "tags": ["Đơn ngày", "Thảm tiêu chuẩn", "ALOBO Booking"], "rating": 4.8, "price": "85k - 160k/h", "lat": 21.026, "lng": 105.8385, "image": "https://images.unsplash.com/photo-1521537634581-0dced2fee2ef?w=600&h=320&fit=crop&q=80", "logo": "https://ui-avatars.com/api/?name=PL&background=6b21a8&color=fff&size=40&bold=true", "amenities": ["Thảm Yonex", "Ghế nghỉ", "Căng tin", "Cho thuê vợt"], "totalCourts": 6}, {"id": 4, "name": "RAILWAY Khâm Thiên Pickleball", "type": "pickleball", "district": "Đống Đa", "distance": "333.3m", "address": "2D Khâm Thiên, Đống Đa, Hà Nội", "hours": "05:00 – 22:30", "tags": ["Đơn ngày", "Sự kiện", "ALOBO Partner"], "rating": 4.7, "price": "100k - 180k/h", "lat": 21.0185, "lng": 105.839, "image": "https://images.unsplash.com/photo-1612872087720-bb876e2e67d1?w=600&h=320&fit=crop&q=80", "logo": "https://ui-avatars.com/api/?name=RW&background=0284c7&color=fff&size=40&bold=true", "amenities": ["Bãi đỗ ô tô", "Đèn chiếu sáng tiêu chuẩn", "Huấn luyện viên"], "totalCourts": 4}, {"id": 5, "name": "City Pickleball Nguyễn Khuyến", "type": "pickleball", "district": "Đống Đa", "distance": "337.5m", "address": "11A P. Nguyễn Khuyến, Văn Miếu, Đống Đa, Hà Nội", "hours": "05:00 – 23:00", "tags": ["Đơn ngày", "Sự kiện", "ALOBO Partner"], "rating": 4.8, "price": "130k - 220k/h", "lat": 21.027, "lng": 105.838, "image": "https://images.unsplash.com/photo-1568702846914-96b305d2aaeb?w=600&h=320&fit=crop&q=80", "logo": "https://ui-avatars.com/api/?name=CP&background=0369a1&color=fff&size=40&bold=true", "amenities": ["Mái che kiên cố", "Điều hòa sảnh", "Khu cafe ngắm sân"], "totalCourts": 5}, {"id": 6, "name": "Bảo Việt Pickleball Sĩ Liên", "type": "pickleball", "district": "Đống Đa", "distance": "348.7m", "address": "71 Ngõ Sĩ Liên, Văn Miếu, Đống Đa, Hà Nội", "hours": "05:00 – 22:00", "tags": ["Đơn ngày", "Cố định", "ALOBO Booking"], "rating": 4.8, "price": "110k - 200k/h", "lat": 21.0265, "lng": 105.837, "image": "https://images.unsplash.com/photo-1545809074-59472b3f5ecc?w=600&h=320&fit=crop&q=80", "logo": "https://ui-avatars.com/api/?name=BV&background=eab308&color=000&size=40&bold=true", "amenities": ["Bãi đỗ xe rộng", "Nước khoáng", "Tắm nóng lạnh"], "totalCourts": 4}, {"id": 7, "name": "Sân Cầu Lông Minh Nhật (Chi nhánh 1) - ALOBO", "type": "badminton", "district": "Bình Thạnh", "distance": "1.5km", "address": "Số 42 Ung Văn Khiêm, Phường 25, Bình Thạnh, TP.HCM", "hours": "05:00 – 23:30", "tags": ["ALOBO Trực tuyến", "Đơn ngày", "Cố định"], "rating": 4.9, "price": "90k - 160k/h", "lat": 10.8032, "lng": 106.7145, "image": "https://images.unsplash.com/photo-1626224583764-f87db24ac4ea?w=600&h=320&fit=crop&q=80", "logo": "https://ui-avatars.com/api/?name=MN&background=10b981&color=fff&size=40&bold=true", "amenities": ["Thảm 5 lớp chuẩn BWF", "Hệ thống chiếu sáng LED", "Phòng tắm", "Wifi"], "totalCourts": 8}, {"id": 8, "name": "Sân Cầu Lông TADA Thanh Đa - ALOBO", "type": "badminton", "district": "Bình Thạnh", "distance": "1.8km", "address": "Khu Thanh Đa, Cư xá Thanh Đa, Bình Thạnh, TP.HCM", "hours": "05:30 – 23:00", "tags": ["ALOBO Trực tuyến", "Đơn ngày", "Sự kiện"], "rating": 4.8, "price": "80k - 150k/h", "lat": 10.825, "lng": 106.721, "image": "https://images.unsplash.com/photo-1521537634581-0dced2fee2ef?w=600&h=320&fit=crop&q=80", "logo": "https://ui-avatars.com/api/?name=TD&background=2563eb&color=fff&size=40&bold=true", "amenities": ["Sân trong nhà mát mẻ", "Bãi gửi xe rộng", "Cho thuê vợt"], "totalCourts": 10}, {"id": 9, "name": "Sân Cầu Lông TADA Bình Lợi - ALOBO", "type": "badminton", "district": "Bình Thạnh", "distance": "2.1km", "address": "Đường Bình Lợi, Phường 13, Bình Thạnh, TP.HCM", "hours": "05:00 – 23:00", "tags": ["ALOBO Trực tuyến", "Đơn ngày"], "rating": 4.7, "price": "85k - 155k/h", "lat": 10.8315, "lng": 106.7025, "image": "https://images.unsplash.com/photo-1544717305-2782549b5136?w=600&h=320&fit=crop&q=80", "logo": "https://ui-avatars.com/api/?name=BL&background=8b5cf6&color=fff&size=40&bold=true", "amenities": ["Thảm sàn mới", "Khu khán đài", "Căng tin giải khát"], "totalCourts": 6}, {"id": 10, "name": "Sân Cầu Lông TADA D2 - ALOBO", "type": "badminton", "district": "Bình Thạnh", "distance": "1.3km", "address": "Đường D2 (Nguyễn Gia Trí), Phường 25, Bình Thạnh, TP.HCM", "hours": "05:00 – 24:00", "tags": ["ALOBO Trực tuyến", "Đơn ngày", "Cố định"], "rating": 4.9, "price": "95k - 170k/h", "lat": 10.8045, "lng": 106.716, "image": "https://images.unsplash.com/photo-1626224583764-f87db24ac4ea?w=600&h=320&fit=crop&q=80", "logo": "https://ui-avatars.com/api/?name=D2&background=f97316&color=fff&size=40&bold=true", "amenities": ["Vị trí trung tâm", "Điều hòa khu nghỉ", "Đèn chiếu sáng chuyên nghiệp"], "totalCourts": 8}, {"id": 11, "name": "Sân Cầu Lông Tấn Nguyễn (Chi nhánh 1) - ALOBO", "type": "badminton", "district": "Tân Bình", "distance": "3.5km", "address": "Khu K300, Phường 12, Tân Bình, TP.HCM", "hours": "05:00 – 23:00", "tags": ["ALOBO Trực tuyến", "Đơn ngày", "CLB"], "rating": 4.8, "price": "90k - 160k/h", "lat": 10.798, "lng": 106.652, "image": "https://images.unsplash.com/photo-1521537634581-0dced2fee2ef?w=600&h=320&fit=crop&q=80", "logo": "https://ui-avatars.com/api/?name=TN&background=059669&color=fff&size=40&bold=true", "amenities": ["Thảm cầu lông cao cấp", "Tắm nóng lạnh", "HLV kèm 1-1"], "totalCourts": 8}, {"id": 12, "name": "Sân Cầu Lông Tấn Nguyễn (Chi nhánh 2) - ALOBO", "type": "badminton", "district": "Bình Tân", "distance": "4.2km", "address": "Đường số 7, Phường An Lạc A, Bình Tân, TP.HCM", "hours": "05:00 – 23:00", "tags": ["ALOBO Trực tuyến", "Đơn ngày"], "rating": 4.7, "price": "80k - 140k/h", "lat": 10.752, "lng": 106.613, "image": "https://images.unsplash.com/photo-1544717305-2782549b5136?w=600&h=320&fit=crop&q=80", "logo": "https://ui-avatars.com/api/?name=T2&background=0284c7&color=fff&size=40&bold=true", "amenities": ["Không gian thông thoáng", "Bãi xe ô tô", "Căng tin"], "totalCourts": 10}, {"id": 13, "name": "Sân Cầu Lông Đông An - ALOBO", "type": "badminton", "district": "Bình Thạnh", "distance": "2.0km", "address": "Đường Nơ Trang Long, Bình Thạnh, TP.HCM", "hours": "05:00 – 23:00", "tags": ["ALOBO Trực tuyến", "Đơn ngày", "Cố định"], "rating": 4.8, "price": "85k - 150k/h", "lat": 10.812, "lng": 106.699, "image": "https://images.unsplash.com/photo-1626224583764-f87db24ac4ea?w=600&h=320&fit=crop&q=80", "logo": "https://ui-avatars.com/api/?name=DA&background=dc2626&color=fff&size=40&bold=true", "amenities": ["Sân tiêu chuẩn", "Cửa hàng phụ kiện cầu lông", "Căng tin"], "totalCourts": 6}, {"id": 14, "name": "Sân Cầu Lông Tường Anh - ALOBO", "type": "badminton", "district": "Gò Vấp", "distance": "3.8km", "address": "Đường Lê Đức Thọ, Phường 15, Gò Vấp, TP.HCM", "hours": "05:00 – 23:30", "tags": ["ALOBO Trực tuyến", "Đơn ngày"], "rating": 4.8, "price": "80k - 150k/h", "lat": 10.842, "lng": 106.678, "image": "https://images.unsplash.com/photo-1521537634581-0dced2fee2ef?w=600&h=320&fit=crop&q=80", "logo": "https://ui-avatars.com/api/?name=TA&background=7c3aed&color=fff&size=40&bold=true", "amenities": ["Thảm sân chống trơn", "Bãi đỗ xe", "Đồ uống thể thao"], "totalCourts": 8}, {"id": 15, "name": "Sân Cầu Lông ĐÀO TRÍ - ALOBO", "type": "badminton", "district": "Quận 7", "distance": "5.0km", "address": "Đường Đào Trí, Phường Phú Thuận, Quận 7, TP.HCM", "hours": "05:30 – 23:00", "tags": ["ALOBO Trực tuyến", "Đơn ngày", "Cố định"], "rating": 4.9, "price": "90k - 160k/h", "lat": 10.732, "lng": 106.745, "image": "https://images.unsplash.com/photo-1544717305-2782549b5136?w=600&h=320&fit=crop&q=80", "logo": "https://ui-avatars.com/api/?name=DT&background=ea580c&color=fff&size=40&bold=true", "amenities": ["Trần cao 12m chuẩn quốc tế", "Đèn chống chói", "Khu phục vụ nước giải khát"], "totalCourts": 12}, {"id": 16, "name": "Sân Cầu Lông Ngọc Anh - ALOBO", "type": "badminton", "district": "Tân Phú", "distance": "4.6km", "address": "Đường Lũy Bán Bích, Phường Hòa Thạnh, Tân Phú, TP.HCM", "hours": "05:00 – 23:00", "tags": ["ALOBO Trực tuyến", "Đơn ngày"], "rating": 4.7, "price": "80k - 145k/h", "lat": 10.778, "lng": 106.634, "image": "https://images.unsplash.com/photo-1626224583764-f87db24ac4ea?w=600&h=320&fit=crop&q=80", "logo": "https://ui-avatars.com/api/?name=NA&background=0891b2&color=fff&size=40&bold=true", "amenities": ["Thảm sàn êm ái", "Bãi gửi xe máy & ô tô", "Phòng thay đồ"], "totalCourts": 6}, {"id": 17, "name": "Sân Cầu Lông LOCA - ALOBO", "type": "badminton", "district": "Thủ Đức", "distance": "5.5km", "address": "Đường số 9, Linh Tây, TP. Thủ Đức, TP.HCM", "hours": "05:00 – 23:30", "tags": ["ALOBO Trực tuyến", "Đơn ngày", "Sự kiện"], "rating": 4.8, "price": "85k - 150k/h", "lat": 10.86, "lng": 106.755, "image": "https://images.unsplash.com/photo-1521537634581-0dced2fee2ef?w=600&h=320&fit=crop&q=80", "logo": "https://ui-avatars.com/api/?name=LC&background=4f46e5&color=fff&size=40&bold=true", "amenities": ["Cụm sân mới hiện đại", "Hệ thống quạt thông gió", "Căng tin"], "totalCourts": 8}, {"id": 18, "name": "Garden Pickleball Club - ALOBO Quảng Ngãi", "type": "pickleball", "district": "Quảng Ngãi", "distance": "ALOBO Net", "address": "Trung tâm TP. Quảng Ngãi, Tỉnh Quảng Ngãi", "hours": "05:00 – 23:00", "tags": ["ALOBO Trực tuyến", "Đơn ngày", "Sự kiện"], "rating": 4.9, "price": "100k - 180k/h", "lat": 15.1205, "lng": 108.7923, "image": "https://images.unsplash.com/photo-1554068865-24cecd4e34b8?w=600&h=320&fit=crop&q=80", "logo": "https://ui-avatars.com/api/?name=GP&background=16a34a&color=fff&size=40&bold=true", "amenities": ["Cụm sân ngoài trời thoáng mát", "Khu cafe giải khát", "Dạy chơi cơ bản"], "totalCourts": 6}, {"id": 19, "name": "Spotlight Pickleball Club - ALOBO", "type": "pickleball", "district": "Cầu Giấy", "distance": "1.2km", "address": "Ngõ 19 Duy Tân, Dịch Vọng Hậu, Cầu Giấy, Hà Nội", "hours": "05:00 – 24:00", "tags": ["ALOBO Partner", "Đơn ngày", "Sự kiện"], "rating": 4.9, "price": "140k - 240k/h", "lat": 21.031, "lng": 105.782, "image": "https://images.unsplash.com/photo-1622279457486-62dcc4a431d6?w=600&h=320&fit=crop&q=80", "logo": "https://ui-avatars.com/api/?name=SP&background=e11d48&color=fff&size=40&bold=true", "amenities": ["Sân trong nhà điều hòa", "Mặt sân Acrylic chuẩn USAPA", "HLV chuyên nghiệp"], "totalCourts": 8}, {"id": 20, "name": "Banger Pickleball Club - ALOBO", "type": "pickleball", "district": "Cầu Giấy", "distance": "1.5km", "address": "Khu thể thao Xuân Thủy, Cầu Giấy, Hà Nội", "hours": "05:00 – 23:30", "tags": ["ALOBO Partner", "Đơn ngày", "Giao lưu"], "rating": 4.8, "price": "130k - 220k/h", "lat": 21.036, "lng": 105.79, "image": "https://images.unsplash.com/photo-1612872087720-bb876e2e67d1?w=600&h=320&fit=crop&q=80", "logo": "https://ui-avatars.com/api/?name=BP&background=2563eb&color=fff&size=40&bold=true", "amenities": ["Máy bắn bóng tự động", "Phòng thay đồ VIP", "Bãi đỗ ô tô"], "totalCourts": 6}, {"id": 21, "name": "The 36 Lakeview Pickleball Court - ALOBO", "type": "pickleball", "district": "Tây Hồ", "distance": "2.8km", "address": "Đường Quảng An, View Hồ Tây, Tây Hồ, Hà Nội", "hours": "05:30 – 23:00", "tags": ["ALOBO Partner", "View Hồ Tây", "Sự kiện"], "rating": 4.9, "price": "160k - 260k/h", "lat": 21.065, "lng": 105.825, "image": "https://images.unsplash.com/photo-1568702846914-96b305d2aaeb?w=600&h=320&fit=crop&q=80", "logo": "https://ui-avatars.com/api/?name=36&background=0284c7&color=fff&size=40&bold=true", "amenities": ["View trực diện Hồ Tây", "Quầy cafe sang trọng", "Ghế nghỉ thư giãn"], "totalCourts": 6}, {"id": 22, "name": "Sân Cầu Lông Tam Hưng - ALOBO", "type": "badminton", "district": "Thanh Oai", "distance": "12.0km", "address": "Thôn Hưng Giáo, Xã Tam Hưng, Thanh Oai, Hà Nội", "hours": "05:00 – 22:30", "tags": ["ALOBO Booking", "Đơn ngày"], "rating": 4.7, "price": "70k - 120k/h", "lat": 20.892, "lng": 105.789, "image": "https://images.unsplash.com/photo-1521537634581-0dced2fee2ef?w=600&h=320&fit=crop&q=80", "logo": "https://ui-avatars.com/api/?name=TH&background=15803d&color=fff&size=40&bold=true", "amenities": ["Không gian rộng rãi", "Bãi gửi xe", "Đồ uống"], "totalCourts": 4}, {"id": 23, "name": "Sân Pickleball Sài Gòn Mới - ALOBO", "type": "pickleball", "district": "Nhà Bè", "distance": "7.5km", "address": "Khu đô thị mới Phước Kiển, Nhà Bè, TP.HCM", "hours": "05:00 – 23:00", "tags": ["ALOBO Partner", "Chuẩn quốc tế", "Đơn ngày"], "rating": 4.9, "price": "120k - 200k/h", "lat": 10.71, "lng": 106.705, "image": "https://images.unsplash.com/photo-1554068865-24cecd4e34b8?w=600&h=320&fit=crop&q=80", "logo": "https://ui-avatars.com/api/?name=SG&background=b91c1c&color=fff&size=40&bold=true", "amenities": ["8 sân chuẩn thi đấu", "Máy bắn bóng", "Dịch vụ căn tin cao cấp"], "totalCourts": 8}, {"id": 24, "name": "City Pickleball Chùa Bộc - ALOBO", "type": "pickleball", "district": "Đống Đa", "distance": "500m", "address": "Số 14 Chùa Bộc, Quang Trung, Đống Đa, Hà Nội", "hours": "05:00 – 23:30", "tags": ["ALOBO Partner", "Đơn ngày", "Cố định"], "rating": 4.8, "price": "130k - 220k/h", "lat": 21.008, "lng": 105.828, "image": "https://images.unsplash.com/photo-1622279457486-62dcc4a431d6?w=600&h=320&fit=crop&q=80", "logo": "https://ui-avatars.com/api/?name=CB&background=d97706&color=fff&size=40&bold=true", "amenities": ["Trung tâm phố Chùa Bộc", "Mái che di động", "Wifi cáp quang"], "totalCourts": 6}, {"id": 25, "name": "Sân Cầu Lông Chùa Láng (159 Chùa Láng)", "type": "badminton", "district": "Đống Đa", "distance": "600m", "address": "159 P. Chùa Láng, Láng Thượng, Đống Đa, Hà Nội", "hours": "05:00 – 23:00", "tags": ["Đơn ngày", "Cố định", "ALOBO Booking"], "rating": 4.8, "price": "90k - 160k/h", "lat": 21.023, "lng": 105.802, "image": "https://images.unsplash.com/photo-1544717305-2782549b5136?w=600&h=320&fit=crop&q=80", "logo": "https://ui-avatars.com/api/?name=CL&background=4338ca&color=fff&size=40&bold=true", "amenities": ["Thảm sàn BWF", "Phòng thay đồ", "Căng tin"], "totalCourts": 6}, {"id": 26, "name": "Ông Mập Pickleball Minh Khai", "type": "pickleball", "district": "Hai Bà Trưng", "distance": "1.5km", "address": "460 Minh Khai, Vĩnh Tuy, Hai Bà Trưng, Hà Nội", "hours": "05:00 – 24:00", "tags": ["ALOBO Partner", "Đơn ngày", "Sự kiện"], "rating": 4.8, "price": "120k - 200k/h", "lat": 20.999, "lng": 105.868, "image": "https://images.unsplash.com/photo-1612872087720-bb876e2e67d1?w=600&h=320&fit=crop&q=80", "logo": "https://ui-avatars.com/api/?name=OM&background=ca8a04&color=fff&size=40&bold=true", "amenities": ["Khu check-in đẹp", "Sân chuẩn", "Nước uống miễn phí"], "totalCourts": 6}, {"id": 27, "name": "Pickleball Garden Tứ Liên", "type": "pickleball", "district": "Tây Hồ", "distance": "3.0km", "address": "Ngõ 310 Nghi Tàm, Tứ Liên, Tây Hồ, Hà Nội", "hours": "05:00 – 23:00", "tags": ["Không gian xanh", "Đơn ngày", "ALOBO Booking"], "rating": 4.9, "price": "130k - 210k/h", "lat": 21.061, "lng": 105.843, "image": "https://images.unsplash.com/photo-1545809074-59472b3f5ecc?w=600&h=320&fit=crop&q=80", "logo": "https://ui-avatars.com/api/?name=PG&background=15803d&color=fff&size=40&bold=true", "amenities": ["Cảnh quan sân vườn", "Cafe acoustic", "Bãi ô tô"], "totalCourts": 5}, {"id": 28, "name": "Sân Cầu Lông Sport YH (Yên Hòa)", "type": "badminton", "district": "Cầu Giấy", "distance": "1.4km", "address": "Số 25 ngõ 259 phố Yên Hòa, Cầu Giấy, Hà Nội", "hours": "05:00 – 23:30", "tags": ["ALOBO Partner", "Đơn ngày", "Cố định"], "rating": 4.8, "price": "85k - 160k/h", "lat": 21.022, "lng": 105.795, "image": "https://images.unsplash.com/photo-1626224583764-f87db24ac4ea?w=600&h=320&fit=crop&q=80", "logo": "https://ui-avatars.com/api/?name=YH&background=047857&color=fff&size=40&bold=true", "amenities": ["Thảm đạt chuẩn", "Căng tin giải khát", "Gần khu văn phòng"], "totalCourts": 8}, {"id": 29, "name": "Sân Bóng Đá Đại Học Thủy Lợi", "type": "football", "district": "Đống Đa", "distance": "450m", "address": "175 Tây Sơn, Trung Liệt, Đống Đa, Hà Nội", "hours": "05:30 – 23:00", "tags": ["Sân 7 người", "Cỏ nhân tạo cao cấp", "ALOBO Booking"], "rating": 4.8, "price": "350k - 700k/trận", "lat": 21.0075, "lng": 105.824, "image": "https://images.unsplash.com/photo-1529900748604-07564a03e7a6?w=600&h=320&fit=crop&q=80", "logo": "https://ui-avatars.com/api/?name=TL&background=0284c7&color=fff&size=40&bold=true", "amenities": ["Mặt cỏ FIFA Pro", "Dàn đèn siêu sáng", "Khán đài có mái che"], "totalCourts": 4}, {"id": 30, "name": "Sân Bóng Đá PVV Cầu Giấy", "type": "football", "district": "Cầu Giấy", "distance": "1.6km", "address": "72 Trần Thái Tông, Dịch Vọng Hậu, Cầu Giấy, Hà Nội", "hours": "05:00 – 23:30", "tags": ["Sân 7 người", "ALOBO Partner", "Đơn ngày"], "rating": 4.8, "price": "400k - 800k/trận", "lat": 21.034, "lng": 105.789, "image": "https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=600&h=320&fit=crop&q=80", "logo": "https://ui-avatars.com/api/?name=PV&background=1e40af&color=fff&size=40&bold=true", "amenities": ["Hệ thống thoát nước tốt", "Bãi gửi xe rộng", "Cho thuê áo bib/bóng"], "totalCourts": 6}, {"id": 31, "name": "Sân Bóng Đá Đại Học Y Hà Nội", "type": "football", "district": "Đống Đa", "distance": "700m", "address": "1 Tôn Thất Tùng, Kim Liên, Đống Đa, Hà Nội", "hours": "05:30 – 23:00", "tags": ["Sân 7", "Đơn ngày", "ALOBO Booking"], "rating": 4.7, "price": "350k - 650k/trận", "lat": 21.0035, "lng": 105.8315, "image": "https://images.unsplash.com/photo-1529900748604-07564a03e7a6?w=600&h=320&fit=crop&q=80", "logo": "https://ui-avatars.com/api/?name=DY&background=b91c1c&color=fff&size=40&bold=true", "amenities": ["Cỏ mới thay", "Tắm nóng lạnh", "Căng tin Y Hà Nội"], "totalCourts": 3}, {"id": 32, "name": "Sân Bóng Đá Chảo Lửa Tân Bình - ALOBO", "type": "football", "district": "Tân Bình", "distance": "3.8km", "address": "30 Phan Thúc Duyện, Phường 4, Tân Bình, TP.HCM", "hours": "05:00 – 24:00", "tags": ["ALOBO Trực tuyến", "Sân 5 & 7", "Sự kiện"], "rating": 4.9, "price": "300k - 600k/trận", "lat": 10.801, "lng": 106.662, "image": "https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=600&h=320&fit=crop&q=80", "logo": "https://ui-avatars.com/api/?name=CL&background=ea580c&color=fff&size=40&bold=true", "amenities": ["Cụm 10 sân cỏ cao cấp", "Bãi đỗ xe ô tô 50 chiếc", "Khán đài VIP"], "totalCourts": 10}, {"id": 33, "name": "Sân Pickleball Landmark 81 - ALOBO", "type": "pickleball", "district": "Bình Thạnh", "distance": "2.2km", "address": "Vinhomes Central Park, 208 Nguyễn Hữu Cảnh, Bình Thạnh, TP.HCM", "hours": "05:30 – 23:00", "tags": ["ALOBO Partner", "Khuôn viên Landmark", "Sự kiện"], "rating": 4.9, "price": "150k - 250k/h", "lat": 10.795, "lng": 106.7218, "image": "https://images.unsplash.com/photo-1554068865-24cecd4e34b8?w=600&h=320&fit=crop&q=80", "logo": "https://ui-avatars.com/api/?name=L81&background=0284c7&color=fff&size=40&bold=true", "amenities": ["Không gian công viên đẳng cấp", "Gần trung tâm thương mại", "Đèn LED cao áp"], "totalCourts": 4}, {"id": 34, "name": "Sân Cầu Lông Kỳ Hòa - ALOBO", "type": "badminton", "district": "Quận 10", "distance": "3.2km", "address": "Trung tâm Kỳ Hòa, Sư Vạn Hạnh, Phường 12, Quận 10, TP.HCM", "hours": "05:00 – 23:00", "tags": ["ALOBO Trực tuyến", "Đơn ngày", "Cố định"], "rating": 4.8, "price": "90k - 160k/h", "lat": 10.772, "lng": 106.671, "image": "https://images.unsplash.com/photo-1521537634581-0dced2fee2ef?w=600&h=320&fit=crop&q=80", "logo": "https://ui-avatars.com/api/?name=KH&background=10b981&color=fff&size=40&bold=true", "amenities": ["12 sân chuẩn thi đấu", "Hệ thống sàn gỗ đệm cao su", "Tủ đồ cá nhân"], "totalCourts": 12}, {"id": 35, "name": "Tennis CLB Ba Đình", "type": "tennis", "district": "Ba Đình", "distance": "1.5km", "address": "Hoàng Hoa Thám, Ngọc Hà, Ba Đình, Hà Nội", "hours": "05:00 – 22:30", "tags": ["Sân cứng chuẩn ITF", "Đơn ngày", "ALOBO Booking"], "rating": 4.8, "price": "180k - 300k/h", "lat": 21.041, "lng": 105.823, "image": "https://images.unsplash.com/photo-1595435934249-5df7ed86e1c0?w=600&h=320&fit=crop&q=80", "logo": "https://ui-avatars.com/api/?name=BD&background=047857&color=fff&size=40&bold=true", "amenities": ["Mặt sân giảm chấn", "Đèn LED cao áp", "HLV chuyên nghiệp"], "totalCourts": 4}, {"id": 36, "name": "Sân Tennis & Cầu Lông Bách Khoa", "type": "tennis", "district": "Hai Bà Trưng", "distance": "1.1km", "address": "Khu thể thao ĐH Bách Khoa, Tạ Quang Bửu, Hai Bà Trưng, Hà Nội", "hours": "05:00 – 23:00", "tags": ["Đơn ngày", "Sinh viên ưu đãi", "ALOBO Partner"], "rating": 4.7, "price": "150k - 250k/h", "lat": 21.005, "lng": 105.845, "image": "https://images.unsplash.com/photo-1595435934249-5df7ed86e1c0?w=600&h=320&fit=crop&q=80", "logo": "https://ui-avatars.com/api/?name=BK&background=dc2626&color=fff&size=40&bold=true", "amenities": ["Sân cứng tiêu chuẩn", "Căng tin giải khát", "Bãi gửi xe rộng"], "totalCourts": 4}, {"id": 37, "name": "Sân Tennis Phú Thọ - ALOBO", "type": "tennis", "district": "Quận 11", "distance": "4.0km", "address": "219 Lý Thường Kiệt, Phường 15, Quận 11, TP.HCM", "hours": "05:00 – 23:00", "tags": ["ALOBO Trực tuyến", "Chuẩn ITF", "Sự kiện"], "rating": 4.9, "price": "200k - 350k/h", "lat": 10.769, "lng": 106.657, "image": "https://images.unsplash.com/photo-1595435934249-5df7ed86e1c0?w=600&h=320&fit=crop&q=80", "logo": "https://ui-avatars.com/api/?name=PT&background=7c3aed&color=fff&size=40&bold=true", "amenities": ["Cụm sân thi đấu quốc gia", "Khán đài 2000 chỗ", "Phòng xông hơi / tắm"], "totalCourts": 8}, {"id": 38, "name": "Saigon South Pickleball Arena - ALOBO", "type": "pickleball", "district": "Quận 7", "distance": "5.2km", "address": "Khu đô thị Phú Mỹ Hưng, Quận 7, TP.HCM", "hours": "05:00 – 24:00", "tags": ["ALOBO Partner", "Chuẩn quốc tế", "Sự kiện"], "rating": 4.9, "price": "140k - 250k/h", "lat": 10.728, "lng": 106.715, "image": "https://images.unsplash.com/photo-1622279457486-62dcc4a431d6?w=600&h=320&fit=crop&q=80", "logo": "https://ui-avatars.com/api/?name=SS&background=0284c7&color=fff&size=40&bold=true", "amenities": ["10 sân thi đấu lót thảm cao cấp", "Shop bán đồ pickleball", "Phòng tắm nóng lạnh"], "totalCourts": 10}, {"id": 39, "name": "D-Sports Pickleball Club Tây Hồ", "type": "pickleball", "district": "Tây Hồ", "distance": "2.9km", "address": "Số 26 ngõ 52 Tô Ngọc Vân, Quảng An, Tây Hồ, Hà Nội", "hours": "05:00 – 23:30", "tags": ["Gần Tây Hồ", "Đơn ngày", "ALOBO Booking"], "rating": 4.9, "price": "150k - 250k/h", "lat": 21.068, "lng": 105.828, "image": "https://images.unsplash.com/photo-1554068865-24cecd4e34b8?w=600&h=320&fit=crop&q=80", "logo": "https://ui-avatars.com/api/?name=DS&background=f59e0b&color=000&size=40&bold=true", "amenities": ["Khu vực người nước ngoài yêu thích", "Cafe sân vườn", "HLV chứng chỉ quốc tế"], "totalCourts": 6}, {"id": 40, "name": "VietSports Arena (Pickleball & Cầu Lông)", "type": "pickleball", "district": "Nam Từ Liêm", "distance": "3.5km", "address": "Đường Lê Đức Thọ, Khu liên hợp TT Mỹ Đình, Nam Từ Liêm, Hà Nội", "hours": "05:00 – 24:00", "tags": ["Đa năng", "Sự kiện", "ALOBO Partner"], "rating": 4.9, "price": "120k - 220k/h", "lat": 21.028, "lng": 105.765, "image": "https://images.unsplash.com/photo-1612872087720-bb876e2e67d1?w=600&h=320&fit=crop&q=80", "logo": "https://ui-avatars.com/api/?name=VA&background=2563eb&color=fff&size=40&bold=true", "amenities": ["Nhà vòm kiên cố", "Bãi gửi xe ô tô không giới hạn", "Hệ thống camera phát lại"], "totalCourts": 12}, {"id": 41, "name": "Cụm Sân Pickleball & Tennis Gamuda Gardens", "type": "pickleball", "district": "Hoàng Mai", "distance": "4.5km", "address": "Khu đô thị Gamuda Gardens, Trần Phú, Hoàng Mai, Hà Nội", "hours": "05:30 – 22:30", "tags": ["Không gian sinh thái", "Đơn ngày", "ALOBO Booking"], "rating": 4.8, "price": "120k - 200k/h", "lat": 20.975, "lng": 105.865, "image": "https://images.unsplash.com/photo-1568702846914-96b305d2aaeb?w=600&h=320&fit=crop&q=80", "logo": "https://ui-avatars.com/api/?name=GG&background=059669&color=fff&size=40&bold=true", "amenities": ["Khu đô thị cao cấp", "Bể bơi cạnh sân", "Phòng thay đồ chuẩn resort"], "totalCourts": 6}, {"id": 42, "name": "Sân Bóng Đá Thành Đồng Cầu Giấy", "type": "football", "district": "Cầu Giấy", "distance": "1.8km", "address": "Đường Nguyễn Chánh, Yên Hòa, Cầu Giấy, Hà Nội", "hours": "05:00 – 23:30", "tags": ["Sân 7 người", "Cỏ mới", "ALOBO Partner"], "rating": 4.8, "price": "400k - 750k/trận", "lat": 21.018, "lng": 105.792, "image": "https://images.unsplash.com/photo-1529900748604-07564a03e7a6?w=600&h=320&fit=crop&q=80", "logo": "https://ui-avatars.com/api/?name=TD&background=b91c1c&color=fff&size=40&bold=true", "amenities": ["Hệ thống chiếu sáng công suất lớn", "Căng tin", "Cho thuê đồ đá banh"], "totalCourts": 6}, {"id": 43, "name": "Sân Cầu Lông Cầu Giấy (35 Trần Quý Kiên)", "type": "badminton", "district": "Cầu Giấy", "distance": "1.3km", "address": "35 Trần Quý Kiên, Dịch Vọng, Cầu Giấy, Hà Nội", "hours": "05:00 – 23:00", "tags": ["Đơn ngày", "Cố định", "ALOBO Booking"], "rating": 4.8, "price": "90k - 170k/h", "lat": 21.035, "lng": 105.792, "image": "https://images.unsplash.com/photo-1626224583764-f87db24ac4ea?w=600&h=320&fit=crop&q=80", "logo": "https://ui-avatars.com/api/?name=CG&background=0284c7&color=fff&size=40&bold=true", "amenities": ["Nhà thi đấu quy mô", "Thảm Taraflex", "Khán đài rộng"], "totalCourts": 10}, {"id": 44, "name": "Sân Cầu Lông Bộ Công An", "type": "badminton", "district": "Thanh Xuân", "distance": "2.2km", "address": "Đường Nguyễn Xiển, Hạ Đình, Thanh Xuân, Hà Nội", "hours": "05:00 – 23:00", "tags": ["Đơn ngày", "Cố định", "ALOBO Partner"], "rating": 4.8, "price": "85k - 160k/h", "lat": 20.989, "lng": 105.811, "image": "https://images.unsplash.com/photo-1521537634581-0dced2fee2ef?w=600&h=320&fit=crop&q=80", "logo": "https://ui-avatars.com/api/?name=CA&background=dc2626&color=fff&size=40&bold=true", "amenities": ["An ninh tốt", "Bãi gửi xe rộng", "Tắm nóng lạnh"], "totalCourts": 8}, {"id": 45, "name": "Suzy Pickleball Long Biên", "type": "pickleball", "district": "Long Biên", "distance": "3.5km", "address": "Đường Cổ Linh, Phường Thạch Bàn, Long Biên, Hà Nội", "hours": "05:00 – 23:00", "tags": ["ALOBO Partner", "Gần Aeon Mall", "Đơn ngày"], "rating": 4.9, "price": "120k - 210k/h", "lat": 21.026, "lng": 105.898, "image": "https://images.unsplash.com/photo-1545809074-59472b3f5ecc?w=600&h=320&fit=crop&q=80", "logo": "https://ui-avatars.com/api/?name=SZ&background=e11d48&color=fff&size=40&bold=true", "amenities": ["Gần TTTM Aeon Long Biên", "Khu cafe ngắm cảnh", "HLV nhiệt tình"], "totalCourts": 6}, {"id": 46, "name": "Sân Cầu Lông Hùng Hải Sport", "type": "badminton", "district": "Long Biên", "distance": "3.2km", "address": "Phố Bồ Đề, Long Biên, Hà Nội", "hours": "05:00 – 23:00", "tags": ["Đơn ngày", "Cố định", "ALOBO Booking"], "rating": 4.7, "price": "80k - 150k/h", "lat": 21.033, "lng": 105.872, "image": "https://images.unsplash.com/photo-1544717305-2782549b5136?w=600&h=320&fit=crop&q=80", "logo": "https://ui-avatars.com/api/?name=HH&background=10b981&color=fff&size=40&bold=true", "amenities": ["Thảm sàn êm ái", "Bãi gửi xe thoải mái", "Căng tin giải khát"], "totalCourts": 6}, {"id": 47, "name": "TukTuk Pickleball Yên Xá", "type": "pickleball", "district": "Hà Đông", "distance": "3.8km", "address": "Đường Yên Xá, Xã Tân Triều, Hà Đông, Hà Nội", "hours": "05:00 – 24:00", "tags": ["ALOBO Partner", "Trẻ trung", "Đơn ngày"], "rating": 4.8, "price": "110k - 190k/h", "lat": 20.975, "lng": 105.795, "image": "https://images.unsplash.com/photo-1622279457486-62dcc4a431d6?w=600&h=320&fit=crop&q=80", "logo": "https://ui-avatars.com/api/?name=TT&background=f97316&color=fff&size=40&bold=true", "amenities": ["Khu vực chụp ảnh check-in", "Đồ uống healthy", "Dụng cụ chính hãng"], "totalCourts": 6}, {"id": 48, "name": "Sân Cầu Lông Nhà Thi Đấu Hà Đông", "type": "badminton", "district": "Hà Đông", "distance": "4.2km", "address": "182 Quang Trung, Hà Đông, Hà Nội", "hours": "05:00 – 22:30", "tags": ["Đơn ngày", "Cố định", "ALOBO Booking"], "rating": 4.8, "price": "85k - 150k/h", "lat": 20.968, "lng": 105.772, "image": "https://images.unsplash.com/photo-1626224583764-f87db24ac4ea?w=600&h=320&fit=crop&q=80", "logo": "https://ui-avatars.com/api/?name=HD&background=2563eb&color=fff&size=40&bold=true", "amenities": ["Nhà thi đấu trung tâm quận", "Khán đài lớn", "Bãi xe ô tô"], "totalCourts": 10}, {"id": 49, "name": "CLB Pickleball Văn Quán Hà Đông", "type": "pickleball", "district": "Hà Đông", "distance": "3.5km", "address": "Khu đô thị Văn Quán, Hà Đông, Hà Nội", "hours": "05:00 – 23:00", "tags": ["ALOBO Partner", "View hồ", "Đơn ngày"], "rating": 4.8, "price": "120k - 200k/h", "lat": 20.978, "lng": 105.789, "image": "https://images.unsplash.com/photo-1554068865-24cecd4e34b8?w=600&h=320&fit=crop&q=80", "logo": "https://ui-avatars.com/api/?name=VQ&background=059669&color=fff&size=40&bold=true", "amenities": ["Không gian hồ Văn Quán", "Sân thảm chất lượng", "Phòng thay đồ"], "totalCourts": 5}, {"id": 50, "name": "CLB Pickleball Mỹ Đình (SVĐ Quốc Gia)", "type": "pickleball", "district": "Nam Từ Liêm", "distance": "3.8km", "address": "Khuôn viên SVĐ Quốc Gia Mỹ Đình, Nam Từ Liêm, Hà Nội", "hours": "05:00 – 24:00", "tags": ["Sân quốc tế", "Sự kiện", "ALOBO Booking"], "rating": 4.9, "price": "140k - 240k/h", "lat": 21.02, "lng": 105.763, "image": "https://images.unsplash.com/photo-1612872087720-bb876e2e67d1?w=600&h=320&fit=crop&q=80", "logo": "https://ui-avatars.com/api/?name=MD&background=dc2626&color=fff&size=40&bold=true", "amenities": ["Khu liên hợp thể thao quốc gia", "Bãi đỗ xe không giới hạn", "Hệ thống đèn cao cấp"], "totalCourts": 12}, {"id": 51, "name": "Cung Thể Thao Quần Ngựa (Tennis & Pickleball)", "type": "tennis", "district": "Ba Đình", "distance": "2.0km", "address": "30 Văn Cao, Liễu Giai, Ba Đình, Hà Nội", "hours": "05:00 – 23:00", "tags": ["Đơn ngày", "Sự kiện", "ALOBO Partner"], "rating": 4.9, "price": "180k - 320k/h", "lat": 21.042, "lng": 105.817, "image": "https://images.unsplash.com/photo-1595435934249-5df7ed86e1c0?w=600&h=320&fit=crop&q=80", "logo": "https://ui-avatars.com/api/?name=QN&background=7c3aed&color=fff&size=40&bold=true", "amenities": ["Địa điểm thi đấu quốc gia", "Khu phức hợp thể thao", "Bãi đỗ xe lớn"], "totalCourts": 8}, {"id": 52, "name": "Sân Cầu Lông Khách Sạn Khăn Quàng Đỏ", "type": "badminton", "district": "Ba Đình", "distance": "1.7km", "address": "94 Ngõ 189 Hoàng Hoa Thám, Liễu Giai, Ba Đình, Hà Nội", "hours": "05:00 – 23:00", "tags": ["Đơn ngày", "Cố định", "ALOBO Booking"], "rating": 4.7, "price": "85k - 160k/h", "lat": 21.0415, "lng": 105.819, "image": "https://images.unsplash.com/photo-1521537634581-0dced2fee2ef?w=600&h=320&fit=crop&q=80", "logo": "https://ui-avatars.com/api/?name=KQ&background=e11d48&color=fff&size=40&bold=true", "amenities": ["Thảm sàn chuẩn", "Yên tĩnh", "Có chỗ gửi ô tô"], "totalCourts": 6}, {"id": 53, "name": "Sân Cầu Lông THCS Giảng Võ 2", "type": "badminton", "district": "Ba Đình", "distance": "1.2km", "address": "Phố Trần Huy Liệu, Giảng Võ, Ba Đình, Hà Nội", "hours": "05:30 – 22:30", "tags": ["Đơn ngày", "Cố định", "ALOBO Booking"], "rating": 4.7, "price": "80k - 150k/h", "lat": 21.028, "lng": 105.82, "image": "https://images.unsplash.com/photo-1544717305-2782549b5136?w=600&h=320&fit=crop&q=80", "logo": "https://ui-avatars.com/api/?name=GV&background=0284c7&color=fff&size=40&bold=true", "amenities": ["Sàn gỗ chống chấn", "Gần hồ Giảng Võ", "Bãi gửi xe"], "totalCourts": 4}, {"id": 54, "name": "Sân Pickleball Vinhomes Ocean Park 1", "type": "pickleball", "district": "Gia Lâm", "distance": "8.5km", "address": "Khu đô thị Vinhomes Ocean Park 1, Đa Tốn, Gia Lâm, Hà Nội", "hours": "05:00 – 23:00", "tags": ["ALOBO Partner", "Resort", "Đơn ngày"], "rating": 4.9, "price": "120k - 220k/h", "lat": 20.992, "lng": 105.945, "image": "https://images.unsplash.com/photo-1568702846914-96b305d2aaeb?w=600&h=320&fit=crop&q=80", "logo": "https://ui-avatars.com/api/?name=OP&background=0284c7&color=fff&size=40&bold=true", "amenities": ["Cụm sân công viên biển hồ", "Hệ thống chiếu sáng LED thông minh", "Bãi xe"], "totalCourts": 8}, {"id": 55, "name": "Vạn Phúc Pickleball Club", "type": "pickleball", "district": "Ba Đình", "distance": "1.3km", "address": "Khu Ngoại Giao Đoàn Vạn Phúc, Kim Mã, Ba Đình, Hà Nội", "hours": "05:00 – 23:30", "tags": ["ALOBO Partner", "Ngoại Giao Đoàn", "Sự kiện"], "rating": 4.9, "price": "140k - 240k/h", "lat": 21.0315, "lng": 105.819, "image": "https://images.unsplash.com/photo-1622279457486-62dcc4a431d6?w=600&h=320&fit=crop&q=80", "logo": "https://ui-avatars.com/api/?name=VP&background=047857&color=fff&size=40&bold=true", "amenities": ["An ninh tuyệt đối", "Sân acrylic 5 lớp", "Cafe sang trọng"], "totalCourts": 6}, {"id": 56, "name": "The Mezzo Pickleball Hồ Tây", "type": "pickleball", "district": "Tây Hồ", "distance": "2.7km", "address": "Ngõ 612 Lạc Long Quân, Nhật Tân, Tây Hồ, Hà Nội", "hours": "05:00 – 24:00", "tags": ["ALOBO Partner", "Gần Hồ Tây", "Sự kiện"], "rating": 4.9, "price": "150k - 250k/h", "lat": 21.072, "lng": 105.818, "image": "https://images.unsplash.com/photo-1554068865-24cecd4e34b8?w=600&h=320&fit=crop&q=80", "logo": "https://ui-avatars.com/api/?name=MZ&background=ea580c&color=fff&size=40&bold=true", "amenities": ["Nhà thi đấu có mái che cao 10m", "Hệ thống điều hòa làm mát", "Phòng tắm nước nóng"], "totalCourts": 8}, {"id": 57, "name": "Sân Cầu Lông Tây Hồ Lạc Long Quân", "type": "badminton", "district": "Tây Hồ", "distance": "2.5km", "address": "431 Lạc Long Quân, Xuân La, Tây Hồ, Hà Nội", "hours": "05:00 – 23:00", "tags": ["Đơn ngày", "Cố định", "ALOBO Booking"], "rating": 4.8, "price": "90k - 170k/h", "lat": 21.058, "lng": 105.811, "image": "https://images.unsplash.com/photo-1626224583764-f87db24ac4ea?w=600&h=320&fit=crop&q=80", "logo": "https://ui-avatars.com/api/?name=TH&background=0891b2&color=fff&size=40&bold=true", "amenities": ["Thảm sàn mới 100%", "Hệ thống đèn chống lóa", "Bãi đỗ ô tô"], "totalCourts": 8}, {"id": 58, "name": "Sân Bóng Đá Trung Tâm VHTT Tây Hồ", "type": "football", "district": "Tây Hồ", "distance": "2.8km", "address": "101 Xuân La, Tây Hồ, Hà Nội", "hours": "05:00 – 23:00", "tags": ["Sân 7 người", "ALOBO Partner", "Đơn ngày"], "rating": 4.8, "price": "400k - 750k/trận", "lat": 21.06, "lng": 105.808, "image": "https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=600&h=320&fit=crop&q=80", "logo": "https://ui-avatars.com/api/?name=TH&background=15803d&color=fff&size=40&bold=true", "amenities": ["Cỏ nhân tạo chất lượng cao", "Khán đài có mái che", "Bãi gửi xe rộng"], "totalCourts": 4}, {"id": 59, "name": "Nhà Thi Đấu Đa Năng Cầu Giấy", "type": "badminton", "district": "Cầu Giấy", "distance": "1.5km", "address": "35 Trần Quý Kiên, Dịch Vọng, Cầu Giấy, Hà Nội", "hours": "05:00 – 23:00", "tags": ["Đa năng", "Sự kiện", "ALOBO Booking"], "rating": 4.9, "price": "100k - 180k/h", "lat": 21.036, "lng": 105.793, "image": "https://images.unsplash.com/photo-1521537634581-0dced2fee2ef?w=600&h=320&fit=crop&q=80", "logo": "https://ui-avatars.com/api/?name=CG&background=4f46e5&color=fff&size=40&bold=true", "amenities": ["Sức chứa 1500 khán giả", "Sàn gỗ tiêu chuẩn SEA Games", "Phòng VIP"], "totalCourts": 10}, {"id": 60, "name": "CLB Pickleball Cầu Giấy Duy Tân", "type": "pickleball", "district": "Cầu Giấy", "distance": "1.3km", "address": "Ngõ 78 Duy Tân, Dịch Vọng Hậu, Cầu Giấy, Hà Nội", "hours": "05:00 – 24:00", "tags": ["ALOBO Partner", "Đơn ngày", "Dân văn phòng"], "rating": 4.8, "price": "130k - 220k/h", "lat": 21.0315, "lng": 105.784, "image": "https://images.unsplash.com/photo-1612872087720-bb876e2e67d1?w=600&h=320&fit=crop&q=80", "logo": "https://ui-avatars.com/api/?name=DT&background=ca8a04&color=fff&size=40&bold=true", "amenities": ["Ngay phố văn phòng Duy Tân", "Đèn chiếu sáng ban đêm", "Nước uống bổ sung ion"], "totalCourts": 6}, {"id": 61, "name": "Sân Bóng Đá Trung Kính Hạ", "type": "football", "district": "Cầu Giấy", "distance": "1.6km", "address": "Ngõ 219 Trung Kính, Yên Hòa, Cầu Giấy, Hà Nội", "hours": "05:00 – 23:00", "tags": ["Sân 7 người", "ALOBO Booking", "Đơn ngày"], "rating": 4.7, "price": "350k - 700k/trận", "lat": 21.015, "lng": 105.795, "image": "https://images.unsplash.com/photo-1529900748604-07564a03e7a6?w=600&h=320&fit=crop&q=80", "logo": "https://ui-avatars.com/api/?name=TK&background=0284c7&color=fff&size=40&bold=true", "amenities": ["Cỏ nhân tạo êm ái", "Bãi xe ô tô", "Đèn pha Led"], "totalCourts": 4}, {"id": 62, "name": "Pickleball Student Village (PSV)", "type": "pickleball", "district": "Thanh Xuân", "distance": "2.0km", "address": "Làng Sinh Viên Hacinco, Nhân Chính, Thanh Xuân, Hà Nội", "hours": "05:00 – 23:30", "tags": ["ALOBO Partner", "Sinh viên", "Đơn ngày"], "rating": 4.8, "price": "100k - 180k/h", "lat": 21.002, "lng": 105.805, "image": "https://images.unsplash.com/photo-1545809074-59472b3f5ecc?w=600&h=320&fit=crop&q=80", "logo": "https://ui-avatars.com/api/?name=SV&background=2563eb&color=fff&size=40&bold=true", "amenities": ["Ưu đãi học sinh sinh viên", "CLB giao lưu sôi động", "Cho thuê vợt"], "totalCourts": 6}, {"id": 63, "name": "CLB Bóng Rổ PK - Không Quân", "type": "basketball", "district": "Thanh Xuân", "distance": "1.8km", "address": "Khu Quân Chủng PK-KQ, Lê Trọng Tấn, Khương Mai, Thanh Xuân, Hà Nội", "hours": "05:30 – 22:30", "tags": ["Sân gỗ trong nhà", "ALOBO Booking", "Sự kiện"], "rating": 4.9, "price": "250k - 450k/h", "lat": 20.998, "lng": 105.828, "image": "https://images.unsplash.com/photo-1546519638-68e109498ffc?w=600&h=320&fit=crop&q=80", "logo": "https://ui-avatars.com/api/?name=KQ&background=1e40af&color=fff&size=40&bold=true", "amenities": ["Sàn gỗ chuẩn thi đấu VBA", "Bảng rổ kính cường lực", "Bảng điểm điện tử"], "totalCourts": 3}, {"id": 64, "name": "Sân Cầu Lông Khương Đình", "type": "badminton", "district": "Thanh Xuân", "distance": "2.2km", "address": "Ngõ 460 Khương Đình, Hạ Đình, Thanh Xuân, Hà Nội", "hours": "05:00 – 23:00", "tags": ["Đơn ngày", "Cố định", "ALOBO Booking"], "rating": 4.7, "price": "80k - 150k/h", "lat": 20.985, "lng": 105.815, "image": "https://images.unsplash.com/photo-1544717305-2782549b5136?w=600&h=320&fit=crop&q=80", "logo": "https://ui-avatars.com/api/?name=KD&background=059669&color=fff&size=40&bold=true", "amenities": ["Thảm sân chống trượt", "Căng tin", "Phòng thay đồ"], "totalCourts": 6}, {"id": 65, "name": "Sân Pickleball Định Công 175", "type": "pickleball", "district": "Hoàng Mai", "distance": "2.5km", "address": "175 Định Công, Định Công, Hoàng Mai, Hà Nội", "hours": "05:00 – 23:30", "tags": ["ALOBO Partner", "Đơn ngày", "Cố định"], "rating": 4.8, "price": "110k - 190k/h", "lat": 20.985, "lng": 105.835, "image": "https://images.unsplash.com/photo-1554068865-24cecd4e34b8?w=600&h=320&fit=crop&q=80", "logo": "https://ui-avatars.com/api/?name=DC&background=d97706&color=fff&size=40&bold=true", "amenities": ["Mái vòm cao 10m", "Bãi để xe ô tô", "Quầy cafe nước giải khát"], "totalCourts": 6}, {"id": 66, "name": "Sân Cầu Lông Hoàng Mai Linh Đàm", "type": "badminton", "district": "Hoàng Mai", "distance": "3.5km", "address": "Bán đảo Linh Đàm, Hoàng Liệt, Hoàng Mai, Hà Nội", "hours": "05:00 – 23:00", "tags": ["Đơn ngày", "Cố định", "ALOBO Booking"], "rating": 4.8, "price": "85k - 155k/h", "lat": 20.965, "lng": 105.828, "image": "https://images.unsplash.com/photo-1626224583764-f87db24ac4ea?w=600&h=320&fit=crop&q=80", "logo": "https://ui-avatars.com/api/?name=LD&background=0284c7&color=fff&size=40&bold=true", "amenities": ["Khu đô thị sinh thái", "Thảm mới", "Tủ gửi đồ"], "totalCourts": 8}, {"id": 67, "name": "Sân Cầu Lông Lệ Mật Long Biên", "type": "badminton", "district": "Long Biên", "distance": "3.8km", "address": "Phố Việt Hưng, Lệ Mật, Long Biên, Hà Nội", "hours": "05:00 – 23:00", "tags": ["Đơn ngày", "Cố định", "ALOBO Booking"], "rating": 4.7, "price": "80k - 150k/h", "lat": 21.048, "lng": 105.892, "image": "https://images.unsplash.com/photo-1521537634581-0dced2fee2ef?w=600&h=320&fit=crop&q=80", "logo": "https://ui-avatars.com/api/?name=LM&background=7c3aed&color=fff&size=40&bold=true", "amenities": ["Sân rộng rãi", "Bãi đỗ ô tô", "Đồ uống thể thao"], "totalCourts": 6}, {"id": 68, "name": "Cụm Sân Pickleball Hoa Phượng", "type": "pickleball", "district": "Nam Từ Liêm", "distance": "3.6km", "address": "Đường Lê Đức Thọ, Mỹ Đình 2, Nam Từ Liêm, Hà Nội", "hours": "05:00 – 24:00", "tags": ["ALOBO Partner", "Đơn ngày", "Sự kiện"], "rating": 4.9, "price": "130k - 220k/h", "lat": 21.032, "lng": 105.772, "image": "https://images.unsplash.com/photo-1622279457486-62dcc4a431d6?w=600&h=320&fit=crop&q=80", "logo": "https://ui-avatars.com/api/?name=HP&background=e11d48&color=fff&size=40&bold=true", "amenities": ["Khu liên hợp hiện đại", "Mặt sân cao cấp", "Bãi gửi xe thoải mái"], "totalCourts": 8}, {"id": 69, "name": "Sân Bóng Đá Chu Văn An Thụy Khuê", "type": "football", "district": "Tây Hồ", "distance": "2.2km", "address": "10 Thụy Khuê, Tây Hồ, Hà Nội", "hours": "05:30 – 23:00", "tags": ["Sân 7 người", "View Hồ Tây", "ALOBO Booking"], "rating": 4.8, "price": "400k - 750k/trận", "lat": 21.0425, "lng": 105.832, "image": "https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=600&h=320&fit=crop&q=80", "logo": "https://ui-avatars.com/api/?name=CA&background=1e40af&color=fff&size=40&bold=true", "amenities": ["Ngay sát Hồ Tây gió mát", "Đèn pha hiện đại", "Căng tin giải khát"], "totalCourts": 3}, {"id": 70, "name": "CLB Pickleball Ga Hà Nội (Lê Duẩn)", "type": "pickleball", "district": "Đống Đa", "distance": "250m", "address": "Khuôn viên Ga Hà Nội, Lê Duẩn, Văn Miếu, Đống Đa, Hà Nội", "hours": "05:00 – 24:00", "tags": ["ALOBO Partner", "Trung tâm", "Đơn ngày"], "rating": 4.9, "price": "130k - 220k/h", "lat": 21.024, "lng": 105.8415, "image": "https://images.unsplash.com/photo-1612872087720-bb876e2e67d1?w=600&h=320&fit=crop&q=80", "logo": "https://ui-avatars.com/api/?name=GH&background=b91c1c&color=fff&size=40&bold=true", "amenities": ["Vị trí trung tâm thủ đô", "Bãi gửi xe rộng", "Tắm nóng lạnh"], "totalCourts": 6}];
+    // Danh sách sân do ứng dụng gửi sang (tin nhắn SET_VENUES) hoặc đọc từ localStorage khi mở bản đồ ở tab riêng.
+    // Không còn danh sách cố định: trước đây bản đồ chỉ hiện đúng 70 sân mẫu cũ dù ứng dụng có hàng trăm sân.
+    var venuesData = loadVenuesFromStorage();
+
+    function loadVenuesFromStorage() {
+      try {
+        var raw = window.localStorage.getItem('alobooking_venues');
+        var arr = raw ? JSON.parse(raw) : [];
+        return Array.isArray(arr) ? arr : [];
+      } catch (e) {
+        return [];
+      }
+    }
+
+    // Tên sân, địa chỉ... đến từ dữ liệu bên ngoài nên phải làm sạch trước khi chèn vào HTML
+    function esc(s) {
+      return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+    function safeUrl(u) {
+      u = String(u || '');
+      return /^https?:\/\//i.test(u) ? u : '';
+    }
+    function hasCoords(v) {
+      return isFinite(Number(v.lat)) && isFinite(Number(v.lng)) && Number(v.lat) !== 0 && Number(v.lng) !== 0;
+    }
     var isGoogleMapLoaded = false;
     var googleMap = null;
     var leafletMap = null;
@@ -363,10 +395,19 @@
       '</svg>';
     }
 
+    var SPORT_FALLBACK_IMG = {
+      badminton: 'https://images.pexels.com/photos/8007089/pexels-photo-8007089.jpeg?auto=compress&cs=tinysrgb&w=600&h=340&fit=crop',
+      pickleball: 'https://images.pexels.com/photos/29439337/pexels-photo-29439337.jpeg?auto=compress&cs=tinysrgb&w=600&h=340&fit=crop',
+      tennis: 'https://images.pexels.com/photos/1784798/pexels-photo-1784798.jpeg?auto=compress&cs=tinysrgb&w=600&h=340&fit=crop',
+      basketball: 'https://images.pexels.com/photos/1702624/pexels-photo-1702624.jpeg?auto=compress&cs=tinysrgb&w=600&h=340&fit=crop',
+      football: 'https://images.pexels.com/photos/13907433/pexels-photo-13907433.jpeg?auto=compress&cs=tinysrgb&w=600&h=340&fit=crop'
+    };
+
     function buildCardHtml(v) {
       var color = SPORT_COLORS[v.type] || '#15803d';
-      var typeName = SPORT_NAMES[v.type] || v.type;
-      var img = v.image || 'https://images.unsplash.com/photo-1626224583764-f87db24ac4ea?w=600';
+      var typeName = SPORT_NAMES[v.type] || esc(v.type);
+      var img = safeUrl(v.image) || SPORT_FALLBACK_IMG[v.type] || SPORT_FALLBACK_IMG.badminton;
+      var rating = Number(v.rating) > 0 ? Number(v.rating).toFixed(1) : 'Mới';
 
       var distHtml = '';
       if (currentUserPos) {
@@ -377,43 +418,64 @@
 
       return '<div class="iw-card">' +
         '<div class="iw-img-wrapper">' +
-          '<img class="iw-img" src="' + img + '" alt="' + v.name + '"/>' +
+          '<img class="iw-img" src="' + esc(img) + '" alt="' + esc(v.name) + '"/>' +
           '<div class="iw-badge" style="background: ' + color + ';">' + typeName + '</div>' +
-          '<div class="iw-rating">★ ' + (v.rating || 4.8) + '</div>' +
+          '<div class="iw-rating">★ ' + rating + '</div>' +
         '</div>' +
         '<div class="iw-content">' +
-          '<div class="iw-title">' + v.name + '</div>' +
+          '<div class="iw-title">' + esc(v.name) + '</div>' +
           distHtml +
-          '<div class="iw-addr">📌 ' + (v.address || v.district || 'Hà Nội') + '</div>' +
-          '<div class="iw-hours">⏰ ' + (v.hours || '06:00 - 23:00') + '</div>' +
+          '<div class="iw-addr">📌 ' + esc(v.address || v.district || 'Hà Nội') + '</div>' +
+          '<div class="iw-hours">⏰ ' + esc(v.hours || '06:00 - 23:00') + '</div>' +
           '<div class="iw-footer">' +
-            '<div class="iw-price">' + (v.price || '100.000đ/h') + '</div>' +
-            '<button class="iw-book-btn" onclick="bookVenue(' + v.id + ')">Đặt sân</button>' +
+            '<div class="iw-price">' + esc(v.price || 'Liên hệ') + '</div>' +
+            '<button class="iw-book-btn" onclick="bookVenue(' + Number(v.id) + ')">Đặt sân</button>' +
           '</div>' +
         '</div>' +
       '</div>';
     }
 
+    var iconUrlCache = {};
+    function markerIconUrl(type) {
+      if (!iconUrlCache[type]) {
+        iconUrlCache[type] = 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(createMarkerIconSvg(type));
+      }
+      return iconUrlCache[type];
+    }
+
+    // Biểu tượng cụm ghim: vòng tròn xanh có số sân trong cụm
+    function clusterIcon(count) {
+      var size = count < 10 ? 40 : (count < 100 ? 48 : 56);
+      var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + size + '" height="' + size + '" viewBox="0 0 ' + size + ' ' + size + '">' +
+        '<circle cx="' + (size / 2) + '" cy="' + (size / 2) + '" r="' + (size / 2 - 2) + '" fill="#15803d" fill-opacity="0.92" stroke="#ffffff" stroke-width="3"/>' +
+        '<text x="50%" y="50%" text-anchor="middle" dominant-baseline="central" font-family="Arial,sans-serif" font-size="' + (size > 48 ? 16 : 14) +
+        '" font-weight="700" fill="#ffffff">' + count + '</text></svg>';
+      return { url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg), size: size };
+    }
+
+    var googleClusterer = null;
+
     function renderGoogleMarkers() {
+      if (googleClusterer) {
+        googleClusterer.clearMarkers();
+        googleClusterer.setMap(null);
+        googleClusterer = null;
+      }
       for (var i = 0; i < googleMarkers.length; i++) {
         googleMarkers[i].setMap(null);
       }
       googleMarkers = [];
 
-      var visibleCount = 0;
-      var svgIconBase = 'data:image/svg+xml;charset=UTF-8,';
-
       for (var j = 0; j < venuesData.length; j++) {
         var v = venuesData[j];
         if (currentFilter !== 'all' && v.type !== currentFilter) continue;
+        if (!hasCoords(v)) continue;
 
-        var svg = createMarkerIconSvg(v.type);
         var marker = new google.maps.Marker({
           position: { lat: Number(v.lat), lng: Number(v.lng) },
-          map: googleMap,
           title: v.name,
           icon: {
-            url: svgIconBase + encodeURIComponent(svg),
+            url: markerIconUrl(v.type),
             scaledSize: new google.maps.Size(48, 58),
             anchor: new google.maps.Point(24, 58)
           }
@@ -435,48 +497,88 @@
         })(marker, v);
 
         googleMarkers.push(marker);
-        visibleCount++;
       }
 
-      document.getElementById('venueCountText').textContent = visibleCount + ' sân thể thao khả dụng';
+      if (window.markerClusterer && markerClusterer.MarkerClusterer) {
+        googleClusterer = new markerClusterer.MarkerClusterer({
+          map: googleMap,
+          markers: googleMarkers,
+          renderer: {
+            render: function(cluster) {
+              var ic = clusterIcon(cluster.count);
+              return new google.maps.Marker({
+                position: cluster.position,
+                icon: {
+                  url: ic.url,
+                  scaledSize: new google.maps.Size(ic.size, ic.size),
+                  anchor: new google.maps.Point(ic.size / 2, ic.size / 2)
+                },
+                zIndex: Number(google.maps.Marker.MAX_ZINDEX) + cluster.count
+              });
+            }
+          }
+        });
+      } else {
+        for (var k = 0; k < googleMarkers.length; k++) {
+          googleMarkers[k].setMap(googleMap);
+        }
+      }
+
+      document.getElementById('venueCountText').textContent = googleMarkers.length + ' sân thể thao khả dụng';
     }
 
+    var leafletCluster = null;
+    var leafletSvgCache = {};
+
     function renderLeafletMarkers() {
+      if (leafletCluster) {
+        leafletMap.removeLayer(leafletCluster);
+        leafletCluster = null;
+      }
       for (var i = 0; i < leafletMarkers.length; i++) {
         leafletMap.removeLayer(leafletMarkers[i]);
       }
       leafletMarkers = [];
 
-      var visibleCount = 0;
+      var group = (typeof L.markerClusterGroup === 'function')
+        ? L.markerClusterGroup({ showCoverageOnHover: false, maxClusterRadius: 50 })
+        : null;
+
       for (var j = 0; j < venuesData.length; j++) {
         var v = venuesData[j];
         if (currentFilter !== 'all' && v.type !== currentFilter) continue;
+        if (!hasCoords(v)) continue;
 
-        var svg = createMarkerIconSvg(v.type);
+        if (!leafletSvgCache[v.type]) leafletSvgCache[v.type] = createMarkerIconSvg(v.type);
         var icon = L.divIcon({
-          html: svg,
+          html: leafletSvgCache[v.type],
           className: '',
           iconSize: [48, 58],
           iconAnchor: [24, 58],
           popupAnchor: [0, -48]
         });
 
-        var marker = L.marker([Number(v.lat), Number(v.lng)], { icon: icon }).addTo(leafletMap);
+        var marker = L.marker([Number(v.lat), Number(v.lng)], { icon: icon });
         marker.venueId = v.id;
         marker.venueData = v;
-        marker.bindPopup(buildCardHtml(v));
 
-        (function(venue) {
-          marker.on('click', function() {
+        (function(venue, m) {
+          m.bindPopup(function() { return buildCardHtml(venue); });
+          m.on('click', function() {
             notifyParent('VENUE_SELECTED', { venueId: venue.id });
           });
-        })(v);
+        })(v, marker);
 
+        if (group) group.addLayer(marker); else marker.addTo(leafletMap);
         leafletMarkers.push(marker);
-        visibleCount++;
       }
 
-      document.getElementById('venueCountText').textContent = visibleCount + ' sân thể thao khả dụng';
+      if (group) {
+        leafletMap.addLayer(group);
+        leafletCluster = group;
+      }
+
+      document.getElementById('venueCountText').textContent = leafletMarkers.length + ' sân thể thao khả dụng';
     }
 
     function bookVenue(venueId) {
@@ -645,6 +747,16 @@
       }
     }
 
+    // Xin ứng dụng gửi danh sách sân mới nhất (ứng dụng trả lời bằng SET_VENUES); thử lại vài lần nếu chưa có dữ liệu
+    function requestVenues() {
+      notifyParent('REQUEST_VENUES', {});
+    }
+    window.addEventListener('load', function() {
+      requestVenues();
+      setTimeout(function() { if (venuesData.length === 0) requestVenues(); }, 1200);
+      setTimeout(function() { if (venuesData.length === 0) requestVenues(); }, 3500);
+    });
+
     window.addEventListener('message', function(event) {
       var data = event.data;
       if (!data || !data.type) return;
@@ -653,7 +765,7 @@
       } else if (data.type === 'FILTER_SPORT') {
         filterSport(data.sport);
       } else if (data.type === 'SET_VENUES') {
-        venuesData = data.venues || venuesData;
+        venuesData = Array.isArray(data.venues) ? data.venues : venuesData;
         if (isGoogleMapLoaded) renderGoogleMarkers();
         else if (leafletMap) renderLeafletMarkers();
       } else if (data.type === 'LOCATE_USER') {

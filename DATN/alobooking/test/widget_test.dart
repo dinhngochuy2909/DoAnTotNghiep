@@ -90,6 +90,15 @@ void main() {
       expect(Venue.fromJson(v.toJson()).fromOpenStreetMap, isTrue);
     });
 
+    test('sân nhập từ Overture Maps cũng được coi là sân nhập từ dữ liệu mở (giá, giờ chỉ là mức tham khảo)', () {
+      final v = _venue().copyWith(source: 'overture');
+      expect(v.isImportedListing, isTrue);
+      expect(v.fromOpenStreetMap, isFalse);
+      expect(Venue.fromJson(v.toJson()).source, 'overture');
+      expect(_venue().copyWith(source: 'osm').isImportedListing, isTrue);
+      expect(_venue().isImportedListing, isFalse);
+    });
+
     testWidgets('không cho chọn giờ và không hiện giá bịa khi sân chưa niêm yết giá', (tester) async {
       await _openBooking(tester, _venue().copyWith(price: 'Liên hệ', source: 'osm'));
       expect(find.textContaining('chưa niêm yết giá'), findsWidgets);

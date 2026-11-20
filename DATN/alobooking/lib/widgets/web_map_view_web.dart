@@ -9,6 +9,25 @@ import '../models/venue.dart';
 
 bool _isViewRegistered = false;
 
+/// Được gọi khi trang bản đồ (iframe) tải xong, để gửi danh sách sân sang ngay.
+void Function()? _onMapFrameLoaded;
+
+/// Chỉ gửi sang bản đồ những trường cần thiết (nhẹ hơn nhiều so với toJson đầy đủ, nhất là khi sân có ảnh dạng base64).
+Map<String, dynamic> _mapJson(Venue v) => {
+      'id': v.id,
+      'name': v.name,
+      'type': v.type,
+      'district': v.district,
+      'address': v.address,
+      'hours': v.hours,
+      'price': v.price,
+      'rating': v.rating,
+      'lat': v.lat,
+      'lng': v.lng,
+      // ảnh dạng base64 không đưa sang bản đồ; thẻ sân sẽ dùng ảnh minh họa theo môn
+      'image': v.displayImage.startsWith('http') ? v.displayImage : '',
+    };
+
 class GoogleMapViewWidget extends StatefulWidget {
   final List<Venue> venues;
   final String selectedType;
@@ -41,6 +60,7 @@ class _GoogleMapViewWidgetState extends State<GoogleMapViewWidget> {
     _registerView();
     _saveVenuesToLocalStorage();
     _listenToMapMessages();
+    _onMapFrameLoaded = _sendVenuesToIframe;
   }
 
   void _registerView() {
@@ -55,6 +75,8 @@ class _GoogleMapViewWidgetState extends State<GoogleMapViewWidget> {
             ..style.width = '100%'
             ..style.height = '100%'
             ..allow = 'geolocation *; fullscreen *';
+          // Trước đây không bao giờ gửi danh sách sân sang trang bản đồ, nên bản đồ chỉ hiện sân mẫu cố định
+          iframe.onLoad.listen((_) => _onMapFrameLoaded?.call());
           return iframe;
         },
       );
@@ -64,7 +86,7 @@ class _GoogleMapViewWidgetState extends State<GoogleMapViewWidget> {
 
   void _saveVenuesToLocalStorage() {
     try {
-      final list = widget.venues.map((v) => v.toJson()).toList();
+      final list = widget.venues.map(_mapJson).toList();
       html.window.localStorage['alobooking_venues'] = jsonEncode(list);
     } catch (e) {
       debugPrint('Error saving venues to localStorage: $e');
@@ -112,7 +134,7 @@ class _GoogleMapViewWidgetState extends State<GoogleMapViewWidget> {
     try {
       final iframe = html.document.getElementById('google-maps-frame') as html.IFrameElement?;
       if (iframe != null && iframe.contentWindow != null) {
-        final list = widget.venues.map((v) => v.toJson()).toList();
+        final list = widget.venues.map(_mapJson).toList();
         iframe.contentWindow!.postMessage({'type': 'SET_VENUES', 'venues': list}, '*');
       }
     } catch (e) {
@@ -123,6 +145,11 @@ class _GoogleMapViewWidgetState extends State<GoogleMapViewWidget> {
   @override
   void didUpdateWidget(covariant GoogleMapViewWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.venues, widget.venues) || oldWidget.venues.length != widget.venues.length) {
+      // Danh sách sân thay đổi (vừa tải xong, thêm/sửa sân): cập nhật lại ghim trên bản đồ
+      _saveVenuesToLocalStorage();
+      _sendVenuesToIframe();
+    }
     if (oldWidget.selectedType != widget.selectedType) {
       _sendFilterToIframe(widget.selectedType);
     }
@@ -140,6 +167,7 @@ class _GoogleMapViewWidgetState extends State<GoogleMapViewWidget> {
   @override
   void dispose() {
     _messageSub?.cancel();
+    _onMapFrameLoaded = null;
     super.dispose();
   }
 

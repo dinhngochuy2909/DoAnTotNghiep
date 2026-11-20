@@ -1,3 +1,5 @@
+import '../data/venue_photos.dart';
+
 class Venue {
   final int id;
   final String name;
@@ -21,7 +23,8 @@ class Venue {
   /// Số sân con của cụm (0 = chưa khai báo, dùng mặc định theo môn).
   final int courtCount;
 
-  /// Nguồn dữ liệu của cụm sân: '' = do chủ sân/admin nhập; 'osm' = nhập từ OpenStreetMap.
+  /// Nguồn dữ liệu của cụm sân: '' = do chủ sân/admin nhập; 'osm' = nhập từ OpenStreetMap;
+  /// 'overture' = nhập từ Overture Maps (dữ liệu mở về địa điểm).
   final String source;
 
   Venue({
@@ -92,6 +95,16 @@ class Venue {
   bool get hasListedPrice => RegExp(r'\d+\s*k\s*-\s*\d+\s*k', caseSensitive: false).hasMatch(price);
 
   bool get fromOpenStreetMap => source == 'osm';
+
+  /// Sân nhập từ dữ liệu mở (OpenStreetMap hoặc Overture Maps): giá, giờ mở cửa và số sân chỉ là mức tham khảo,
+  /// chưa được cơ sở xác nhận trên AloBooking.
+  bool get isImportedListing => source == 'osm' || source == 'overture';
+
+  /// Ảnh để hiển thị: sân chưa có ảnh thì dùng một ảnh minh họa đúng môn (ổn định theo id).
+  String get displayImage => image.trim().isNotEmpty ? image : VenuePhotos.forVenue(type, id);
+
+  /// Ảnh đang hiển thị là ảnh minh họa (kho Pexels/Unsplash), không phải ảnh thật do chủ sân đăng.
+  bool get hasStockImage => VenuePhotos.isStock(displayImage);
 
   /// Điểm đánh giá để hiển thị: chưa có đánh giá thì ghi "Mới" thay vì số giả.
   String get ratingLabel => rating > 0 ? rating.toStringAsFixed(1) : 'Mới';

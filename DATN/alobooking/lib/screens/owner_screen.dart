@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../data/venue_photos.dart';
 import '../models/venue.dart';
 import '../models/customer.dart';
 import '../models/payment.dart';
@@ -85,23 +86,8 @@ class _OwnerScreenState extends State<OwnerScreen> with SingleTickerProviderStat
     'Hoàng Mai', 'Long Biên', 'Gia Lâm', 'Đông Anh', 'Thanh Trì', 'Hoài Đức'
   ];
 
-  final Map<String, List<String>> _sampleImages = {
-    'pickleball': [
-      'https://images.unsplash.com/photo-1622279457486-62dcc4a431d6?w=600&h=320&fit=crop&q=80',
-      'https://images.unsplash.com/photo-1554068865-24cecd4e34b8?w=600&h=320&fit=crop&q=80',
-    ],
-    'badminton': [
-      'https://images.unsplash.com/photo-1521537634581-0dced2fee2ef?w=600&h=320&fit=crop&q=80',
-      'https://images.unsplash.com/photo-1626224583764-f87db24ac4ea?w=600&h=320&fit=crop&q=80',
-    ],
-    'football': [
-      'https://images.unsplash.com/photo-1529900241451-93b9423c9604?w=600&h=320&fit=crop&q=80',
-      'https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=600&h=320&fit=crop&q=80',
-    ],
-    'tennis': [
-      'https://images.unsplash.com/photo-1554068865-24cecd4e34b8?w=600&h=320&fit=crop&q=80',
-    ],
-  };
+  // Kho ảnh minh họa theo môn (đã duyệt đúng môn), xem lib/data/venue_photos.dart
+  final Map<String, List<String>> _sampleImages = VenuePhotos.bySport;
 
   @override
   void initState() {
@@ -524,7 +510,7 @@ class _OwnerScreenState extends State<OwnerScreen> with SingleTickerProviderStat
               ClipRRect(
                 borderRadius: BorderRadius.circular(8),
                 child: VenueImageView(
-                  imageUrl: v.image,
+                  imageUrl: v.displayImage,
                   width: 90,
                   height: 70,
                   fit: BoxFit.cover,
@@ -1360,7 +1346,11 @@ class _OwnerScreenState extends State<OwnerScreen> with SingleTickerProviderStat
                     ],
 
                     const SizedBox(height: 8),
-                    Row(
+                    // Wrap thay cho Row: kho ảnh mẫu có hàng chục ảnh nên phải xuống dòng
+                    Wrap(
+                      spacing: 0,
+                      runSpacing: 4,
+                      crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
                         const Text('Chọn mẫu: ', style: TextStyle(color: Color(0xFF64748B), fontSize: 11)),
                         ...(_sampleImages[selectedType] ?? _sampleImages['pickleball']!).asMap().entries.map((entry) {

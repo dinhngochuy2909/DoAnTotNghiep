@@ -38,7 +38,7 @@ QUY TẮC:
 3. Khi nhắc sân: nêu tên, địa chỉ, giá, giờ mở cửa, đánh giá. Với câu hỏi về lịch trống, dùng đúng dòng "Lịch ..." trong dữ liệu; không khẳng định sân còn trống nếu dữ liệu không nói vậy.
 4. Chỉ nói sân có tiện ích nào đó nếu dữ liệu ghi rõ. Không suy diễn; đặc biệt không khẳng định sân "trong nhà"/"có mái che" nếu dữ liệu không ghi. Thời tiết: chỉ dùng mục thoi_tiet_ha_noi (kể cả "du_bao") và nêu đúng số liệu/khả năng mưa theo buổi khách hỏi.
 5. Khi gợi ý sân, nhắc khách bấm nút "ĐẶT SÂN" trên thẻ sân hiển thị bên dưới để chọn giờ.
-6. TRẢ LỜI ĐÚNG TRỌNG TÂM câu hỏi: nếu khách hỏi giá trung bình/mặt bằng giá, nêu ngay con số trong phần "Thống kê giá" (đúng khung giờ khách hỏi: giờ vàng = từ 17:00), rồi chỉ nêu tối đa 2-3 sân làm ví dụ. Đừng liệt kê sân khi khách không hỏi tìm sân.
+6. TRẢ LỜI ĐÚNG TRỌNG TÂM câu hỏi: nếu khách hỏi giá trung bình/mặt bằng giá, nêu ngay con số trong phần "Thống kê giá" (đúng khung giờ khách hỏi: giờ vàng = ca 16:00–22:00), rồi chỉ nêu tối đa 2-3 sân làm ví dụ. Đừng liệt kê sân khi khách không hỏi tìm sân.
 7. Khi có mục "DỰ ĐOÁN": đó là ước lượng thống kê. Luôn nói là dự đoán, nêu mức nhu cầu, tỉ lệ hủy dự kiến, yếu tố chính và độ tin cậy; không hứa chắc chắn.
 8. Hiểu các câu hỏi nối tiếp dựa vào lịch sử hội thoại. Trả lời tiếng Việt, thân thiện, ngắn gọn (tối đa ~150 từ), dùng **in đậm** cho thông tin chính, danh sách gạch đầu dòng.
 ''';
@@ -205,11 +205,11 @@ CÂU HỎI CỦA KHÁCH: $userMessage''';
         final u = g.unit;
         b.writeln('💵 **Giá ${g.label}** (${g.count} sân):\n');
         if (it.goldenHour) {
-          b.writeln('• **Khung giờ vàng (từ 17:00): trung bình ${k(g.avgHigh)}/$u**');
-          b.writeln('• Khung giờ thường (trước 17:00): trung bình ${k(g.avgLow)}/$u');
+          b.writeln('• **Ca giờ vàng (16:00–22:00): trung bình ${k(g.avgHigh)}/$u**');
+          b.writeln('• Khung giờ thường (ngoài ca vàng): trung bình ${k(g.avgLow)}/$u');
         } else {
-          b.writeln('• **Khung giờ thường (trước 17:00): trung bình ${k(g.avgLow)}/$u**');
-          b.writeln('• Khung giờ vàng (từ 17:00): trung bình ${k(g.avgHigh)}/$u');
+          b.writeln('• **Khung giờ thường (ngoài ca vàng): trung bình ${k(g.avgLow)}/$u**');
+          b.writeln('• Ca giờ vàng (16:00–22:00): trung bình ${k(g.avgHigh)}/$u');
         }
         b.writeln('• Thấp nhất ${k(g.minLow)}/$u • Cao nhất ${k(g.maxHigh)}/$u');
         b.writeln();

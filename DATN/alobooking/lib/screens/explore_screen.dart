@@ -162,7 +162,7 @@ class ExploreScreen extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  SizedBox(height: 108, width: double.infinity, child: VenueImageView(imageUrl: v.image)),
+                  SizedBox(height: 108, width: double.infinity, child: VenueImageView(imageUrl: v.displayImage)),
                   Padding(
                     padding: const EdgeInsets.all(10),
                     child: Column(
@@ -257,7 +257,7 @@ class _VenueListPage extends StatelessWidget {
                 children: [
                   ClipRRect(
                     borderRadius: BorderRadius.circular(10),
-                    child: SizedBox(width: 72, height: 72, child: VenueImageView(imageUrl: v.image)),
+                    child: SizedBox(width: 72, height: 72, child: VenueImageView(imageUrl: v.displayImage)),
                   ),
                   const SizedBox(width: 12),
                   Expanded(

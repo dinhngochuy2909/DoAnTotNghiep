@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../data/venue_photos.dart';
 import '../models/venue.dart';
 import '../widgets/venue_image_view.dart';
 import '../services/auth_service.dart';
@@ -315,7 +316,7 @@ class _VenueDetailScreenState extends State<VenueDetailScreen> with SingleTicker
                   fit: StackFit.expand,
                   children: [
                     VenueImageView(
-                      imageUrl: v.image,
+                      imageUrl: v.displayImage,
                       fit: BoxFit.cover,
                     ),
                     Container(
@@ -331,6 +332,29 @@ class _VenueDetailScreenState extends State<VenueDetailScreen> with SingleTicker
                         ),
                       ),
                     ),
+
+                    // Nhãn báo đây là ảnh minh họa theo môn, không phải ảnh thật của sân
+                    if (v.hasStockImage)
+                      Positioned(
+                        right: 16,
+                        bottom: 56,
+                        child: Container(
+                          key: const ValueKey('stock-image-badge'),
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withOpacity(0.55),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.photo_camera_outlined, color: Colors.white70, size: 12),
+                              SizedBox(width: 4),
+                              Text('Ảnh minh họa', style: TextStyle(color: Colors.white70, fontSize: 10.5)),
+                            ],
+                          ),
+                        ),
+                      ),
 
                     // Hai nút Pill nổi bật nằm ngang trên mép card trắng
                     Positioned(
@@ -685,7 +709,7 @@ class _VenueDetailScreenState extends State<VenueDetailScreen> with SingleTicker
           row(Icons.payments_outlined, 'Giá', v.price),
           row(Icons.qr_code_2_rounded, 'Thanh toán', 'Chuyển khoản VietQR (không nhận tiền mặt)'),
           if (v.ownerName.trim().isNotEmpty) row(Icons.person_outline_rounded, 'Quản lý', v.ownerName),
-          if (v.fromOpenStreetMap)
+          if (v.isImportedListing)
             Padding(
               padding: const EdgeInsets.only(top: 10),
               child: Container(
@@ -694,8 +718,9 @@ class _VenueDetailScreenState extends State<VenueDetailScreen> with SingleTicker
                   color: const Color(0xFFF1F5F9),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: const Text(
-                  'Vị trí và thông tin cơ bản lấy từ dữ liệu mở © OpenStreetMap contributors (giấy phép ODbL). '
+                child: Text(
+                  'Vị trí và thông tin cơ bản lấy từ dữ liệu mở '
+                  '${v.source == 'overture' ? '© Overture Maps Foundation (giấy phép CDLA-Permissive-2.0)' : '© OpenStreetMap contributors (giấy phép ODbL)'}. '
                   'Giá thuê, giờ mở cửa và số sân là mức tham khảo theo mặt bằng chung của môn này, '
                   'chưa được cơ sở xác nhận; vui lòng liên hệ trực tiếp để xác nhận trước khi đặt.',
                   style: TextStyle(fontSize: 12, height: 1.4, color: Color(0xFF475569)),
@@ -878,26 +903,51 @@ class _VenueDetailScreenState extends State<VenueDetailScreen> with SingleTicker
 
   // 4. Tab HÌNH ẢNH
   Widget _buildTabGallery() {
-    final images = [
-      widget.venue.image,
-      'https://images.unsplash.com/photo-1521537634581-0dced2fee2ef?w=600&h=380&fit=crop',
-      'https://images.unsplash.com/photo-1626224583764-f87db24ac4ea?w=600&h=380&fit=crop',
-      'https://images.unsplash.com/photo-1554068865-24cecd4e34b8?w=600&h=380&fit=crop',
-    ];
+    // Ảnh chính của sân, rồi các ảnh khác CÙNG MÔN (trước đây luôn hiện ảnh cầu lông cho mọi sân)
+    final v = widget.venue;
+    final images = VenuePhotos.gallery(v.type, v.displayImage, v.id, count: 8);
 
-    return GridView.builder(
-      padding: const EdgeInsets.all(14),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        mainAxisSpacing: 10,
-        crossAxisSpacing: 10,
-        childAspectRatio: 1.3,
-      ),
-      itemCount: images.length,
-      itemBuilder: (ctx, idx) => ClipRRect(
-        borderRadius: BorderRadius.circular(10),
-        child: VenueImageView(imageUrl: images[idx], fit: BoxFit.cover),
-      ),
+    return Column(
+      children: [
+        if (v.hasStockImage)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 12, 14, 0),
+            child: Row(
+              children: [
+                const Icon(Icons.info_outline, size: 14, color: Color(0xFF64748B)),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    'Ảnh minh họa theo môn ${const {
+                          'badminton': 'cầu lông',
+                          'pickleball': 'pickleball',
+                          'tennis': 'tennis',
+                          'basketball': 'bóng rổ',
+                          'football': 'bóng đá',
+                        }[v.type] ?? 'thể thao'}, chưa phải ảnh thực tế của sân.',
+                    style: const TextStyle(fontSize: 11.5, color: Color(0xFF64748B)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        Expanded(
+          child: GridView.builder(
+            padding: const EdgeInsets.all(14),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              mainAxisSpacing: 10,
+              crossAxisSpacing: 10,
+              childAspectRatio: 1.3,
+            ),
+            itemCount: images.length,
+            itemBuilder: (ctx, idx) => ClipRRect(
+              borderRadius: BorderRadius.circular(10),
+              child: VenueImageView(imageUrl: images[idx], fit: BoxFit.cover),
+            ),
+          ),
+        ),
+      ],
     );
   }
 

@@ -11,6 +11,50 @@ import 'booked_screen.dart';
 import 'home_screen.dart';
 import 'chatbot_screen.dart';
 
+/// Bảng màu nền đen của màn đặt lịch trực quan.
+class _Vb {
+  static const bg = Color(0xFF0A0A0B); // nền màn hình
+  static const surface = Color(0xFF121214); // thanh, khung, ô trống
+  static const surface2 = Color(0xFF1A1A1D); // hộp thoại, bảng xác nhận
+  static const field = Color(0xFF242428); // dòng/ô nổi trên hộp thoại
+  static const header = Color(0xFF17212B); // hàng và cột tiêu đề của bảng giờ
+  static const border = Color(0xFF2C2C31);
+  static const text = Color(0xFFF4F4F5);
+  static const textDim = Color(0xFFA1A1AA);
+  static const accent = Color(0xFF4ADE80); // xanh lá sáng
+  static const selected = Color(0xFF166534); // ô đang chọn
+  static const booked = Color(0xFFB91C1C); // ô đã đặt
+  static const locked = Color(0xFF3F3F46); // ô khoá
+  static const gold = Color(0xFFFACC15);
+  static const warn = Color(0xFFFBBF24);
+}
+
+/// Theme tối cho màn hình và các hộp thoại/bảng mở ra từ màn hình này (giữ nguyên phông chữ của ứng dụng).
+ThemeData _vbTheme(BuildContext context) {
+  final base = Theme.of(context);
+  return base.copyWith(
+    colorScheme: const ColorScheme.dark(
+      primary: _Vb.accent,
+      onPrimary: Colors.black,
+      secondary: _Vb.accent,
+      surface: _Vb.surface2,
+      onSurface: _Vb.text,
+      error: Color(0xFFF87171),
+    ),
+    scaffoldBackgroundColor: _Vb.bg,
+    canvasColor: _Vb.surface2,
+    dividerColor: _Vb.border,
+    dividerTheme: const DividerThemeData(color: _Vb.border),
+    textTheme: base.textTheme.apply(bodyColor: _Vb.text, displayColor: _Vb.text),
+    inputDecorationTheme: const InputDecorationTheme(
+      labelStyle: TextStyle(color: _Vb.textDim),
+      prefixIconColor: _Vb.textDim,
+      enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: _Vb.border)),
+      focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: _Vb.accent)),
+    ),
+  );
+}
+
 class VisualBookingScreen extends StatefulWidget {
   final Venue venue;
 
@@ -196,11 +240,14 @@ class _VisualBookingScreenState extends State<VisualBookingScreen> {
     final v = widget.venue;
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
+      builder: (ctx) => Theme(
+        data: _vbTheme(ctx),
+        child: AlertDialog(
+        backgroundColor: _Vb.surface2,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Row(
           children: [
-            const Icon(Icons.sell_outlined, color: Color(0xFF15803D)),
+            const Icon(Icons.sell_outlined, color: _Vb.accent),
             const SizedBox(width: 8),
             Expanded(
               child: Text(
@@ -215,9 +262,9 @@ class _VisualBookingScreenState extends State<VisualBookingScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              _buildPriceRow('Khung giờ thường (trước 17:00)', v.hasListedPrice ? _formatCurrency(_priceForHour(10)) : 'Chưa niêm yết'),
+              _buildPriceRow('Khung giờ thường (trước 16:00, sau 22:00)', v.hasListedPrice ? _formatCurrency(_priceForHour(10)) : 'Chưa niêm yết'),
               const SizedBox(height: 6),
-              _buildPriceRow('Khung giờ vàng (từ 17:00)', v.hasListedPrice ? _formatCurrency(_priceForHour(18)) : 'Chưa niêm yết'),
+              _buildPriceRow('Ca giờ vàng (${BookingSlots.goldenLabel})', v.hasListedPrice ? _formatCurrency(_priceForHour(18)) : 'Chưa niêm yết'),
               const Divider(height: 20),
               Text('🏟️ Số sân: ${_subCourts.length} sân (${_subCourts.first} … ${_subCourts.last})', style: const TextStyle(fontSize: 13)),
               const SizedBox(height: 4),
@@ -241,6 +288,7 @@ class _VisualBookingScreenState extends State<VisualBookingScreen> {
           ),
         ],
       ),
+      ),
     );
   }
 
@@ -248,14 +296,14 @@ class _VisualBookingScreenState extends State<VisualBookingScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
-        color: const Color(0xFFF1F5F9),
+        color: _Vb.field,
         borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Expanded(child: Text(label, style: const TextStyle(fontSize: 12.5))),
-          Text(price, style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF15803D), fontSize: 13)),
+          Text(price, style: const TextStyle(fontWeight: FontWeight.bold, color: _Vb.accent, fontSize: 13)),
         ],
       ),
     );
@@ -295,7 +343,12 @@ class _VisualBookingScreenState extends State<VisualBookingScreen> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (ctx) => StatefulBuilder(
+      builder: (ctx) => Theme(
+        data: _vbTheme(ctx),
+        // BottomSheet đặt Material theo theme SÁNG của ứng dụng nên phải đặt lại màu chữ mặc định cho nền tối
+        child: DefaultTextStyle.merge(
+        style: const TextStyle(color: _Vb.text),
+        child: StatefulBuilder(
         builder: (context, _) => Container(
           padding: EdgeInsets.only(
             top: 20,
@@ -304,7 +357,7 @@ class _VisualBookingScreenState extends State<VisualBookingScreen> {
             bottom: MediaQuery.of(context).viewInsets.bottom + 20,
           ),
           decoration: const BoxDecoration(
-            color: Colors.white,
+            color: _Vb.surface2,
             borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
           ),
           child: SingleChildScrollView(
@@ -317,7 +370,7 @@ class _VisualBookingScreenState extends State<VisualBookingScreen> {
                     width: 40,
                     height: 4,
                     decoration: BoxDecoration(
-                      color: const Color(0xFFCBD5E1),
+                      color: const Color(0xFF52525B),
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
@@ -332,7 +385,7 @@ class _VisualBookingScreenState extends State<VisualBookingScreen> {
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
-                        color: Color(0xFF0F172A),
+                        color: _Vb.text,
                       ),
                     ),
                     IconButton(
@@ -346,16 +399,16 @@ class _VisualBookingScreenState extends State<VisualBookingScreen> {
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFF0FDF4),
+                    color: const Color(0xFF0F2A1A),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: const Color(0xFF86EFAC)),
+                    border: Border.all(color: const Color(0xFF166534)),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
                         widget.venue.name,
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF15803D)),
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: _Vb.accent),
                       ),
                       const SizedBox(height: 4),
                       Text('📅 Ngày đặt: $dateStr', style: const TextStyle(fontSize: 13)),
@@ -386,7 +439,7 @@ class _VisualBookingScreenState extends State<VisualBookingScreen> {
                           Text('Tổng số giờ: ${totalHours}h00', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
                           Text(
                             _formatCurrency(totalPrice),
-                            style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Color(0xFFDC2626)),
+                            style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Color(0xFFF87171)),
                           ),
                         ],
                       ),
@@ -433,21 +486,21 @@ class _VisualBookingScreenState extends State<VisualBookingScreen> {
                   width: double.infinity,
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFF0FDF4),
+                    color: const Color(0xFF0F2A1A),
                     borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: const Color(0xFF86EFAC)),
+                    border: Border.all(color: const Color(0xFF166534)),
                   ),
                   child: const Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Icon(Icons.qr_code_2, size: 22, color: Color(0xFF15803D)),
+                      Icon(Icons.qr_code_2, size: 22, color: _Vb.accent),
                       SizedBox(width: 10),
                       Expanded(
                         child: Text(
                           'Chuyển khoản ngân hàng bằng mã VietQR, không nhận tiền mặt. '
                           'Sau khi xác nhận, bạn sẽ nhận mã QR kèm nội dung chuyển khoản; '
                           'đơn được xác nhận khi ban quản lý nhận được tiền.',
-                          style: TextStyle(fontSize: 12.5, height: 1.4, color: Color(0xFF14532D)),
+                          style: TextStyle(fontSize: 12.5, height: 1.4, color: Color(0xFFBBF7D0)),
                         ),
                       ),
                     ],
@@ -548,13 +601,13 @@ class _VisualBookingScreenState extends State<VisualBookingScreen> {
                             }
                           },
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFEAB308),
-                      foregroundColor: Colors.white,
+                      backgroundColor: _Vb.gold,
+                      foregroundColor: Colors.black,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                       elevation: 2,
                     ),
                     child: _isLoading
-                        ? const CircularProgressIndicator(color: Colors.white)
+                        ? const CircularProgressIndicator(color: Colors.black)
                         : const Text(
                             'XÁC NHẬN & THANH TOÁN',
                             style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15, letterSpacing: 0.5),
@@ -566,6 +619,8 @@ class _VisualBookingScreenState extends State<VisualBookingScreen> {
           ),
         ),
       ),
+      ),
+      ),
     );
   }
 
@@ -574,7 +629,7 @@ class _VisualBookingScreenState extends State<VisualBookingScreen> {
       padding: const EdgeInsets.symmetric(vertical: 3),
       child: Row(
         children: [
-          SizedBox(width: 96, child: Text(label, style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)))),
+          SizedBox(width: 96, child: Text(label, style: const TextStyle(fontSize: 12, color: _Vb.textDim))),
           Expanded(child: Text(value, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700))),
           if (copyValue != null)
             InkWell(
@@ -586,7 +641,7 @@ class _VisualBookingScreenState extends State<VisualBookingScreen> {
               },
               child: const Padding(
                 padding: EdgeInsets.all(4),
-                child: Icon(Icons.copy_rounded, size: 16, color: Color(0xFF15803D)),
+                child: Icon(Icons.copy_rounded, size: 16, color: _Vb.accent),
               ),
             ),
         ],
@@ -607,15 +662,18 @@ class _VisualBookingScreenState extends State<VisualBookingScreen> {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
+      builder: (ctx) => Theme(
+        data: _vbTheme(ctx),
+        child: AlertDialog(
+        backgroundColor: _Vb.surface2,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: const Column(
           children: [
-            Icon(Icons.account_balance_outlined, color: Color(0xFF15803D), size: 44),
+            Icon(Icons.account_balance_outlined, color: _Vb.accent, size: 44),
             SizedBox(height: 8),
             Text(
               'CHUYỂN KHOẢN ĐỂ GIỮ SÂN',
-              style: TextStyle(fontWeight: FontWeight.w900, color: Color(0xFF15803D), fontSize: 17),
+              style: TextStyle(fontWeight: FontWeight.w900, color: _Vb.accent, fontSize: 17),
               textAlign: TextAlign.center,
             ),
           ],
@@ -649,14 +707,14 @@ class _VisualBookingScreenState extends State<VisualBookingScreen> {
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFFFFBEB),
+                      color: const Color(0xFF2A2410),
                       borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: const Color(0xFFFCD34D)),
+                      border: Border.all(color: const Color(0xFF854D0E)),
                     ),
                     child: Text(
                       'Hệ thống chưa khai báo tài khoản nhận tiền nên chưa tạo được mã QR. '
                       'Vui lòng liên hệ hotline 0364059999 để nhận thông tin chuyển khoản cho đơn $code.',
-                      style: const TextStyle(fontSize: 12.5, height: 1.4, color: Color(0xFF92400E)),
+                      style: const TextStyle(fontSize: 12.5, height: 1.4, color: _Vb.warn),
                     ),
                   ),
                 const SizedBox(height: 10),
@@ -699,16 +757,22 @@ class _VisualBookingScreenState extends State<VisualBookingScreen> {
           ),
         ],
       ),
+      ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
+    final media = MediaQuery.of(context).size;
+    final screenWidth = media.width;
     final isMobile = screenWidth < 750;
+    // Màn hình thấp (điện thoại xoay ngang): các khối phía trên không đủ chỗ nếu xếp cố định
+    final isShort = media.height < 520;
 
-    return Scaffold(
-      backgroundColor: Colors.white,
+    return Theme(
+      data: _vbTheme(context),
+      child: Scaffold(
+      backgroundColor: _Vb.bg,
       body: SafeArea(
         child: Column(
           children: [
@@ -719,13 +783,24 @@ class _VisualBookingScreenState extends State<VisualBookingScreen> {
 
             // ==========================================
             // 2. HORIZONTAL DATE PICKER & STATUS LEGEND
-            // ==========================================
-            _buildDateStripAndLegend(isMobile),
-
-            // ==========================================
             // 3. NOTICE BOX (Lưu ý chuẩn xác theo ảnh mới)
             // ==========================================
-            _buildNoticesBox(isMobile),
+            if (isShort)
+              ConstrainedBox(
+                constraints: BoxConstraints(maxHeight: media.height * 0.38),
+                child: SingleChildScrollView(
+                  child: Column(
+                    children: [
+                      _buildDateStripAndLegend(isMobile),
+                      _buildNoticesBox(isMobile),
+                    ],
+                  ),
+                ),
+              )
+            else ...[
+              _buildDateStripAndLegend(isMobile),
+              _buildNoticesBox(isMobile),
+            ],
 
             // ==========================================
             // 4. THE CORE VISUAL TIMELINE MATRIX (5:00 -> 24:00)
@@ -735,9 +810,9 @@ class _VisualBookingScreenState extends State<VisualBookingScreen> {
             ),
 
             // ==========================================
-            // 5. SLIDER ZOOM TRỰC QUAN
+            // 5. SLIDER ZOOM TRỰC QUAN (ẩn khi màn hình thấp để dành chỗ cho bảng giờ)
             // ==========================================
-            _buildZoomSliderRow(),
+            if (!isShort) _buildZoomSliderRow(),
 
             // ==========================================
             // 6. BOTTOM GREEN BAR VỚI TỔNG GIỜ & TIẾP THEO
@@ -746,13 +821,14 @@ class _VisualBookingScreenState extends State<VisualBookingScreen> {
           ],
         ),
       ),
+      ),
     );
   }
 
   // ─── 1. TOP APP BAR ───────────────────────────────────────
   Widget _buildTopAppBar(bool isMobile) {
     return Container(
-      color: const Color(0xFF0D6A38),
+      color: _Vb.surface,
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       child: Row(
         children: [
@@ -836,7 +912,7 @@ class _VisualBookingScreenState extends State<VisualBookingScreen> {
   // ─── 2. DATE STRIP & STATUS LEGEND ─────────────────────────
   Widget _buildDateStripAndLegend(bool isMobile) {
     return Container(
-      color: const Color(0xFF0D6A38),
+      color: _Vb.surface,
       padding: const EdgeInsets.fromLTRB(14, 0, 14, 10),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -848,6 +924,7 @@ class _VisualBookingScreenState extends State<VisualBookingScreen> {
                 onTap: () async {
                   final picked = await showDatePicker(
                     context: context,
+                    builder: (ctx, child) => Theme(data: _vbTheme(ctx), child: child!),
                     initialDate: _selectedDate,
                     firstDate: DateTime.now().subtract(const Duration(days: 7)),
                     lastDate: DateTime.now().add(const Duration(days: 90)),
@@ -925,10 +1002,10 @@ class _VisualBookingScreenState extends State<VisualBookingScreen> {
                     width: 58,
                     margin: const EdgeInsets.only(right: 6),
                     decoration: BoxDecoration(
-                      color: isSelected ? Colors.white : Colors.white.withOpacity(0.14),
+                      color: isSelected ? _Vb.accent : Colors.white.withOpacity(0.07),
                       borderRadius: BorderRadius.circular(8),
                       border: Border.all(
-                        color: isSelected ? Colors.white : Colors.white.withOpacity(0.25),
+                        color: isSelected ? _Vb.accent : _Vb.border,
                         width: 1,
                       ),
                       boxShadow: isSelected
@@ -944,7 +1021,7 @@ class _VisualBookingScreenState extends State<VisualBookingScreen> {
                         Text(
                           dayOfWeek,
                           style: TextStyle(
-                            color: isSelected ? const Color(0xFF0D6A38) : Colors.white70,
+                            color: isSelected ? const Color(0xFF052E16) : _Vb.textDim,
                             fontSize: 10.5,
                             fontWeight: FontWeight.bold,
                           ),
@@ -953,7 +1030,7 @@ class _VisualBookingScreenState extends State<VisualBookingScreen> {
                         Text(
                           dateStr,
                           style: TextStyle(
-                            color: isSelected ? const Color(0xFF0F172A) : Colors.white,
+                            color: isSelected ? Colors.black : _Vb.text,
                             fontSize: 12,
                             fontWeight: FontWeight.w900,
                           ),
@@ -972,11 +1049,11 @@ class _VisualBookingScreenState extends State<VisualBookingScreen> {
             scrollDirection: Axis.horizontal,
             child: Row(
               children: [
-                _buildLegendItem(const Color(0xFFFFFFFF), 'Trống', hasBorder: true),
+                _buildLegendItem(_Vb.surface, 'Trống', hasBorder: true),
                 const SizedBox(width: 14),
-                _buildLegendItem(const Color(0xFFF87171), 'Đã đặt'),
+                _buildLegendItem(_Vb.booked, 'Đã đặt'),
                 const SizedBox(width: 14),
-                _buildLegendItem(const Color(0xFF64748B), 'Khoá'),
+                _buildLegendItem(_Vb.locked, 'Khoá'),
                 const SizedBox(width: 14),
                 _buildLegendItem(const Color(0xFFD946EF), 'Sự kiện', isEvent: true),
                 const SizedBox(width: 18),
@@ -1026,7 +1103,7 @@ class _VisualBookingScreenState extends State<VisualBookingScreen> {
           decoration: BoxDecoration(
             color: color,
             borderRadius: BorderRadius.circular(4),
-            border: hasBorder ? Border.all(color: Colors.grey.shade400, width: 1) : null,
+            border: hasBorder ? Border.all(color: const Color(0xFF52525B), width: 1) : null,
           ),
           child: isEvent
               ? const Center(
@@ -1048,20 +1125,20 @@ class _VisualBookingScreenState extends State<VisualBookingScreen> {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-      color: Colors.white,
+      color: _Vb.surface,
       child: Center(
         child: Column(
           children: [
             Text(
               '${widget.venue.name} · ${_subCourts.length} sân',
-              style: const TextStyle(fontSize: 13, color: Color(0xFF0F172A), fontWeight: FontWeight.w800),
+              style: const TextStyle(fontSize: 13, color: _Vb.text, fontWeight: FontWeight.w800),
               textAlign: TextAlign.center,
             ),
-            if (widget.venue.fromOpenStreetMap && widget.venue.hasListedPrice) ...[
+            if (widget.venue.isImportedListing && widget.venue.hasListedPrice) ...[
               const SizedBox(height: 3),
               const Text(
                 'Giá và giờ mở cửa là mức tham khảo, cơ sở chưa xác nhận trên AloBooking.',
-                style: TextStyle(fontSize: 12, color: Color(0xFFB45309), fontWeight: FontWeight.w700),
+                style: TextStyle(fontSize: 12, color: _Vb.warn, fontWeight: FontWeight.w700),
                 textAlign: TextAlign.center,
               ),
             ],
@@ -1069,39 +1146,40 @@ class _VisualBookingScreenState extends State<VisualBookingScreen> {
               const SizedBox(height: 3),
               const Text(
                 'Cụm sân chưa niêm yết giá trên AloBooking: chưa đặt online được, vui lòng liên hệ trực tiếp cơ sở.',
-                style: TextStyle(fontSize: 12, color: Color(0xFFB45309), fontWeight: FontWeight.w700),
+                style: TextStyle(fontSize: 12, color: _Vb.warn, fontWeight: FontWeight.w700),
                 textAlign: TextAlign.center,
               ),
             ],
             const SizedBox(height: 3),
-            RichText(
-              textAlign: TextAlign.center,
-              text: const TextSpan(
-                style: TextStyle(fontSize: 12, color: Color(0xFF334155)),
+            // Text.rich (không phải RichText) để nhận phông chữ của ứng dụng
+            Text.rich(
+              const TextSpan(
+                style: TextStyle(fontSize: 12, color: _Vb.textDim),
                 children: [
                   TextSpan(
                     text: 'Lưu ý: ',
-                    style: TextStyle(color: Color(0xFFEA580C), fontWeight: FontWeight.bold),
+                    style: TextStyle(color: Color(0xFFFB923C), fontWeight: FontWeight.bold),
                   ),
                   TextSpan(text: 'Nếu bạn cần đặt lịch cố định vui lòng liên hệ: '),
                   TextSpan(
                     text: '0364059999',
-                    style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                    style: TextStyle(fontWeight: FontWeight.bold, color: _Vb.text),
                   ),
                   TextSpan(text: ' để được hỗ trợ'),
                 ],
               ),
+              textAlign: TextAlign.center,
             ),
             const SizedBox(height: 2),
             const Text(
               'Thanh toán bằng chuyển khoản VietQR, không nhận tiền mặt',
-              style: TextStyle(fontSize: 12, color: Color(0xFF334155), fontWeight: FontWeight.w500),
+              style: TextStyle(fontSize: 12, color: _Vb.textDim, fontWeight: FontWeight.w500),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 2),
             const Text(
               'Lịch đã đặt KHÔNG hỗ trợ Huỷ',
-              style: TextStyle(fontSize: 12, color: Color(0xFF334155), fontWeight: FontWeight.w500),
+              style: TextStyle(fontSize: 12, color: _Vb.textDim, fontWeight: FontWeight.w500),
               textAlign: TextAlign.center,
             ),
           ],
@@ -1123,8 +1201,8 @@ class _VisualBookingScreenState extends State<VisualBookingScreen> {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 10),
       decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border.all(color: const Color(0xFFCBD5E1), width: 1),
+        color: _Vb.surface,
+        border: Border.all(color: _Vb.border, width: 1),
       ),
       child: SingleChildScrollView(
         child: Row(
@@ -1140,15 +1218,15 @@ class _VisualBookingScreenState extends State<VisualBookingScreen> {
                     alignment: Alignment.centerLeft,
                     padding: const EdgeInsets.symmetric(horizontal: 6),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFBAE6FD),
-                      border: Border(
-                        bottom: const BorderSide(color: Color(0xFF94A3B8), width: 1),
-                        right: BorderSide(color: Colors.grey.shade400, width: 1),
+                      color: _Vb.header,
+                      border: const Border(
+                        bottom: BorderSide(color: _Vb.border, width: 1),
+                        right: BorderSide(color: _Vb.border, width: 1),
                       ),
                     ),
                     child: Text(
                       '${_subCourts.length} sân',
-                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF0369A1)),
+                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF7DD3FC)),
                     ),
                   ),
                   for (int i = 0; i < _subCourts.length; i++)
@@ -1157,15 +1235,15 @@ class _VisualBookingScreenState extends State<VisualBookingScreen> {
                       alignment: Alignment.centerLeft,
                       padding: const EdgeInsets.symmetric(horizontal: 6),
                       decoration: BoxDecoration(
-                        color: Colors.white,
-                        border: Border(
-                          bottom: const BorderSide(color: Color(0xFFCBD5E1), width: 1),
-                          right: BorderSide(color: Colors.grey.shade400, width: 1),
+                        color: _Vb.surface,
+                        border: const Border(
+                          bottom: BorderSide(color: _Vb.border, width: 1),
+                          right: BorderSide(color: _Vb.border, width: 1),
                         ),
                       ),
                       child: Text(
                         _subCourts[i],
-                        style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: Color(0xFF15803D)),
+                        style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: _Vb.accent),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -1204,8 +1282,8 @@ class _VisualBookingScreenState extends State<VisualBookingScreen> {
       width: gridWidth,
       height: _headerHeight,
       decoration: const BoxDecoration(
-        color: Color(0xFFBAE6FD),
-        border: Border(bottom: BorderSide(color: Color(0xFF94A3B8), width: 1)),
+        color: _Vb.header,
+        border: Border(bottom: BorderSide(color: _Vb.border, width: 1)),
       ),
       child: Stack(
         clipBehavior: Clip.none,
@@ -1225,7 +1303,7 @@ class _VisualBookingScreenState extends State<VisualBookingScreen> {
                       fit: BoxFit.scaleDown,
                       child: Text(
                         '${_startHour + idx}:00',
-                        style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: Color(0xFF0369A1)),
+                        style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: Color(0xFF7DD3FC)),
                       ),
                     ),
                   ),
@@ -1244,8 +1322,8 @@ class _VisualBookingScreenState extends State<VisualBookingScreen> {
       width: gridWidth,
       height: _rowHeight,
       decoration: const BoxDecoration(
-        color: Colors.white,
-        border: Border(bottom: BorderSide(color: Color(0xFFCBD5E1), width: 1)),
+        color: _Vb.surface,
+        border: Border(bottom: BorderSide(color: _Vb.border, width: 1)),
       ),
       child: Row(
         children: [
@@ -1275,35 +1353,32 @@ class _VisualBookingScreenState extends State<VisualBookingScreen> {
     Border cellBorder;
 
     if (isSelected) {
-      // ĐANG CHỌN (18:00 - 20:00 ở Sân 1): Xanh bạc hà nhạt với viền đen sắc nét như ảnh mẫu
-      cellColor = const Color(0xFFD4EDDA);
+      // ĐANG CHỌN: xanh lá đậm, viền xanh lá sáng
+      cellColor = _Vb.selected;
       cellBorder = Border(
-        top: const BorderSide(color: Color(0xFF1E293B), width: 1.5),
-        bottom: const BorderSide(color: Color(0xFF1E293B), width: 1.5),
-        left: prevSelected
-            ? BorderSide.none
-            : const BorderSide(color: Color(0xFF1E293B), width: 1.5),
-        right: nextSelected
-            ? BorderSide.none
-            : const BorderSide(color: Color(0xFF1E293B), width: 1.5),
+        top: const BorderSide(color: _Vb.accent, width: 1.5),
+        bottom: const BorderSide(color: _Vb.accent, width: 1.5),
+        left: prevSelected ? BorderSide.none : const BorderSide(color: _Vb.accent, width: 1.5),
+        right: nextSelected ? BorderSide.none : const BorderSide(color: _Vb.accent, width: 1.5),
       );
     } else if (status == 'booked') {
-      // ĐÃ ĐẶT (14:00 - 17:00 ở Sân 1 & 2): Đỏ san hô liền mạch
-      cellColor = const Color(0xFFF87171);
+      // ĐÃ ĐẶT: đỏ liền mạch
+      cellColor = _Vb.booked;
+      const edge = Color(0xFF7F1D1D);
       cellBorder = Border(
-        top: BorderSide(color: Colors.grey.shade300, width: 0.5),
-        bottom: BorderSide(color: Colors.grey.shade300, width: 0.5),
-        left: prevBooked ? BorderSide.none : BorderSide(color: Colors.grey.shade300, width: 1),
-        right: nextBooked ? BorderSide.none : BorderSide(color: Colors.grey.shade300, width: 1),
+        top: const BorderSide(color: edge, width: 0.5),
+        bottom: const BorderSide(color: edge, width: 0.5),
+        left: prevBooked ? BorderSide.none : const BorderSide(color: edge, width: 1),
+        right: nextBooked ? BorderSide.none : const BorderSide(color: edge, width: 1),
       );
     } else if (status == 'locked') {
-      cellColor = const Color(0xFF64748B);
-      cellBorder = Border.all(color: Colors.grey.shade300, width: 0.5);
+      cellColor = _Vb.locked;
+      cellBorder = Border.all(color: _Vb.border, width: 0.5);
     } else {
-      // TRỐNG (MÀU TRẮNG TINH): Có vạch dọc xám mỏng trùng khớp chuẩn xác với mốc giờ bên trên
-      cellColor = Colors.white;
-      cellBorder = Border(
-        right: BorderSide(color: Colors.grey.shade300, width: 1),
+      // TRỐNG: ô tối, vạch dọc mảnh trùng với mốc giờ bên trên
+      cellColor = _Vb.surface;
+      cellBorder = const Border(
+        right: BorderSide(color: _Vb.border, width: 1),
       );
     }
 
@@ -1325,13 +1400,13 @@ class _VisualBookingScreenState extends State<VisualBookingScreen> {
   // ─── 5. THANH SLIDER ZOOM ──────────────────────────────────
   Widget _buildZoomSliderRow() {
     return Container(
-      color: Colors.white,
+      color: _Vb.surface,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       alignment: Alignment.centerRight,
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.zoom_out, size: 16, color: Color(0xFF94A3B8)),
+          const Icon(Icons.zoom_out, size: 16, color: _Vb.textDim),
           SizedBox(
             width: 120,
             child: SliderTheme(
@@ -1339,9 +1414,9 @@ class _VisualBookingScreenState extends State<VisualBookingScreen> {
                 trackHeight: 3,
                 thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 7),
                 overlayShape: const RoundSliderOverlayShape(overlayRadius: 12),
-                activeTrackColor: const Color(0xFF16A34A),
-                inactiveTrackColor: const Color(0xFFE2E8F0),
-                thumbColor: const Color(0xFF16A34A),
+                activeTrackColor: _Vb.accent,
+                inactiveTrackColor: _Vb.locked,
+                thumbColor: _Vb.accent,
               ),
               child: Slider(
                 value: _hourColumnWidth,
@@ -1353,7 +1428,7 @@ class _VisualBookingScreenState extends State<VisualBookingScreen> {
               ),
             ),
           ),
-          const Icon(Icons.zoom_in, size: 16, color: Color(0xFF94A3B8)),
+          const Icon(Icons.zoom_in, size: 16, color: _Vb.textDim),
         ],
       ),
     );
@@ -1365,7 +1440,10 @@ class _VisualBookingScreenState extends State<VisualBookingScreen> {
     final totalPrice = _totalPrice(_selectedHours());
 
     return Container(
-      color: const Color(0xFF0D6A38),
+      decoration: const BoxDecoration(
+        color: _Vb.surface,
+        border: Border(top: BorderSide(color: _Vb.border, width: 1)),
+      ),
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -1402,8 +1480,8 @@ class _VisualBookingScreenState extends State<VisualBookingScreen> {
             child: ElevatedButton(
               onPressed: _onNextStep,
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFEAB308),
-                foregroundColor: Colors.white,
+                backgroundColor: _Vb.gold,
+                foregroundColor: Colors.black,
                 elevation: 0,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(4),

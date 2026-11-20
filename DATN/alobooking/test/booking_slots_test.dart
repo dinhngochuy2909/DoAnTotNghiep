@@ -73,12 +73,22 @@ void main() {
   });
 
   group('priceForHour', () {
-    test('giá thường trước 17h, giá cao từ 17h', () {
-      final v = _venue('80k - 160k/h');
+    test('ca giờ vàng 16:00 – 22:00 tính giá cao, ngoài ca tính giá thường', () {
+      final v = _venue('80k - 100k/h');
       expect(BookingSlots.priceForHour(v, 10), 80000);
-      expect(BookingSlots.priceForHour(v, 16), 80000);
-      expect(BookingSlots.priceForHour(v, 17), 160000);
-      expect(BookingSlots.priceForHour(v, 20), 160000);
+      expect(BookingSlots.priceForHour(v, 15), 80000);
+      expect(BookingSlots.priceForHour(v, 16), 100000);
+      expect(BookingSlots.priceForHour(v, 20), 100000);
+      expect(BookingSlots.priceForHour(v, 21), 100000);
+      expect(BookingSlots.priceForHour(v, 22), 80000);
+    });
+    test('isGolden đúng biên ca vàng', () {
+      expect([15, 16, 21, 22].map(BookingSlots.isGolden), [false, true, true, false]);
+    });
+    test('khoảng giá nhập ngược vẫn cho giờ vàng là mức cao hơn', () {
+      final v = _venue('100k - 80k/h');
+      expect(BookingSlots.priceForHour(v, 10), 80000);
+      expect(BookingSlots.priceForHour(v, 18), 100000);
     });
     test('giá không đọc được thì dùng mặc định', () {
       expect(BookingSlots.priceForHour(_venue('liên hệ'), 10), 150000);

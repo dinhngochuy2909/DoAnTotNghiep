@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import '../data/venue_photos.dart';
 import '../models/venue.dart';
 import '../models/customer.dart';
 import '../models/payment.dart';
@@ -84,31 +85,8 @@ class _AdminScreenState extends State<AdminScreen> {
     'Hoài Đức': {'lat': 21.0180, 'lng': 105.7100},
   };
 
-  final Map<String, List<String>> _sampleImages = {
-    'pickleball': [
-      'https://images.unsplash.com/photo-1622279457486-62dcc4a431d6?w=600&h=320&fit=crop&q=80',
-      'https://images.unsplash.com/photo-1554068865-24cecd4e34b8?w=600&h=320&fit=crop&q=80',
-      'https://images.unsplash.com/photo-1612872087720-bb876e2e67d1?w=600&h=320&fit=crop&q=80',
-    ],
-    'badminton': [
-      'https://images.unsplash.com/photo-1521537634581-0dced2fee2ef?w=600&h=320&fit=crop&q=80',
-      'https://images.unsplash.com/photo-1626224583764-f87db24ac4ea?w=600&h=320&fit=crop&q=80',
-      'https://images.unsplash.com/photo-1544698310-74ea9d1c8258?w=600&h=320&fit=crop&q=80',
-    ],
-    'football': [
-      'https://images.unsplash.com/photo-1529900241451-93b9423c9604?w=600&h=320&fit=crop&q=80',
-      'https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=600&h=320&fit=crop&q=80',
-      'https://images.unsplash.com/photo-1508098682722-e99c43a406b2?w=600&h=320&fit=crop&q=80',
-    ],
-    'tennis': [
-      'https://images.unsplash.com/photo-1554068865-24cecd4e34b8?w=600&h=320&fit=crop&q=80',
-      'https://images.unsplash.com/photo-1595435934249-5df7ed86e1c0?w=600&h=320&fit=crop&q=80',
-    ],
-    'basketball': [
-      'https://images.unsplash.com/photo-1519861531473-9200262188bf?w=600&h=320&fit=crop&q=80',
-      'https://images.unsplash.com/photo-1546519638-68e109498ffc?w=600&h=320&fit=crop&q=80',
-    ],
-  };
+  // Kho ảnh minh họa theo môn (đã duyệt đúng môn), xem lib/data/venue_photos.dart
+  final Map<String, List<String>> _sampleImages = VenuePhotos.bySport;
 
   @override
   void initState() {
@@ -1543,7 +1521,7 @@ class _AdminScreenState extends State<AdminScreen> {
               ClipRRect(
                 borderRadius: BorderRadius.circular(10),
                 child: VenueImageView(
-                  imageUrl: v.image,
+                  imageUrl: v.displayImage,
                   width: 75,
                   height: 75,
                   fit: BoxFit.cover,
@@ -3609,7 +3587,7 @@ class _AdminScreenState extends State<AdminScreen> {
                   height: 180,
                   width: double.infinity,
                   child: VenueImageView(
-                    imageUrl: v.image,
+                    imageUrl: v.displayImage,
                     fit: BoxFit.cover,
                   ),
                 ),

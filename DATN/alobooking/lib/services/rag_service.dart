@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 import 'demand_forecast_service.dart';
 import 'weather_service.dart';
+import 'booking_slots.dart';
 import '../models/venue.dart';
 import 'firestore_service.dart';
 
@@ -68,7 +69,7 @@ class RagStats {
   final String label;
   final int count;
   final double avgLow; // giá khung thường trung bình
-  final double avgHigh; // giá khung vàng (từ 17h) trung bình
+  final double avgHigh; // giá ca giờ vàng (16:00 – 22:00) trung bình
   final int minLow;
   final int maxHigh;
   final String unit; // 'giờ' | 'trận'
@@ -88,8 +89,8 @@ class RagStats {
   String toText({bool goldenFocus = false}) {
     final b = StringBuffer();
     b.writeln('Thống kê giá $label ($count sân, đơn vị: đồng/$unit):');
-    b.writeln('- Khung giờ vàng (từ 17:00) trung bình: ${_k(avgHigh)}/$unit');
-    b.writeln('- Khung giờ thường (trước 17:00) trung bình: ${_k(avgLow)}/$unit');
+    b.writeln('- Ca giờ vàng (${BookingSlots.goldenLabel}) trung bình: ${_k(avgHigh)}/$unit');
+    b.writeln('- Khung giờ thường (ngoài ca vàng) trung bình: ${_k(avgLow)}/$unit');
     b.writeln('- Rẻ nhất: ${_k(minLow)}/$unit (khung thường); đắt nhất: ${_k(maxHigh)}/$unit (khung vàng)');
     return b.toString().trim();
   }
@@ -286,7 +287,7 @@ Chủ sân: ${v.ownerName}''',
           title: 'Đặt lịch cố định theo tháng/quý',
           keywords: ['co dinh', 'thang', 'quy', 'hang tuan', 'chiet khau', 'hotline'],
           content: '''- Đặt cố định hàng tuần (2-3 buổi/tuần) từ 1 tháng trở lên: chiết khấu 15% tổng tiền giờ.
-- Ưu tiên giữ khung giờ vàng 17:30–20:30.
+- Ưu tiên giữ ca giờ vàng 16:00–22:00.
 - Đăng ký qua Hotline/Zalo 0364059999 để nhân viên khoá sân cố định.''',
         ),
         RagKnowledgeChunk(
@@ -317,7 +318,7 @@ Chủ sân: ${v.ownerName}''',
 3. Bảng giờ: ô trắng = trống, ô đỏ = đã có người đặt, ô xám = tạm khoá.
 4. Chạm vào các ô trắng muốn đặt (ô chọn có viền xanh đậm).
 5. Kiểm tra "Tổng giờ" và "Tổng tiền" ở thanh dưới, bấm "TIẾP THEO" để xác nhận và thanh toán.
-Giá mỗi sân ghi dạng "giá giờ thường - giá giờ vàng": giờ thường là trước 17:00, giờ vàng từ 17:00 có giá cao hơn (mức chênh khác nhau theo từng sân).''',
+Giá mỗi sân ghi dạng "giá giờ thường - giá giờ vàng": ca giờ vàng là 16:00–22:00 và có giá nhỉnh hơn giờ thường (trước 16:00 và sau 22:00); mức chênh khác nhau theo từng sân.''',
         ),
         RagKnowledgeChunk(
           id: 'guide_weather',
@@ -751,8 +752,8 @@ Giá mỗi sân ghi dạng "giá giờ thường - giá giờ vàng": giờ thư
       }
       if (it.maxPricePerHour != null) {
         final p = priceRange(v.price);
-        // Ngân sách áp dụng cho đúng khung giờ khách muốn chơi: từ 17h (hoặc hỏi giờ vàng) tính giá cao
-        final peak = (it.hour ?? 0) >= 17 || it.goldenHour;
+        // Ngân sách áp dụng cho đúng khung giờ khách muốn chơi: trong ca vàng 16:00–22:00 (hoặc hỏi giờ vàng) tính giá cao
+        final peak = BookingSlots.isGolden(it.hour ?? 0) || it.goldenHour;
         if (p == null || (peak ? p.$2 : p.$1) > it.maxPricePerHour!) return false;
       }
       if (it.amenities.contains('den_dem') && !hasTag(v, RegExp(r'den'))) return false;

@@ -348,7 +348,8 @@ class AppFooter extends StatelessWidget {
     return Text(
       '©  AloBooking. Bảo lưu mọi quyền. '
       'Được phát triển bởi Đinh Ngọc Huy. '
-      'Một phần dữ liệu vị trí sân: © OpenStreetMap contributors.',
+      'Một phần dữ liệu vị trí sân: © OpenStreetMap contributors, © Overture Maps Foundation. '
+      'Ảnh minh họa các môn thể thao: Pexels, Unsplash.',
       style: TextStyle(
         color: Colors.white.withOpacity(0.45),
         fontSize: 11,
