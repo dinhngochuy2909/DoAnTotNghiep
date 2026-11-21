@@ -3,20 +3,30 @@ import 'package:flutter/material.dart';
 import '../data/venue_photos.dart';
 import '../models/news_post.dart';
 import '../models/venue.dart';
+import '../services/explore_highlights.dart';
 import '../services/firestore_service.dart';
 import '../services/news_feed.dart';
+import '../services/weather_service.dart';
 import '../widgets/news_visuals.dart';
 import '../widgets/venue_image_view.dart';
 import 'news_detail_screen.dart';
 import 'venue_detail_screen.dart';
 
 /// Dữ liệu một lần tải dòng tin: tin admin đăng, đánh giá của khách, và cờ báo tải lỗi một phần/toàn bộ.
-typedef NewsBundle = ({List<NewsPost> posts, List<ReviewItem> reviews, bool failed});
+typedef NewsBundle = ({
+  List<NewsPost> posts,
+  List<ReviewItem> reviews,
+  bool failed,
+});
 typedef NewsLoader = Future<NewsBundle> Function();
+typedef WeatherLoader = Future<WeatherData> Function();
 
 Future<NewsBundle> _loadFromFirestore() async {
   FirestoreService.lastLoadFailed = false;
-  final r = await Future.wait<Object?>([FirestoreService.getNews(), FirestoreService.getAllReviews()]);
+  final r = await Future.wait<Object?>([
+    FirestoreService.getNews(),
+    FirestoreService.getAllReviews(),
+  ]);
   return (
     posts: r[0] as List<NewsPost>,
     reviews: r[1] as List<ReviewItem>,
@@ -31,9 +41,16 @@ class ExploreScreen extends StatefulWidget {
 
   /// Chỉ dùng khi kiểm thử: thay cho việc đọc Firestore / đồng hồ hệ thống.
   final NewsLoader? newsLoader;
+  final WeatherLoader? weatherLoader;
   final DateTime? now;
 
-  const ExploreScreen({super.key, required this.venues, this.newsLoader, this.now});
+  const ExploreScreen({
+    super.key,
+    required this.venues,
+    this.newsLoader,
+    this.weatherLoader,
+    this.now,
+  });
 
   @override
   State<ExploreScreen> createState() => _ExploreScreenState();
@@ -46,7 +63,10 @@ class _ExploreScreenState extends State<ExploreScreen> {
   static const _line = Color(0xFFE2E8F0);
 
   /// Ảnh nền banner đầu trang: một ảnh minh họa trong kho (sân bóng đá buổi tối).
-  static final String _heroPhoto = VenuePhotos.pick('football', 23).replaceFirst('w=800&h=450', 'w=1200&h=520');
+  static final String _heroPhoto = VenuePhotos.pick(
+    'football',
+    23,
+  ).replaceFirst('w=800&h=450', 'w=1200&h=520');
 
   /// Thứ tự các nhãn lọc.
   static const _filterOrder = [
@@ -66,10 +86,14 @@ class _ExploreScreenState extends State<ExploreScreen> {
   bool _failed = false;
   List<NewsEntry> _entries = const [];
   List<ReviewItem> _reviews = const [];
+  List<FeaturedVenue> _featured = const [];
+  WeatherData? _weather;
   NewsKind? _kind;
   final Set<String> _expanded = {};
 
-  late final Map<int, Venue> _venueById = {for (final v in widget.venues) v.id: v};
+  late final Map<int, Venue> _venueById = {
+    for (final v in widget.venues) v.id: v,
+  };
 
   @override
   void initState() {
@@ -78,14 +102,28 @@ class _ExploreScreenState extends State<ExploreScreen> {
     _load();
   }
 
+  /// Thời tiết thật của Hà Nội cho lời chào ở banner. Tải riêng, lỗi thì chỉ ẩn phần thời tiết.
+  Future<void> _loadWeather() async {
+    try {
+      final w =
+          await (widget.weatherLoader ?? WeatherService.getCurrentWeather)();
+      if (mounted) setState(() => _weather = w);
+    } catch (_) {}
+  }
+
   Future<void> _load() async {
     if (!mounted) return;
     setState(() => _loading = true);
+    _loadWeather();
     NewsBundle b;
     try {
       b = await (widget.newsLoader ?? _loadFromFirestore)();
     } catch (_) {
-      b = (posts: const <NewsPost>[], reviews: const <ReviewItem>[], failed: true);
+      b = (
+        posts: const <NewsPost>[],
+        reviews: const <ReviewItem>[],
+        failed: true,
+      );
     }
     if (!mounted) return;
     final now = widget.now ?? DateTime.now();
@@ -93,12 +131,23 @@ class _ExploreScreenState extends State<ExploreScreen> {
       _now = now;
       _failed = b.failed;
       _reviews = b.reviews;
-      _entries = NewsFeed.build(posts: b.posts, venues: widget.venues, reviews: b.reviews, now: now);
+      _featured = ExploreHighlights.featured(
+        venues: widget.venues,
+        reviews: b.reviews,
+      );
+      _entries = NewsFeed.build(
+        posts: b.posts,
+        venues: widget.venues,
+        reviews: b.reviews,
+        now: now,
+      );
       _loading = false;
     });
   }
 
-  List<NewsEntry> get _visible => _kind == null ? _entries : _entries.where((e) => e.kind == _kind).toList();
+  List<NewsEntry> get _visible => _kind == null
+      ? _entries
+      : _entries.where((e) => e.kind == _kind).toList();
 
   @override
   Widget build(BuildContext context) {
@@ -108,7 +157,14 @@ class _ExploreScreenState extends State<ExploreScreen> {
         backgroundColor: _green,
         foregroundColor: Colors.white,
         elevation: 0,
-        title: const Text('KHÁM PHÁ', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 20, fontStyle: FontStyle.italic)),
+        title: const Text(
+          'KHÁM PHÁ',
+          style: TextStyle(
+            fontWeight: FontWeight.w900,
+            fontSize: 20,
+            fontStyle: FontStyle.italic,
+          ),
+        ),
         actions: [
           IconButton(
             key: const ValueKey('news-refresh'),
@@ -118,36 +174,40 @@ class _ExploreScreenState extends State<ExploreScreen> {
           ),
         ],
       ),
-      body: _loading && _entries.isEmpty
-          ? const Center(child: CircularProgressIndicator(key: ValueKey('news-loading'), color: _green))
-          : RefreshIndicator(
-              color: _green,
-              onRefresh: _load,
-              child: CustomScrollView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                slivers: [
-                  SliverPadding(
-                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 40),
-                    sliver: SliverList(delegate: SliverChildListDelegate(_items())),
-                  ),
-                ],
-              ),
+      body: RefreshIndicator(
+        color: _green,
+        onRefresh: _load,
+        child: CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          slivers: [
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 40),
+              sliver: SliverList(delegate: SliverChildListDelegate(_items())),
             ),
+          ],
+        ),
+      ),
     );
   }
 
   /// Giữ cột tin ở bề rộng dễ đọc trên màn hình lớn.
   Widget _narrow(Widget child) => Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 760),
-          child: SizedBox(width: double.infinity, child: child),
-        ),
-      );
+    child: ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 760),
+      child: SizedBox(width: double.infinity, child: child),
+    ),
+  );
 
   List<Widget> _items() {
+    // Lần tải đầu chưa có tin: banner và khung xương thay cho vòng quay trống trơn.
+    if (_loading && _entries.isEmpty)
+      return [_narrow(_hero()), _narrow(_skeleton())];
+
     final out = <Widget>[
       _narrow(_hero()),
       if (!_loading) _narrow(_stats()),
+      if (!_loading && _kind == null && _featured.isNotEmpty)
+        _narrow(_featuredSection()),
       _narrow(_filters()),
     ];
     if (_failed && _entries.isNotEmpty) out.add(_narrow(_failedBanner()));
@@ -159,13 +219,24 @@ class _ExploreScreenState extends State<ExploreScreen> {
     }
 
     // Tin đứng đầu danh sách (nếu có ảnh bìa) được trình bày lớn hơn để thành điểm nhấn.
-    final featuredId = list.first.kind == NewsKind.review ? null : list.first.id;
+    final featuredId = list.first.kind == NewsKind.review
+        ? null
+        : list.first.id;
 
+    var revealIndex = 0;
     final pinned = list.where((e) => e.pinned).toList();
     if (pinned.isNotEmpty) {
       out.add(_narrow(_heading('Tin ghim', icon: Icons.push_pin_outlined)));
       for (final e in pinned) {
-        out.add(_narrow(_card(e, featured: e.id == featuredId)));
+        out.add(
+          _narrow(
+            _Reveal(
+              key: ValueKey('reveal-${e.id}'),
+              index: revealIndex++,
+              child: _card(e, featured: e.id == featuredId),
+            ),
+          ),
+        );
       }
     }
 
@@ -177,69 +248,402 @@ class _ExploreScreenState extends State<ExploreScreen> {
         out.add(_narrow(_heading(day)));
         lastDay = key;
       }
-      out.add(_narrow(_card(e, featured: e.id == featuredId)));
+      out.add(
+        _narrow(
+          _Reveal(
+            key: ValueKey('reveal-${e.id}'),
+            index: revealIndex++,
+            child: _card(e, featured: e.id == featuredId),
+          ),
+        ),
+      );
     }
     return out;
   }
 
-  /// Banner đầu trang: ảnh nền kèm lời chào và số tin hiện có.
+  /// Banner đầu trang: ảnh nền, lời chào theo giờ, thời tiết thật của Hà Nội kèm gợi ý ra sân, số tin hiện có.
+  /// Thời tiết chỉ hiện khi lấy được dữ liệu thật; không bao giờ hiện số đoán.
   Widget _hero() {
-    final fallback = Container(decoration: const BoxDecoration(gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFF166534), Color(0xFF0D9488)])));
+    final fallback = Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF166534), Color(0xFF0D9488)],
+        ),
+      ),
+    );
+    final w = _weather;
+    final weather = w == null ? null : ExploreHighlights.weatherChip(w);
+    final tip = w == null ? null : ExploreHighlights.weatherTip(w);
+    final evening = _now.hour < 5 || _now.hour >= 18;
+
+    Widget pill(Widget child, {Key? key}) => Container(
+      key: key,
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.18),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: child,
+    );
+
     return Container(
       key: const ValueKey('news-hero'),
-      height: 172,
+      constraints: const BoxConstraints(minHeight: 176),
       margin: const EdgeInsets.only(bottom: 14),
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         color: _green,
         borderRadius: BorderRadius.circular(20),
-        boxShadow: const [BoxShadow(color: Color(0x33166534), blurRadius: 18, offset: Offset(0, 8))],
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x33166534),
+            blurRadius: 18,
+            offset: Offset(0, 8),
+          ),
+        ],
       ),
       child: Stack(
-        fit: StackFit.expand,
         children: [
-          VenueImageView(imageUrl: _heroPhoto, errorWidget: fallback),
-          const DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.centerLeft,
-                end: Alignment.centerRight,
-                colors: [Color(0xE6064E3B), Color(0xB3166534), Color(0x33000000)],
-                stops: [0, 0.55, 1],
+          Positioned.fill(
+            child: VenueImageView(imageUrl: _heroPhoto, errorWidget: fallback),
+          ),
+          const Positioned.fill(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.centerLeft,
+                  end: Alignment.centerRight,
+                  colors: [
+                    Color(0xE6064E3B),
+                    Color(0xB3166534),
+                    Color(0x33000000),
+                  ],
+                  stops: [0, 0.55, 1],
+                ),
               ),
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-                  decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.18), borderRadius: BorderRadius.circular(20)),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.bolt_rounded, size: 14, color: Color(0xFFFDE047)),
-                      SizedBox(width: 4),
-                      Text('Cập nhật mới nhất', style: TextStyle(color: Colors.white, fontSize: 11.5, fontWeight: FontWeight.w700)),
-                    ],
+          SizedBox(
+            width: double.infinity,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // chừa chỗ bên phải cho nhãn "Ảnh minh họa" ở góc trên, tránh đè lên viên thời tiết
+                  Padding(
+                    padding: const EdgeInsets.only(right: 96),
+                    child: Wrap(
+                      spacing: 8,
+                      runSpacing: 6,
+                      children: [
+                        pill(
+                          key: const ValueKey('news-greeting'),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                evening
+                                    ? Icons.nights_stay_rounded
+                                    : Icons.wb_sunny_rounded,
+                                size: 14,
+                                color: const Color(0xFFFDE047),
+                              ),
+                              const SizedBox(width: 5),
+                              Text(
+                                ExploreHighlights.greeting(_now),
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        if (weather != null)
+                          pill(
+                            key: const ValueKey('news-weather'),
+                            Text(
+                              'Hà Nội · $weather',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
                   ),
-                ),
-                const SizedBox(height: 10),
-                const Text('Có gì mới ở AloBooking', style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w800, height: 1.15)),
-                const SizedBox(height: 6),
-                Text(
-                  _loading ? 'Đang cập nhật…' : '${_entries.length} tin gần đây: ưu đãi, sự kiện, sân mới và đánh giá của khách.',
-                  style: const TextStyle(color: Color(0xFFE2E8F0), fontSize: 13.5, height: 1.35),
-                ),
-              ],
+                  const SizedBox(height: 12),
+                  const Text(
+                    'Có gì mới ở AloBooking',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 24,
+                      fontWeight: FontWeight.w800,
+                      height: 1.15,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    _loading
+                        ? 'Đang cập nhật…'
+                        : '${_entries.length} tin gần đây: ưu đãi, sự kiện, sân mới và đánh giá của khách.',
+                    style: const TextStyle(
+                      color: Color(0xFFE2E8F0),
+                      fontSize: 13.5,
+                      height: 1.35,
+                    ),
+                  ),
+                  if (tip != null) ...[
+                    const SizedBox(height: 10),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Padding(
+                          padding: EdgeInsets.only(top: 1),
+                          child: Icon(
+                            Icons.lightbulb_outline_rounded,
+                            size: 15,
+                            color: Color(0xFFFDE047),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            tip,
+                            key: const ValueKey('news-weather-tip'),
+                            style: const TextStyle(
+                              color: Color(0xFFFEF9C3),
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w600,
+                              height: 1.35,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ],
+              ),
             ),
           ),
           const Positioned(right: 8, top: 8, child: StockPhotoLabel()),
         ],
       ),
+    );
+  }
+
+  /// Khung xương hiện trong lúc tải tin lần đầu: nhấp nháy nhẹ, báo trước hình dáng của thẻ tin.
+  Widget _skeleton() {
+    Widget bar(double w, double h) => Container(
+      width: w,
+      height: h,
+      decoration: BoxDecoration(
+        color: const Color(0xFFE2E8F0),
+        borderRadius: BorderRadius.circular(6),
+      ),
+    );
+    Widget card() => Container(
+      margin: const EdgeInsets.only(bottom: 14),
+      clipBehavior: Clip.antiAlias,
+      decoration: _cardDecoration(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          AspectRatio(
+            aspectRatio: 16 / 7,
+            child: Container(color: const Color(0xFFE2E8F0)),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                bar(200, 16),
+                const SizedBox(height: 10),
+                LayoutBuilder(builder: (_, c) => bar(c.maxWidth, 12)),
+                const SizedBox(height: 6),
+                LayoutBuilder(builder: (_, c) => bar(c.maxWidth * 0.7, 12)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+    return _Pulse(
+      key: const ValueKey('news-loading'),
+      child: Column(children: [card(), card()]),
+    );
+  }
+
+  /// Dải "Sân nổi bật": vuốt ngang. Mỗi sân kèm đúng lý do và con số lấy từ dữ liệu thật.
+  Widget _featuredSection() {
+    const kindStyle = {
+      FeaturedKind.rated: (Color(0xFFF59E0B), Icons.star_rounded),
+      FeaturedKind.cheapest: (Color(0xFF16A34A), Icons.sell_outlined),
+      FeaturedKind.mostCourts: (Color(0xFF2563EB), Icons.grid_view_rounded),
+    };
+    return Column(
+      key: const ValueKey('news-featured'),
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _heading('Sân nổi bật', icon: Icons.local_fire_department_outlined),
+        SizedBox(
+          height: 228,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: _featured.length,
+            separatorBuilder: (_, _) => const SizedBox(width: 12),
+            itemBuilder: (_, i) {
+              final f = _featured[i];
+              final v = f.venue;
+              final st = kindStyle[f.kind]!;
+              return InkWell(
+                key: ValueKey('news-featured-${v.id}'),
+                borderRadius: BorderRadius.circular(16),
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => VenueDetailScreen(venue: v),
+                  ),
+                ),
+                child: Container(
+                  width: 236,
+                  clipBehavior: Clip.antiAlias,
+                  decoration: _cardDecoration().copyWith(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      SizedBox(
+                        height: 118,
+                        width: double.infinity,
+                        child: Stack(
+                          fit: StackFit.expand,
+                          children: [
+                            _HoverZoom(
+                              child: VenueImageView(imageUrl: v.displayImage),
+                            ),
+                            Positioned(
+                              left: 8,
+                              top: 8,
+                              right: 8,
+                              child: Align(
+                                alignment: Alignment.centerLeft,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 4,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: st.$1,
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        st.$2,
+                                        size: 13,
+                                        color: Colors.white,
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Flexible(
+                                        child: Text(
+                                          f.reason,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                            if (v.hasStockImage)
+                              const Positioned(
+                                right: 6,
+                                bottom: 6,
+                                child: StockPhotoLabel(),
+                              ),
+                          ],
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              v.name,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: _ink,
+                                fontSize: 13.5,
+                                fontWeight: FontWeight.w800,
+                                height: 1.25,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Row(
+                              children: [
+                                const Icon(
+                                  Icons.place_outlined,
+                                  size: 13,
+                                  color: _grey,
+                                ),
+                                const SizedBox(width: 3),
+                                Expanded(
+                                  child: Text(
+                                    v.district.trim().isEmpty
+                                        ? Venue.courtLabel(v.type)
+                                        : '${Venue.courtLabel(v.type)} · ${v.district.trim()}',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      color: _grey,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              f.detail,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: _green,
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+        const SizedBox(height: 6),
+      ],
     );
   }
 
@@ -257,7 +661,8 @@ class _ExploreScreenState extends State<ExploreScreen> {
   Widget _stats() {
     final st = NewsFeed.stats(widget.venues, _reviews);
     if (st.places == 0) return const SizedBox.shrink();
-    Widget tile(String key, IconData icon, Color color, int n, String label) => Container(
+    Widget tile(String key, IconData icon, Color color, int n, String label) =>
+        Container(
           key: ValueKey(key),
           width: 156,
           height: 80,
@@ -267,14 +672,23 @@ class _ExploreScreenState extends State<ExploreScreen> {
             color: Colors.white,
             borderRadius: BorderRadius.circular(16),
             border: Border.all(color: _line),
-            boxShadow: const [BoxShadow(color: Color(0x0A0F172A), blurRadius: 10, offset: Offset(0, 4))],
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x0A0F172A),
+                blurRadius: 10,
+                offset: Offset(0, 4),
+              ),
+            ],
           ),
           child: Row(
             children: [
               Container(
                 width: 40,
                 height: 40,
-                decoration: BoxDecoration(color: color.withValues(alpha: 0.12), shape: BoxShape.circle),
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.12),
+                  shape: BoxShape.circle,
+                ),
                 child: Icon(icon, size: 21, color: color),
               ),
               const SizedBox(width: 10),
@@ -283,9 +697,26 @@ class _ExploreScreenState extends State<ExploreScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Text(_fmt(n), style: const TextStyle(color: _ink, fontSize: 20, fontWeight: FontWeight.w800, height: 1.1)),
+                    Text(
+                      _fmt(n),
+                      style: const TextStyle(
+                        color: _ink,
+                        fontSize: 20,
+                        fontWeight: FontWeight.w800,
+                        height: 1.1,
+                      ),
+                    ),
                     const SizedBox(height: 2),
-                    Text(label, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: _grey, fontSize: 11.5, height: 1.2)),
+                    Text(
+                      label,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: _grey,
+                        fontSize: 11.5,
+                        height: 1.2,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -303,10 +734,34 @@ class _ExploreScreenState extends State<ExploreScreen> {
           padding: const EdgeInsets.only(bottom: 4),
           child: Row(
             children: [
-              tile('news-stat-places', Icons.stadium_outlined, _green, st.places, 'Địa điểm sân'),
-              tile('news-stat-areas', Icons.map_outlined, const Color(0xFF2563EB), st.districts, 'Khu vực có sân'),
-              tile('news-stat-sports', Icons.sports_tennis_rounded, const Color(0xFFEA580C), st.sports, 'Môn thể thao'),
-              tile('news-stat-reviews', Icons.star_rounded, const Color(0xFFD97706), st.reviews, 'Đánh giá của khách'),
+              tile(
+                'news-stat-places',
+                Icons.stadium_outlined,
+                _green,
+                st.places,
+                'Địa điểm sân',
+              ),
+              tile(
+                'news-stat-areas',
+                Icons.map_outlined,
+                const Color(0xFF2563EB),
+                st.districts,
+                'Khu vực có sân',
+              ),
+              tile(
+                'news-stat-sports',
+                Icons.sports_tennis_rounded,
+                const Color(0xFFEA580C),
+                st.sports,
+                'Môn thể thao',
+              ),
+              tile(
+                'news-stat-reviews',
+                Icons.star_rounded,
+                const Color(0xFFD97706),
+                st.reviews,
+                'Đánh giá của khách',
+              ),
             ],
           ),
         ),
@@ -317,12 +772,24 @@ class _ExploreScreenState extends State<ExploreScreen> {
 
   Widget _filters() {
     int count(NewsKind k) => _entries.where((e) => e.kind == k).length;
-    Widget chip(String key, String label, int n, bool selected, VoidCallback onTap, {required IconData icon, required Color iconColor}) {
+    Widget chip(
+      String key,
+      String label,
+      int n,
+      bool selected,
+      VoidCallback onTap, {
+      required IconData icon,
+      required Color iconColor,
+    }) {
       return Padding(
         padding: const EdgeInsets.only(right: 8),
         child: ChoiceChip(
           key: ValueKey(key),
-          avatar: Icon(icon, size: 16, color: selected ? Colors.white : iconColor),
+          avatar: Icon(
+            icon,
+            size: 16,
+            color: selected ? Colors.white : iconColor,
+          ),
           label: Text('$label ($n)'),
           selected: selected,
           showCheckmark: false,
@@ -330,7 +797,11 @@ class _ExploreScreenState extends State<ExploreScreen> {
           selectedColor: _green,
           backgroundColor: Colors.white,
           side: BorderSide(color: selected ? _green : _line),
-          labelStyle: TextStyle(color: selected ? Colors.white : _ink, fontSize: 13, fontWeight: FontWeight.w600),
+          labelStyle: TextStyle(
+            color: selected ? Colors.white : _ink,
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+          ),
         ),
       );
     }
@@ -342,10 +813,25 @@ class _ExploreScreenState extends State<ExploreScreen> {
         scrollDirection: Axis.horizontal,
         child: Row(
           children: [
-            chip('news-chip-all', 'Tất cả', _entries.length, _kind == null, () => setState(() => _kind = null), icon: Icons.apps_rounded, iconColor: _green),
+            chip(
+              'news-chip-all',
+              'Tất cả',
+              _entries.length,
+              _kind == null,
+              () => setState(() => _kind = null),
+              icon: Icons.apps_rounded,
+              iconColor: _green,
+            ),
             for (final k in _filterOrder)
-              chip('news-chip-${k.name}', k.label, count(k), _kind == k, () => setState(() => _kind = k),
-                  icon: NewsKindStyle.of(k).icon, iconColor: NewsKindStyle.of(k).strong),
+              chip(
+                'news-chip-${k.name}',
+                k.label,
+                count(k),
+                _kind == k,
+                () => setState(() => _kind = k),
+                icon: NewsKindStyle.of(k).icon,
+                iconColor: NewsKindStyle.of(k).strong,
+              ),
           ],
         ),
       ),
@@ -357,8 +843,19 @@ class _ExploreScreenState extends State<ExploreScreen> {
       padding: const EdgeInsets.fromLTRB(2, 14, 2, 8),
       child: Row(
         children: [
-          if (icon != null) ...[Icon(icon, size: 16, color: _grey), const SizedBox(width: 6)],
-          Text(text, style: const TextStyle(color: _grey, fontSize: 13, fontWeight: FontWeight.w700, letterSpacing: 0.2)),
+          if (icon != null) ...[
+            Icon(icon, size: 16, color: _grey),
+            const SizedBox(width: 6),
+          ],
+          Text(
+            text,
+            style: const TextStyle(
+              color: _grey,
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.2,
+            ),
+          ),
         ],
       ),
     );
@@ -369,14 +866,24 @@ class _ExploreScreenState extends State<ExploreScreen> {
       key: const ValueKey('news-failed-banner'),
       margin: const EdgeInsets.only(top: 8),
       padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(color: const Color(0xFFFEF3C7), borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFFFCD34D))),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFEF3C7),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFFCD34D)),
+      ),
       child: const Row(
         children: [
           Icon(Icons.warning_amber_rounded, color: Color(0xFFB45309), size: 20),
           SizedBox(width: 10),
           Expanded(
-            child: Text('Một số tin chưa tải được nên danh sách có thể chưa đầy đủ. Kéo xuống hoặc bấm làm mới để thử lại.',
-                style: TextStyle(color: Color(0xFF78350F), fontSize: 12.5, height: 1.4)),
+            child: Text(
+              'Một số tin chưa tải được nên danh sách có thể chưa đầy đủ. Kéo xuống hoặc bấm làm mới để thử lại.',
+              style: TextStyle(
+                color: Color(0xFF78350F),
+                fontSize: 12.5,
+                height: 1.4,
+              ),
+            ),
           ),
         ],
       ),
@@ -413,9 +920,21 @@ class _ExploreScreenState extends State<ExploreScreen> {
         children: [
           Icon(icon, size: 40, color: _grey),
           const SizedBox(height: 12),
-          Text(title, textAlign: TextAlign.center, style: const TextStyle(color: _ink, fontSize: 16, fontWeight: FontWeight.w700)),
+          Text(
+            title,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: _ink,
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
           const SizedBox(height: 6),
-          Text(sub, textAlign: TextAlign.center, style: const TextStyle(color: _grey, fontSize: 13.5, height: 1.45)),
+          Text(
+            sub,
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: _grey, fontSize: 13.5, height: 1.45),
+          ),
           if (key == 'news-error') ...[
             const SizedBox(height: 14),
             FilledButton.icon(
@@ -432,17 +951,26 @@ class _ExploreScreenState extends State<ExploreScreen> {
   }
 
   BoxDecoration _cardDecoration() => BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: _line),
-        boxShadow: const [BoxShadow(color: Color(0x0F0F172A), blurRadius: 14, offset: Offset(0, 6))],
-      );
+    color: Colors.white,
+    borderRadius: BorderRadius.circular(18),
+    border: Border.all(color: _line),
+    boxShadow: const [
+      BoxShadow(color: Color(0x0F0F172A), blurRadius: 14, offset: Offset(0, 6)),
+    ],
+  );
 
   void _open(NewsEntry e, Venue? venue) {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => NewsDetailScreen(entry: e, venue: venue, now: _now, venues: widget.venues, reviews: _reviews, entries: _entries),
+        builder: (_) => NewsDetailScreen(
+          entry: e,
+          venue: venue,
+          now: _now,
+          venues: widget.venues,
+          reviews: _reviews,
+          entries: _entries,
+        ),
       ),
     );
   }
@@ -455,29 +983,59 @@ class _ExploreScreenState extends State<ExploreScreen> {
     ].join(' · ');
     return Container(
       padding: const EdgeInsets.fromLTRB(8, 8, 4, 8),
-      decoration: BoxDecoration(color: const Color(0xFFF8FAFC), borderRadius: BorderRadius.circular(12), border: Border.all(color: _line)),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: _line),
+      ),
       child: Row(
         children: [
           ClipRRect(
             borderRadius: BorderRadius.circular(8),
-            child: SizedBox(width: 44, height: 44, child: VenueImageView(imageUrl: venue.displayImage)),
+            child: SizedBox(
+              width: 44,
+              height: 44,
+              child: VenueImageView(imageUrl: venue.displayImage),
+            ),
           ),
           const SizedBox(width: 10),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(venue.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: _ink, fontSize: 13, fontWeight: FontWeight.w700)),
+                Text(
+                  venue.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: _ink,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
                 const SizedBox(height: 2),
-                Text(sub, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: _grey, fontSize: 11.5)),
+                Text(
+                  sub,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: _grey, fontSize: 11.5),
+                ),
               ],
             ),
           ),
           TextButton(
             key: ValueKey('news-venue-${e.id}'),
-            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => VenueDetailScreen(venue: venue))),
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => VenueDetailScreen(venue: venue),
+              ),
+            ),
             style: TextButton.styleFrom(foregroundColor: _green),
-            child: const Text('Xem sân', style: TextStyle(fontWeight: FontWeight.w700)),
+            child: const Text(
+              'Xem sân',
+              style: TextStyle(fontWeight: FontWeight.w700),
+            ),
           ),
         ],
       ),
@@ -488,7 +1046,8 @@ class _ExploreScreenState extends State<ExploreScreen> {
     final style = NewsKindStyle.of(e.kind);
     final venue = e.venueId == 0 ? null : _venueById[e.venueId];
     final expanded = _expanded.contains(e.id);
-    final long = e.body.length > _collapseOver || '\n'.allMatches(e.body).length >= 4;
+    final long =
+        e.body.length > _collapseOver || '\n'.allMatches(e.body).length >= 4;
     final isReview = e.kind == NewsKind.review;
     // Ảnh bìa: ảnh của tin; không có thì dùng ảnh của sân gắn kèm; không có nữa thì nền chuyển sắc theo loại tin.
     // Đánh giá của khách không dùng ảnh bìa lớn, chỉ có ảnh nhỏ của sân ở dải bên dưới.
@@ -506,12 +1065,14 @@ class _ExploreScreenState extends State<ExploreScreen> {
             InkWell(
               key: ValueKey('news-cover-${e.id}'),
               onTap: () => _open(e, venue),
-              child: NewsCover(
-                kind: e.kind,
-                imageUrl: coverUrl,
-                aspectRatio: featured ? 16 / 8 : 16 / 7,
-                timeLabel: NewsFeed.ago(e.time, _now),
-                pinned: e.pinned,
+              child: _HoverZoom(
+                child: NewsCover(
+                  kind: e.kind,
+                  imageUrl: coverUrl,
+                  aspectRatio: featured ? 16 / 8 : 16 / 7,
+                  timeLabel: NewsFeed.ago(e.time, _now),
+                  pinned: e.pinned,
+                ),
               ),
             ),
           Padding(
@@ -528,7 +1089,10 @@ class _ExploreScreenState extends State<ExploreScreen> {
                         Icon(Icons.push_pin, size: 14, color: style.strong),
                       ],
                       const Spacer(),
-                      Text(NewsFeed.ago(e.time, _now), style: const TextStyle(color: _grey, fontSize: 12)),
+                      Text(
+                        NewsFeed.ago(e.time, _now),
+                        style: const TextStyle(color: _grey, fontSize: 12),
+                      ),
                     ],
                   ),
                   const SizedBox(height: 10),
@@ -538,7 +1102,12 @@ class _ExploreScreenState extends State<ExploreScreen> {
                   onTap: () => _open(e, venue),
                   child: Text(
                     e.title,
-                    style: TextStyle(color: _ink, fontSize: featured ? 19 : 16.5, fontWeight: FontWeight.w800, height: 1.3),
+                    style: TextStyle(
+                      color: _ink,
+                      fontSize: featured ? 19 : 16.5,
+                      fontWeight: FontWeight.w800,
+                      height: 1.3,
+                    ),
                   ),
                 ),
                 if (e.stars > 0) ...[
@@ -546,7 +1115,13 @@ class _ExploreScreenState extends State<ExploreScreen> {
                   Row(
                     children: [
                       for (var i = 1; i <= 5; i++)
-                        Icon(i <= e.stars ? Icons.star_rounded : Icons.star_outline_rounded, size: 18, color: const Color(0xFFF59E0B)),
+                        Icon(
+                          i <= e.stars
+                              ? Icons.star_rounded
+                              : Icons.star_outline_rounded,
+                          size: 18,
+                          color: const Color(0xFFF59E0B),
+                        ),
                     ],
                   ),
                 ],
@@ -555,17 +1130,34 @@ class _ExploreScreenState extends State<ExploreScreen> {
                   Text(
                     e.body.trim(),
                     maxLines: expanded || !long ? null : 4,
-                    overflow: expanded || !long ? TextOverflow.clip : TextOverflow.ellipsis,
-                    style: const TextStyle(color: Color(0xFF334155), fontSize: 14, height: 1.5),
+                    overflow: expanded || !long
+                        ? TextOverflow.clip
+                        : TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Color(0xFF334155),
+                      fontSize: 14,
+                      height: 1.5,
+                    ),
                   ),
                   if (long)
                     Align(
                       alignment: Alignment.centerLeft,
                       child: TextButton(
                         key: ValueKey('news-more-${e.id}'),
-                        onPressed: () => setState(() => expanded ? _expanded.remove(e.id) : _expanded.add(e.id)),
-                        style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: const Size(0, 32), foregroundColor: _green),
-                        child: Text(expanded ? 'Thu gọn' : 'Xem thêm', style: const TextStyle(fontWeight: FontWeight.w700)),
+                        onPressed: () => setState(
+                          () => expanded
+                              ? _expanded.remove(e.id)
+                              : _expanded.add(e.id),
+                        ),
+                        style: TextButton.styleFrom(
+                          padding: EdgeInsets.zero,
+                          minimumSize: const Size(0, 32),
+                          foregroundColor: _green,
+                        ),
+                        child: Text(
+                          expanded ? 'Thu gọn' : 'Xem thêm',
+                          style: const TextStyle(fontWeight: FontWeight.w700),
+                        ),
                       ),
                     ),
                 ],
@@ -575,14 +1167,122 @@ class _ExploreScreenState extends State<ExploreScreen> {
                 ],
                 const SizedBox(height: 10),
                 Text(
-                  e.isAuto ? 'Tự động từ dữ liệu AloBooking' : 'Đăng bởi ${e.byline}',
-                  style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 11.5),
+                  e.isAuto
+                      ? 'Tự động từ dữ liệu AloBooking'
+                      : 'Đăng bởi ${e.byline}',
+                  style: const TextStyle(
+                    color: Color(0xFF94A3B8),
+                    fontSize: 11.5,
+                  ),
                 ),
               ],
             ),
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Thẻ hiện dần (mờ -> rõ, trượt lên nhẹ) với độ trễ theo thứ tự; thẻ ở xa chỉ chạy khi cuộn tới.
+/// Người dùng bật "giảm chuyển động" thì hiện ngay, không hiệu ứng.
+class _Reveal extends StatelessWidget {
+  final int index;
+  final Widget child;
+
+  const _Reveal({super.key, required this.index, required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    if (MediaQuery.of(context).disableAnimations) return child;
+    final delay = index.clamp(0, 5) * 80;
+    final total = 420 + delay;
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0, end: 1),
+      duration: Duration(milliseconds: total),
+      curve: Interval(delay / total, 1, curve: Curves.easeOutCubic),
+      builder: (context, t, child) => Opacity(
+        opacity: t,
+        child: Transform.translate(
+          offset: Offset(0, (1 - t) * 18),
+          child: child,
+        ),
+      ),
+      child: child,
+    );
+  }
+}
+
+/// Phóng ảnh lên một chút khi rê chuột (máy tính), tự cắt phần tràn.
+class _HoverZoom extends StatefulWidget {
+  final Widget child;
+
+  const _HoverZoom({required this.child});
+
+  @override
+  State<_HoverZoom> createState() => _HoverZoomState();
+}
+
+class _HoverZoomState extends State<_HoverZoom> {
+  bool _hover = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hover = true),
+      onExit: (_) => setState(() => _hover = false),
+      child: ClipRect(
+        child: AnimatedScale(
+          scale: _hover ? 1.05 : 1,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+          child: widget.child,
+        ),
+      ),
+    );
+  }
+}
+
+/// Nhấp nháy nhẹ cho khung xương khi đang tải. Bật "giảm chuyển động" thì đứng yên.
+class _Pulse extends StatefulWidget {
+  final Widget child;
+
+  const _Pulse({super.key, required this.child});
+
+  @override
+  State<_Pulse> createState() => _PulseState();
+}
+
+class _PulseState extends State<_Pulse> with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1100),
+  );
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (MediaQuery.of(context).disableAnimations) {
+      _c.stop();
+    } else if (!_c.isAnimating) {
+      _c.repeat(reverse: true);
+    }
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FadeTransition(
+      opacity: Tween<double>(
+        begin: 0.45,
+        end: 1,
+      ).animate(CurvedAnimation(parent: _c, curve: Curves.easeInOut)),
+      child: widget.child,
     );
   }
 }

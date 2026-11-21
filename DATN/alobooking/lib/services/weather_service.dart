@@ -30,6 +30,10 @@ class WeatherData {
   /// Dự báo mưa theo ngày (khóa dạng yyyy-MM-dd) cho các mô hình dự đoán nhu cầu/hủy sân
   final Map<String, DayRain> rainByDate;
 
+  /// Khả năng mưa tối đa (%) và nhiệt độ trung bình của buổi tối hôm nay (18h–22h); null nếu đã quá 22h hoặc không có dữ liệu.
+  final int? eveningRainProb;
+  final double? eveningTemp;
+
   WeatherData({
     required this.temperature,
     required this.rainMm,
@@ -44,6 +48,8 @@ class WeatherData {
     this.windKmh,
     this.forecast = const [],
     this.rainByDate = const {},
+    this.eveningRainProb,
+    this.eveningTemp,
   }) : updatedAt = updatedAt ?? DateTime.now();
 
   Map<String, dynamic> toMap() {
@@ -124,6 +130,7 @@ class WeatherService {
           final wind = (current['wind_speed_10m'] as num?)?.toDouble();
 
           final condition = _mapWmoCodeToCondition(code, rain);
+          final evening = eveningOutlook(data);
           final w = WeatherData(
             temperature: temp,
             rainMm: rain,
@@ -138,6 +145,8 @@ class WeatherService {
             windKmh: wind,
             forecast: _buildForecast(data),
             rainByDate: _buildRainByDate(data),
+            eveningRainProb: evening?.$1,
+            eveningTemp: evening?.$2,
           );
           _cache = w;
           _cachedAt = DateTime.now();
@@ -181,6 +190,35 @@ class WeatherService {
 
   // Tương thích tên gọi hàm cũ
   static Future<WeatherData> getHanoiWeather() => getCurrentWeather();
+
+  /// Buổi tối hôm nay (18h–22h): (khả năng mưa tối đa %, nhiệt độ trung bình). Null nếu đã quá 22h hoặc thiếu dữ liệu.
+  /// [nowHour] là giờ hiện tại theo múi giờ Việt Nam; mặc định lấy từ đồng hồ.
+  static (int, double)? eveningOutlook(Map<String, dynamic> data, {int? nowHour}) {
+    try {
+      final hour = nowHour ?? DateTime.now().toUtc().add(const Duration(hours: 7)).hour;
+      if (hour >= 22) return null;
+      final dates = ((data['daily'] as Map<String, dynamic>)['time'] as List).cast<String>();
+      final h = data['hourly'] as Map<String, dynamic>;
+      final times = (h['time'] as List).cast<String>();
+      final temps = h['temperature_2m'] as List;
+      final probs = h['precipitation_probability'] as List;
+      double sumT = 0;
+      var n = 0, maxProb = 0;
+      for (var i = 0; i < times.length; i++) {
+        if (!times[i].startsWith(dates.first)) continue;
+        final hr = int.parse(times[i].substring(11, 13));
+        if (hr < 18 || hr > 22) continue;
+        sumT += (temps[i] as num?)?.toDouble() ?? 0;
+        final p = (probs[i] as num?)?.toInt() ?? 0;
+        if (p > maxProb) maxProb = p;
+        n++;
+      }
+      if (n == 0) return null;
+      return (maxProb, sumT / n);
+    } catch (_) {
+      return null;
+    }
+  }
 
   /// Dự báo ngắn gọn bằng chữ để đưa vào ngữ cảnh chatbot.
   static List<String> _buildForecast(Map<String, dynamic> data) {
