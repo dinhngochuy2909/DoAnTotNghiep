@@ -4,6 +4,7 @@ import '../models/venue.dart';
 import '../models/customer.dart';
 import '../models/payment.dart';
 import '../models/notification_item.dart';
+import '../models/news_post.dart';
 
 class BookingItem {
   final String id;
@@ -199,6 +200,7 @@ class FirestoreService {
                   rejectReason: fields?['rejectReason']?['stringValue'] ?? '',
                   courtCount: int.tryParse((fields?['courtCount']?['integerValue'] ?? '0').toString()) ?? 0,
                   source: fields?['source']?['stringValue'] ?? '',
+                  approvedAt: DateTime.tryParse(fields?['approvedAt']?['stringValue'] ?? ''),
                 ));
               }
             }
@@ -250,6 +252,7 @@ class FirestoreService {
           'rejectReason': {'stringValue': venue.rejectReason},
           'courtCount': {'integerValue': venue.courtCount.toString()},
           'source': {'stringValue': venue.source},
+          if (venue.approvedAt != null) 'approvedAt': {'stringValue': venue.approvedAt!.toIso8601String()},
         }
       };
 
@@ -294,6 +297,7 @@ class FirestoreService {
           'rejectReason': {'stringValue': venue.rejectReason},
           'courtCount': {'integerValue': venue.courtCount.toString()},
           'source': {'stringValue': venue.source},
+          if (venue.approvedAt != null) 'approvedAt': {'stringValue': venue.approvedAt!.toIso8601String()},
         }
       };
 
@@ -319,16 +323,22 @@ class FirestoreService {
   }
 
   /// Duyệt / Từ chối duyệt sân (Super Admin)
-  static Future<bool> updateVenueApproval(int venueId, String newStatus, [String rejectReason = '']) async {
+  ///
+  /// [approvedAt]: lúc duyệt lần đầu, chỉ ghi khi duyệt thành công (giữ ngày cũ nếu sân từng được duyệt).
+  static Future<bool> updateVenueApproval(int venueId, String newStatus,
+      [String rejectReason = '', DateTime? approvedAt]) async {
     try {
+      final stamp = newStatus == 'approved' ? approvedAt : null;
       final payload = {
         'fields': {
           'approvalStatus': {'stringValue': newStatus},
           'rejectReason': {'stringValue': rejectReason},
+          if (stamp != null) 'approvedAt': {'stringValue': stamp.toIso8601String()},
         }
       };
       final response = await http.patch(
-        Uri.parse('$baseUrl/venues/$venueId?updateMask.fieldPaths=approvalStatus&updateMask.fieldPaths=rejectReason'),
+        Uri.parse('$baseUrl/venues/$venueId?updateMask.fieldPaths=approvalStatus&updateMask.fieldPaths=rejectReason'
+            '${stamp != null ? '&updateMask.fieldPaths=approvedAt' : ''}'),
         headers: {'Content-Type': 'application/json'},
         body: json.encode(payload),
       );
@@ -689,6 +699,18 @@ class FirestoreService {
     return list;
   }
 
+  /// Toàn bộ đánh giá (mới nhất trước), dùng cho dòng tin ở mục Khám phá.
+  static Future<List<ReviewItem>> getAllReviews() async {
+    final r = await _listDocs('reviews');
+    final list = <ReviewItem>[];
+    for (final doc in r.docs) {
+      final id = (doc['name'] as String).split('/').last;
+      list.add(ReviewItem.fromFirestoreFields(id, (doc['fields'] as Map<String, dynamic>?) ?? {}));
+    }
+    list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    return list;
+  }
+
   static Future<bool> addReview(ReviewItem review) async {
     try {
       final res = await http.post(
@@ -697,6 +719,62 @@ class FirestoreService {
         body: json.encode({'fields': review.toFirestoreFields()}),
       );
       return res.statusCode == 200 || res.statusCode == 201;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  // ==========================================
+  // TIN TỨC (NEWS) — do admin đăng, hiện ở mục Khám phá
+  // ==========================================
+
+  /// Tin đã đăng, mới nhất trước. Tải lỗi thì đặt [lastLoadFailed] và trả về danh sách rỗng.
+  static Future<List<NewsPost>> getNews() async {
+    final r = await _listDocs('news');
+    final list = <NewsPost>[];
+    for (final doc in r.docs) {
+      final id = (doc['name'] as String).split('/').last;
+      final p = NewsPost.tryFromFirestoreFields(id, (doc['fields'] as Map<String, dynamic>?) ?? {});
+      if (p != null) list.add(p);
+    }
+    list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    return list;
+  }
+
+  /// Đăng tin mới.
+  static Future<bool> addNews(NewsPost post) async {
+    try {
+      final res = await http.post(
+        Uri.parse('$baseUrl/news?documentId=${Uri.encodeComponent(post.id)}'),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({'fields': post.toFirestoreFields()}),
+      );
+      return res.statusCode == 200 || res.statusCode == 201;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Sửa tin (ghi đè đúng các trường của bài, không đổi ngày đăng).
+  static Future<bool> updateNews(NewsPost post) async {
+    try {
+      final fields = post.toFirestoreFields();
+      final mask = fields.keys.map((k) => 'updateMask.fieldPaths=$k').join('&');
+      final res = await http.patch(
+        Uri.parse('$baseUrl/news/${Uri.encodeComponent(post.id)}?$mask'),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({'fields': fields}),
+      );
+      return res.statusCode == 200;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  static Future<bool> deleteNews(String id) async {
+    try {
+      final res = await http.delete(Uri.parse('$baseUrl/news/${Uri.encodeComponent(id)}'));
+      return res.statusCode == 200;
     } catch (_) {
       return false;
     }

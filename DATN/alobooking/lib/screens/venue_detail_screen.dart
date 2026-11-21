@@ -709,6 +709,24 @@ class _VenueDetailScreenState extends State<VenueDetailScreen> with SingleTicker
           row(Icons.payments_outlined, 'Giá', v.price),
           row(Icons.qr_code_2_rounded, 'Thanh toán', 'Chuyển khoản VietQR (không nhận tiền mặt)'),
           if (v.ownerName.trim().isNotEmpty) row(Icons.person_outline_rounded, 'Quản lý', v.ownerName),
+          if (v.isDemo)
+            Padding(
+              padding: const EdgeInsets.only(top: 10),
+              child: Container(
+                key: const ValueKey('demo-venue-note'),
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFEF3C7),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Text(
+                  'SÂN DEMO: đây là dữ liệu minh họa do hệ thống tạo để trình diễn, không phải cơ sở có thật. '
+                  'Địa chỉ chỉ là khu vực gần đúng, giá và giờ mở cửa là mức tham khảo. '
+                  'Bạn có thể xem lịch và bảng giá nhưng không đặt hoặc thanh toán được.',
+                  style: TextStyle(fontSize: 12, height: 1.4, color: Color(0xFF92400E)),
+                ),
+              ),
+            ),
           if (v.isImportedListing)
             Padding(
               padding: const EdgeInsets.only(top: 10),

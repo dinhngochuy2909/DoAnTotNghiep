@@ -213,7 +213,8 @@ class RagService {
       FirestoreService.getBookings(),
     ]);
     // Chỉ sân đã được duyệt mới được tư vấn cho khách
-    _venues = (results[0] as List<Venue>).where((v) => v.isApproved).toList();
+    // Sân demo (dữ liệu minh họa) không có thật và không đặt được nên trợ lý AI không giới thiệu/thống kê chúng
+    _venues = (results[0] as List<Venue>).where((v) => v.isApproved && !v.isDemo).toList();
     _bookings = results[1] as List<BookingItem>;
     _policyChunks = _buildPolicyChunks();
     _rebuildIndex();

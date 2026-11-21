@@ -99,6 +99,27 @@ void main() {
       expect(_venue().isImportedListing, isFalse);
     });
 
+    test('sân demo được nhận diện, giữ qua JSON và không bị coi là sân nhập từ dữ liệu mở', () {
+      final v = _venue().copyWith(source: 'demo');
+      expect(v.isDemo, isTrue);
+      expect(v.isImportedListing, isFalse);
+      expect(Venue.fromJson(v.toJson()).isDemo, isTrue);
+      expect(_venue().isDemo, isFalse);
+      expect(_venue().copyWith(source: 'osm').isDemo, isFalse);
+    });
+
+    testWidgets('sân demo hiện cảnh báo và không cho chọn giờ để đặt', (tester) async {
+      await _openBooking(tester, _venue().copyWith(name: '[Demo] Cầu lông Cầu Giấy 01', source: 'demo'));
+      expect(find.byKey(const ValueKey('demo-venue-notice')), findsOneWidget);
+      final cell = find.byKey(const ValueKey('slot-0-18'));
+      await tester.ensureVisible(cell);
+      await tester.tap(cell);
+      await tester.pump();
+      expect(find.textContaining('Đây là sân demo'), findsOneWidget);
+      expect(find.textContaining('Tổng giờ: 0h00'), findsWidgets);
+      expect(find.text('TIẾP THEO'), findsOneWidget);
+    });
+
     testWidgets('không cho chọn giờ và không hiện giá bịa khi sân chưa niêm yết giá', (tester) async {
       await _openBooking(tester, _venue().copyWith(price: 'Liên hệ', source: 'osm'));
       expect(find.textContaining('chưa niêm yết giá'), findsWidgets);

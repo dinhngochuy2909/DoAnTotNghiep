@@ -58,9 +58,13 @@ ThemeData _vbTheme(BuildContext context) {
 class VisualBookingScreen extends StatefulWidget {
   final Venue venue;
 
+  /// Ngày mở sẵn khi vào màn hình (mặc định hôm nay), ví dụ khi người dùng chọn một khung giờ ở trang Khám phá.
+  final DateTime? initialDate;
+
   const VisualBookingScreen({
     super.key,
     required this.venue,
+    this.initialDate,
   });
 
   @override
@@ -95,7 +99,12 @@ class _VisualBookingScreenState extends State<VisualBookingScreen> {
   void initState() {
     super.initState();
     final now = DateTime.now();
-    _selectedDate = DateTime(now.year, now.month, now.day);
+    final today = DateTime(now.year, now.month, now.day);
+    final init = widget.initialDate;
+    // Không mở vào ngày đã qua
+    _selectedDate = (init != null && !DateTime(init.year, init.month, init.day).isBefore(today))
+        ? DateTime(init.year, init.month, init.day)
+        : today;
     _dateScrollController = ScrollController();
     _timelineScrollController = ScrollController();
 
@@ -155,6 +164,15 @@ class _VisualBookingScreenState extends State<VisualBookingScreen> {
   }
 
   void _toggleSlot(int courtIndex, int hour) {
+    if (widget.venue.isDemo) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Đây là sân demo (dữ liệu minh họa, không phải cơ sở có thật) nên không đặt được.'),
+          duration: Duration(seconds: 3),
+        ),
+      );
+      return;
+    }
     if (!widget.venue.hasListedPrice) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -1134,6 +1152,15 @@ class _VisualBookingScreenState extends State<VisualBookingScreen> {
               style: const TextStyle(fontSize: 13, color: _Vb.text, fontWeight: FontWeight.w800),
               textAlign: TextAlign.center,
             ),
+            if (widget.venue.isDemo) ...[
+              const SizedBox(height: 3),
+              const Text(
+                'SÂN DEMO: dữ liệu minh họa, không phải cơ sở có thật. Chỉ xem lịch và bảng giá, không đặt hoặc thanh toán được.',
+                key: ValueKey('demo-venue-notice'),
+                style: TextStyle(fontSize: 12, color: _Vb.warn, fontWeight: FontWeight.w700),
+                textAlign: TextAlign.center,
+              ),
+            ],
             if (widget.venue.isImportedListing && widget.venue.hasListedPrice) ...[
               const SizedBox(height: 3),
               const Text(

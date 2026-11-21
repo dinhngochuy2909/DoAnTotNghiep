@@ -3562,6 +3562,10 @@ class _HomeScreenState extends State<HomeScreen> {
                             ownerName: ownerName,
                             approvalStatus: approvalStatus,
                             rejectReason: isEdit ? existingVenue.rejectReason : '',
+                            // Giữ nguyên số sân con, nguồn dữ liệu và ngày duyệt khi sửa (trước đây bị đặt lại về mặc định)
+                            courtCount: isEdit ? existingVenue.courtCount : 0,
+                            source: isEdit ? existingVenue.source : '',
+                            approvedAt: isEdit ? existingVenue.approvedAt : (approvalStatus == 'approved' ? DateTime.now() : null),
                           );
 
                           Navigator.pop(ctx);

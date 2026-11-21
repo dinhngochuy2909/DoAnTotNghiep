@@ -65,21 +65,56 @@ class BookingSlots {
 
   static String _norm(String s) => s.toLowerCase().replaceAll(RegExp(r'\s+'), ' ').trim();
 
-  /// Các ô đã đặt của [venue] trong [date]: tập khoá "courtIdx-hour".
-  static Future<Set<String>> bookedSlots(Venue venue, DateTime date, int courtCount) async {
-    final bookings = await FirestoreService.getBookings();
-    final key = _norm(venue.name);
-    final slots = <String>{};
+  /// Lịch đã đặt của MỌI cụm sân trong [date], gom theo tên cụm: tên chuẩn hoá -> danh sách (tên sân con, các giờ bị chiếm).
+  /// Dùng khi cần xem nhiều cụm sân cùng lúc (trang Khám phá) để chỉ phải duyệt đơn đặt một lần.
+  static Map<String, List<(String, Set<int>)>> bookedIndex(Iterable<BookingItem> bookings, DateTime date) {
+    final index = <String, List<(String, Set<int>)>>{};
     for (final b in bookings) {
-      if (_norm(b.venueName) != key) continue;
       if (isCancelled(b.status)) continue;
       if (!sameDay(b.date, date)) continue;
-      final court = courtIndex(b.field, courtCount);
-      for (final h in occupiedHours(b.time)) {
+      final hours = occupiedHours(b.time);
+      if (hours.isEmpty) continue;
+      (index[_norm(b.venueName)] ??= []).add((b.field, hours));
+    }
+    return index;
+  }
+
+  /// Các ô đã đặt của [venue] lấy từ chỉ mục [bookedIndex]: tập khoá "courtIdx-hour".
+  static Set<String> slotsFromIndex(Map<String, List<(String, Set<int>)>> index, Venue venue, int courtCount) {
+    final slots = <String>{};
+    for (final (field, hours) in index[_norm(venue.name)] ?? const <(String, Set<int>)>[]) {
+      final court = courtIndex(field, courtCount);
+      for (final h in hours) {
         slots.add('$court-$h');
       }
     }
     return slots;
+  }
+
+  /// Các ô đã đặt của [venue] trong [date]: tập khoá "courtIdx-hour".
+  static Future<Set<String>> bookedSlots(Venue venue, DateTime date, int courtCount) async {
+    final bookings = await FirestoreService.getBookings();
+    return slotsFromIndex(bookedIndex(bookings, date), venue, courtCount);
+  }
+
+  /// Số sân con còn trống trong giờ [hour] khi các ô [booked] đã có người đặt.
+  static int freeCourts(Set<String> booked, int courtCount, int hour) {
+    var free = 0;
+    for (var c = 0; c < courtCount; c++) {
+      if (!booked.contains('$c-$hour')) free++;
+    }
+    return free;
+  }
+
+  /// Giờ mở cửa "06:00 – 23:00" -> (giờ mở, giờ đóng làm tròn lên). Sai định dạng thì lấy 05:00 – 23:00;
+  /// luôn nằm trong 05:00 – 24:00 để khớp bảng đặt sân.
+  static (int, int) openRange(String hours) {
+    final m = RegExp(r'(\d{1,2}):(\d{2})\s*[–—-]\s*(\d{1,2}):(\d{2})').firstMatch(hours);
+    if (m == null) return (5, 23);
+    final open = int.parse(m.group(1)!).clamp(5, 23);
+    var close = int.parse(m.group(3)!) + (int.parse(m.group(4)!) > 0 ? 1 : 0);
+    if (close <= open) close = 24; // mở qua đêm: coi như mở đến hết ngày
+    return (open, close.clamp(open + 1, 24));
   }
 
   /// Gộp các giờ liên tiếp thành ca: [18,19,21] -> ["18:00 - 20:00", "21:00 - 22:00"].

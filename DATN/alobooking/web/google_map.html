@@ -345,6 +345,7 @@
         });
 
         isGoogleMapLoaded = true;
+        googleMap.addListener('zoom_changed', applyPinSize);
         renderGoogleMarkers();
         console.log('Google Maps initialized successfully with', venuesData.length, 'venues');
       } catch (err) {
@@ -453,7 +454,51 @@
       return { url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg), size: size };
     }
 
+    // Kích thước ghim đổi theo mức zoom: zoom xa thì nhỏ cho đỡ chồng lên nhau, zoom gần thì to dần về cỡ gốc 48x58
+    var PIN_RATIO = 58 / 48;
+    var pinIconCache = {};
+    var currentPinWidth = 0;
+
+    function pinWidth(zoom) {
+      if (zoom >= 17) return 48;
+      if (zoom === 16) return 44;
+      if (zoom === 15) return 38;
+      if (zoom === 14) return 30;
+      if (zoom === 13) return 24;
+      return 20;
+    }
+
+    function pinIcon(type, w) {
+      var key = type + '|' + w;
+      if (!pinIconCache[key]) {
+        var h = Math.round(w * PIN_RATIO);
+        pinIconCache[key] = {
+          url: markerIconUrl(type),
+          scaledSize: new google.maps.Size(w, h),
+          anchor: new google.maps.Point(w / 2, h)
+        };
+      }
+      return pinIconCache[key];
+    }
+
+    // Thẻ thông tin phải nằm ngay trên đỉnh ghim, nên độ lệch cũng đổi theo kích thước ghim
+    function infoOffsetY(zoom) {
+      return Math.round(pinWidth(zoom) * PIN_RATIO * 0.72);
+    }
+
+    function applyPinSize() {
+      if (!googleMap) return;
+      var w = pinWidth(googleMap.getZoom() || 13);
+      if (w === currentPinWidth) return;
+      currentPinWidth = w;
+      for (var i = 0; i < googleMarkers.length; i++) {
+        googleMarkers[i].setIcon(pinIcon(googleMarkers[i].venueData.type, w));
+      }
+    }
+
     var googleClusterer = null;
+    // Chỉ gom ghim thành cụm khi thu nhỏ bản đồ ra xa (zoom <= 12); từ mức mặc định (13) trở vào hiện từng ghim riêng
+    var CLUSTER_MAX_ZOOM = 12;
 
     function renderGoogleMarkers() {
       if (googleClusterer) {
@@ -465,6 +510,7 @@
         googleMarkers[i].setMap(null);
       }
       googleMarkers = [];
+      currentPinWidth = pinWidth(googleMap.getZoom() || 13);
 
       for (var j = 0; j < venuesData.length; j++) {
         var v = venuesData[j];
@@ -474,11 +520,7 @@
         var marker = new google.maps.Marker({
           position: { lat: Number(v.lat), lng: Number(v.lng) },
           title: v.name,
-          icon: {
-            url: markerIconUrl(v.type),
-            scaledSize: new google.maps.Size(48, 58),
-            anchor: new google.maps.Point(24, 58)
-          }
+          icon: pinIcon(v.type, currentPinWidth)
         });
 
         marker.venueId = v.id;
@@ -489,7 +531,7 @@
             if (currentInfoWindow) currentInfoWindow.close();
             currentInfoWindow = new google.maps.InfoWindow({
               content: buildCardHtml(venue),
-              pixelOffset: new google.maps.Size(0, -42)
+              pixelOffset: new google.maps.Size(0, -infoOffsetY(googleMap.getZoom() || 13))
             });
             currentInfoWindow.open(googleMap, m);
             notifyParent('VENUE_SELECTED', { venueId: venue.id });
@@ -503,6 +545,9 @@
         googleClusterer = new markerClusterer.MarkerClusterer({
           map: googleMap,
           markers: googleMarkers,
+          algorithm: markerClusterer.SuperClusterAlgorithm
+            ? new markerClusterer.SuperClusterAlgorithm({ radius: 60, maxZoom: CLUSTER_MAX_ZOOM })
+            : undefined,
           renderer: {
             render: function(cluster) {
               var ic = clusterIcon(cluster.count);
@@ -541,7 +586,7 @@
       leafletMarkers = [];
 
       var group = (typeof L.markerClusterGroup === 'function')
-        ? L.markerClusterGroup({ showCoverageOnHover: false, maxClusterRadius: 50 })
+        ? L.markerClusterGroup({ showCoverageOnHover: false, maxClusterRadius: 50, disableClusteringAtZoom: CLUSTER_MAX_ZOOM + 1 })
         : null;
 
       for (var j = 0; j < venuesData.length; j++) {
@@ -722,7 +767,7 @@
             if (currentInfoWindow) currentInfoWindow.close();
             currentInfoWindow = new google.maps.InfoWindow({
               content: buildCardHtml(m.venueData),
-              pixelOffset: new google.maps.Size(0, -42)
+              pixelOffset: new google.maps.Size(0, -infoOffsetY(16))
             });
             currentInfoWindow.open(googleMap, m);
             break;

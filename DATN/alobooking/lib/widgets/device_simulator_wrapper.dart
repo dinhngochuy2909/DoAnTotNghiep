@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'app_scroll_behavior.dart';
 import 'floating_chat_button.dart';
 
 /// Danh sách thiết bị mẫu để giả lập giao diện
@@ -261,7 +262,11 @@ class _DeviceSimulatorWrapperState extends State<DeviceSimulatorWrapper> {
                                       bottom: _isLandscape ? 0 : 24,
                                     ),
                                   ),
-                                  child: widget.child,
+                                  // Trong khung điện thoại: giữ chuột kéo để vuốt, không hiện thanh cuộn kiểu máy tính
+                                  child: ScrollConfiguration(
+                                    behavior: PhoneScrollBehavior(ios: _selectedDevice != DeviceType.galaxyS25),
+                                    child: widget.child,
+                                  ),
                                 ),
 
                                 // Thanh trạng thái Status Bar chuẩn iOS 20
@@ -530,7 +535,7 @@ class _DeviceSimulatorWrapperState extends State<DeviceSimulatorWrapper> {
                     ],
                   ),
                   const Text(
-                    'Màn hình Super Retina XDR 120Hz · Viền Titan siêu tràn · Trải nghiệm như máy thật',
+                    'Giữ chuột và kéo để vuốt như ngón tay · Màn hình Super Retina XDR 120Hz · Viền Titan siêu tràn',
                     style: TextStyle(color: Color(0xFF94A3B8), fontSize: 11),
                   ),
                 ],

@@ -4,6 +4,7 @@ import '../data/venue_photos.dart';
 import '../models/venue.dart';
 import '../models/customer.dart';
 import '../models/payment.dart';
+import '../models/news_post.dart';
 import '../services/firestore_service.dart';
 import '../services/auth_service.dart';
 import 'home_screen.dart';
@@ -36,6 +37,7 @@ class _AdminScreenState extends State<AdminScreen> {
   List<BookingItem> _bookings = [];
   List<CustomerItem> _customers = [];
   List<PaymentItem> _payments = [];
+  List<NewsPost> _news = [];
   bool _isLoading = false;
   String _searchVenueQuery = '';
   String _selectedSport = 'all';
@@ -91,7 +93,7 @@ class _AdminScreenState extends State<AdminScreen> {
   @override
   void initState() {
     super.initState();
-    _selectedNavIndex = (widget.initialTabIndex >= 0 && widget.initialTabIndex < 5)
+    _selectedNavIndex = (widget.initialTabIndex >= 0 && widget.initialTabIndex < 6)
         ? widget.initialTabIndex
         : 0;
     _venues = List.from(widget.initialVenues);
@@ -116,6 +118,7 @@ class _AdminScreenState extends State<AdminScreen> {
         FirestoreService.getCustomers(),
         FirestoreService.getPayments(),
         WeatherService.getCurrentWeather(),
+        FirestoreService.getNews(),
       ]);
       if (!mounted) return;
       setState(() {
@@ -128,6 +131,8 @@ class _AdminScreenState extends State<AdminScreen> {
           _loadError = 'Một số dữ liệu chưa tải được từ máy chủ nên danh sách có thể chưa đầy đủ. Bấm làm mới để thử lại.';
         }
         _rainByDate = (results[4] as WeatherData).rainByDate;
+        _news = results[5] as List<NewsPost>;
+        _sortNews();
         _lastLoaded = DateTime.now();
         _isLoading = false;
       });
@@ -192,13 +197,14 @@ class _AdminScreenState extends State<AdminScreen> {
   // ==========================================
   // KHUNG TRANG QUẢN TRỊ (sidebar + thanh trên), tự thu gọn theo độ rộng
   // ==========================================
-  static const _tabTitles = ['Tổng quan', 'Quản lý sân', 'Đơn đặt sân', 'Khách hàng', 'Thanh toán'];
+  static const _tabTitles = ['Tổng quan', 'Quản lý sân', 'Đơn đặt sân', 'Khách hàng', 'Thanh toán', 'Tin tức'];
   static const _tabSubtitles = [
     'Doanh thu, đơn đặt sân và dự báo nhu cầu từ dữ liệu thực',
     'Duyệt sân, cập nhật thông tin và bảng giá',
     'Theo dõi và xử lý lịch đặt của khách',
     'Hồ sơ khách hàng và hạng thành viên',
     'Giao dịch và đối soát thanh toán',
+    'Đăng ưu đãi, sự kiện và thông báo hiện trong mục Khám phá của khách',
   ];
 
   @override
@@ -259,6 +265,7 @@ class _AdminScreenState extends State<AdminScreen> {
       (2, Icons.event_note_outlined, 'Đơn đặt sân', pendingBookings),
       (3, Icons.people_outline_rounded, 'Khách hàng', 0),
       (4, Icons.account_balance_wallet_outlined, 'Thanh toán', 0),
+      (5, Icons.campaign_outlined, 'Tin tức', 0),
     ];
     final user = AuthService.currentUser;
     final name = (user != null && user.fullName.trim().isNotEmpty) ? user.fullName.trim() : 'Quản trị viên';
@@ -753,6 +760,8 @@ class _AdminScreenState extends State<AdminScreen> {
         return _minWidthScroll(_buildCustomersTab());
       case 4:
         return _minWidthScroll(_buildPaymentsTab());
+      case 5:
+        return _buildNewsTab();
       default:
         return _buildAnalyticsTab();
     }
@@ -1645,8 +1654,10 @@ class _AdminScreenState extends State<AdminScreen> {
                   ),
                   ElevatedButton.icon(
                     onPressed: () async {
-                      await FirestoreService.updateVenueApproval(v.id, 'approved');
-                      final updated = v.copyWith(approvalStatus: 'approved');
+                      // Giữ ngày duyệt lần đầu nếu sân từng được duyệt (sửa rồi duyệt lại không thành "sân mới")
+                      final stamp = v.approvedAt ?? DateTime.now();
+                      await FirestoreService.updateVenueApproval(v.id, 'approved', '', stamp);
+                      final updated = v.copyWith(approvalStatus: 'approved', approvedAt: stamp);
                       final idx = _venues.indexWhere((item) => item.id == v.id);
                       if (idx != -1) setState(() => _venues[idx] = updated);
                       _showToast('Đã duyệt đăng bài sân "${v.name}" thành công!');
@@ -3473,6 +3484,7 @@ class _AdminScreenState extends State<AdminScreen> {
                       image: imageCtrl.text.trim(),
                       logo: 'https://ui-avatars.com/api/?name=PB&background=10b981&color=fff&size=40&bold=true',
                       courtCount: courtCount,
+                      approvedAt: DateTime.now(),
                     );
                     await FirestoreService.addVenue(created);
                     setState(() {
@@ -3523,6 +3535,381 @@ class _AdminScreenState extends State<AdminScreen> {
           ),
         ),
       ],
+    );
+  }
+
+  // ==========================================
+  // TAB 5: TIN TỨC (hiện ở mục Khám phá của khách)
+  // ==========================================
+  static String _newsStamp(DateTime d) =>
+      '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year} '
+      '${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
+
+  Color _newsColor(String category) {
+    switch (category) {
+      case 'promo':
+        return AdminUi.warn;
+      case 'event':
+        return AdminUi.violet;
+      case 'update':
+        return AdminUi.accent;
+      default:
+        return AdminUi.info;
+    }
+  }
+
+  void _sortNews() => _news.sort((a, b) {
+        if (a.pinned != b.pinned) return a.pinned ? -1 : 1;
+        return b.createdAt.compareTo(a.createdAt);
+      });
+
+  Widget _buildNewsTab() {
+    return LayoutBuilder(builder: (context, c) {
+      return SingleChildScrollView(
+        padding: EdgeInsets.all(c.maxWidth >= 760 ? 24 : 16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            AdminCard(
+              title: 'Tin đã đăng (${_news.length})',
+              subtitle: 'Hiện ở mục Khám phá của khách. Tin ghim nằm trên cùng, còn lại mới nhất trước.',
+              trailing: ElevatedButton.icon(
+                key: const ValueKey('admin-news-add'),
+                onPressed: () => _openNewsDialog(),
+                icon: const Icon(Icons.add_rounded, size: 18),
+                label: const Text('Đăng tin mới', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12.5)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AdminUi.accent,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+              ),
+              child: _news.isEmpty
+                  ? const EmptyHint(
+                      icon: Icons.campaign_outlined,
+                      text: 'Chưa có tin nào. Bấm "Đăng tin mới" để đăng ưu đãi, sự kiện hoặc thông báo cho khách.',
+                    )
+                  : Column(children: [for (final p in _news) _newsRow(p)]),
+            ),
+            const SizedBox(height: 16),
+            const AdminCard(
+              title: 'Tin tự động',
+              subtitle: 'Hệ thống tự thêm vào Khám phá, không cần đăng tay',
+              child: Text(
+                '• Sân mới: sân được duyệt hoặc thêm trong 30 ngày qua (chỉ sân có ngày duyệt; sân nhập từ dữ liệu mở và sân demo không đưa lên).\n'
+                '• Đánh giá mới: đánh giá có nội dung của khách trong 30 ngày qua, tối đa 10 đánh giá gần nhất.',
+                style: TextStyle(color: AdminUi.muted, fontSize: 13, height: 1.55),
+              ),
+            ),
+          ],
+        ),
+      );
+    });
+  }
+
+  Widget _newsRow(NewsPost p) {
+    final color = _newsColor(p.category);
+    final venueName = p.venueId == 0 ? null : _venues.where((v) => v.id == p.venueId).map((v) => v.name).firstOrNull;
+    return Container(
+      key: ValueKey('admin-news-${p.id}'),
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.fromLTRB(14, 12, 6, 12),
+      decoration: BoxDecoration(
+        color: AdminUi.surfaceAlt,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AdminUi.border),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(padding: const EdgeInsets.only(top: 1), child: StatusPill(NewsPost.labelOf(p.category), color)),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(p.title,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(color: AdminUi.text, fontSize: 14, fontWeight: FontWeight.w600)),
+                    ),
+                    if (p.pinned) ...[
+                      const SizedBox(width: 8),
+                      const Icon(Icons.push_pin, size: 14, color: AdminUi.warn),
+                    ],
+                  ],
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  '${_newsStamp(p.createdAt)}${venueName != null ? ' · Gắn sân: $venueName' : ''}',
+                  style: AdminUi.caption,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            key: ValueKey('admin-news-edit-${p.id}'),
+            tooltip: 'Sửa',
+            icon: const Icon(Icons.edit_outlined, size: 19, color: AdminUi.muted),
+            onPressed: () => _openNewsDialog(existing: p),
+          ),
+          IconButton(
+            key: ValueKey('admin-news-delete-${p.id}'),
+            tooltip: 'Xóa',
+            icon: const Icon(Icons.delete_outline_rounded, size: 19, color: AdminUi.danger),
+            onPressed: () => _confirmDeleteNews(p),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _confirmDeleteNews(NewsPost p) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AdminUi.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14), side: const BorderSide(color: AdminUi.border)),
+        title: const Text('Xóa tin này?', style: TextStyle(color: AdminUi.text, fontWeight: FontWeight.w600, fontSize: 16)),
+        content: Text('"${p.title}" sẽ biến mất khỏi mục Khám phá của khách.',
+            style: const TextStyle(color: AdminUi.muted, fontSize: 13.5, height: 1.45)),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Hủy', style: TextStyle(color: AdminUi.muted))),
+          FilledButton(
+            key: const ValueKey('admin-news-confirm-delete'),
+            onPressed: () async {
+              Navigator.pop(ctx);
+              final ok = await FirestoreService.deleteNews(p.id);
+              if (!mounted) return;
+              if (!ok) {
+                _showToast('Không xóa được tin. Kiểm tra kết nối rồi thử lại.', isError: true);
+                return;
+              }
+              setState(() => _news.removeWhere((x) => x.id == p.id));
+              _showToast('Đã xóa tin.');
+            },
+            style: FilledButton.styleFrom(backgroundColor: AdminUi.danger, foregroundColor: Colors.white),
+            child: const Text('Xóa'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _openNewsDialog({NewsPost? existing}) {
+    final isEdit = existing != null;
+    final titleCtrl = TextEditingController(text: existing?.title ?? '');
+    final bodyCtrl = TextEditingController(text: existing?.body ?? '');
+    final imageCtrl = TextEditingController(text: existing?.imageUrl ?? '');
+    var category = existing?.category ?? 'promo';
+    var pinned = existing?.pinned ?? false;
+    Venue? linked = (existing == null || existing.venueId == 0) ? null : _venues.where((v) => v.id == existing.venueId).firstOrNull;
+    String? error;
+    var saving = false;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setD) => AlertDialog(
+          backgroundColor: AdminUi.surface,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: const BorderSide(color: AdminUi.border)),
+          title: Text(isEdit ? 'Sửa tin' : 'Đăng tin mới', style: const TextStyle(color: AdminUi.text, fontWeight: FontWeight.w600, fontSize: 17)),
+          content: SizedBox(
+            width: 520,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Loại tin', style: TextStyle(color: AdminUi.muted, fontSize: 12)),
+                  const SizedBox(height: 6),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 6,
+                    children: [
+                      for (final c in NewsPost.categories)
+                        ChoiceChip(
+                          key: ValueKey('admin-news-cat-${c.$1}'),
+                          label: Text(c.$2),
+                          selected: category == c.$1,
+                          showCheckmark: false,
+                          onSelected: (_) => setD(() => category = c.$1),
+                          selectedColor: _newsColor(c.$1).withValues(alpha: 0.25),
+                          backgroundColor: AdminUi.bg,
+                          side: BorderSide(color: category == c.$1 ? _newsColor(c.$1) : AdminUi.border),
+                          labelStyle: TextStyle(color: category == c.$1 ? AdminUi.text : AdminUi.muted, fontSize: 12.5, fontWeight: FontWeight.w600),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  KeyedSubtree(key: const ValueKey('admin-news-title'), child: _dialogTextField('Tiêu đề *', titleCtrl, 'VD: Giảm 20% giờ vàng cuối tuần')),
+                  const SizedBox(height: 12),
+                  const Text('Nội dung *', style: TextStyle(color: AdminUi.muted, fontSize: 12)),
+                  const SizedBox(height: 4),
+                  Container(
+                    decoration: BoxDecoration(color: AdminUi.bg, borderRadius: BorderRadius.circular(8), border: Border.all(color: AdminUi.border)),
+                    child: TextField(
+                      key: const ValueKey('admin-news-body'),
+                      controller: bodyCtrl,
+                      minLines: 4,
+                      maxLines: 8,
+                      style: const TextStyle(color: Colors.white, fontSize: 13, height: 1.45),
+                      decoration: const InputDecoration(
+                        hintText: 'Viết nội dung tin: áp dụng khi nào, ở đâu, điều kiện...',
+                        hintStyle: TextStyle(color: AdminUi.faint, fontSize: 12),
+                        border: InputBorder.none,
+                        contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        isDense: true,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  KeyedSubtree(key: const ValueKey('admin-news-image'), child: _dialogTextField('Ảnh (đường dẫn http, không bắt buộc)', imageCtrl, 'https://...')),
+                  const SizedBox(height: 12),
+                  const Text('Gắn với một sân (không bắt buộc)', style: TextStyle(color: AdminUi.muted, fontSize: 12)),
+                  const SizedBox(height: 4),
+                  if (linked != null)
+                    Container(
+                      key: const ValueKey('admin-news-linked'),
+                      padding: const EdgeInsets.fromLTRB(12, 6, 4, 6),
+                      decoration: BoxDecoration(color: AdminUi.bg, borderRadius: BorderRadius.circular(8), border: Border.all(color: AdminUi.accent)),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.place_outlined, size: 16, color: AdminUi.accent),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(linked!.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AdminUi.text, fontSize: 13)),
+                          ),
+                          IconButton(
+                            tooltip: 'Bỏ gắn sân',
+                            icon: const Icon(Icons.close_rounded, size: 18, color: AdminUi.muted),
+                            onPressed: () => setD(() => linked = null),
+                          ),
+                        ],
+                      ),
+                    )
+                  else
+                    Autocomplete<Venue>(
+                      displayStringForOption: (v) => v.name,
+                      optionsBuilder: (value) {
+                        final q = value.text.trim().toLowerCase();
+                        if (q.length < 2) return const Iterable<Venue>.empty();
+                        return _venues.where((v) => v.isApproved && !v.isDemo && v.name.toLowerCase().contains(q)).take(8);
+                      },
+                      onSelected: (v) => setD(() => linked = v),
+                      fieldViewBuilder: (ctx, ctrl, focus, onSubmit) => Container(
+                        decoration: BoxDecoration(color: AdminUi.bg, borderRadius: BorderRadius.circular(8), border: Border.all(color: AdminUi.border)),
+                        child: TextField(
+                          key: const ValueKey('admin-news-venue-search'),
+                          controller: ctrl,
+                          focusNode: focus,
+                          style: const TextStyle(color: Colors.white, fontSize: 13),
+                          decoration: const InputDecoration(
+                            hintText: 'Gõ tên sân (từ 2 ký tự) để chọn',
+                            hintStyle: TextStyle(color: AdminUi.faint, fontSize: 12),
+                            prefixIcon: Icon(Icons.search, size: 18, color: AdminUi.muted),
+                            border: InputBorder.none,
+                            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                            isDense: true,
+                          ),
+                        ),
+                      ),
+                    ),
+                  const SizedBox(height: 10),
+                  SwitchListTile(
+                    key: const ValueKey('admin-news-pinned'),
+                    value: pinned,
+                    onChanged: (v) => setD(() => pinned = v),
+                    contentPadding: EdgeInsets.zero,
+                    dense: true,
+                    activeThumbColor: AdminUi.accent,
+                    title: const Text('Ghim lên đầu Khám phá', style: TextStyle(color: AdminUi.text, fontSize: 13.5)),
+                  ),
+                  if (error != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 6),
+                      child: Text(error!, key: const ValueKey('admin-news-error'), style: const TextStyle(color: AdminUi.danger, fontSize: 12.5)),
+                    ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: saving ? null : () => Navigator.pop(ctx),
+              child: const Text('Hủy', style: TextStyle(color: AdminUi.muted)),
+            ),
+            ElevatedButton(
+              key: const ValueKey('admin-news-save'),
+              onPressed: saving
+                  ? null
+                  : () async {
+                      final title = titleCtrl.text.trim();
+                      final body = bodyCtrl.text.trim();
+                      final img = imageCtrl.text.trim();
+                      String? err;
+                      if (title.length < 3) {
+                        err = 'Nhập tiêu đề (ít nhất 3 ký tự).';
+                      } else if (body.isEmpty) {
+                        err = 'Nhập nội dung tin.';
+                      } else if (img.isNotEmpty && !img.startsWith('http')) {
+                        err = 'Ảnh phải là đường dẫn bắt đầu bằng http:// hoặc https://';
+                      }
+                      if (err != null) {
+                        setD(() => error = err);
+                        return;
+                      }
+                      setD(() {
+                        saving = true;
+                        error = null;
+                      });
+                      final post = existing != null
+                          ? existing.copyWith(title: title, body: body, category: category, imageUrl: img, venueId: linked?.id ?? 0, pinned: pinned)
+                          : NewsPost(
+                              id: 'n${DateTime.now().millisecondsSinceEpoch}',
+                              title: title,
+                              body: body,
+                              category: category,
+                              imageUrl: img,
+                              venueId: linked?.id ?? 0,
+                              pinned: pinned,
+                              createdAt: DateTime.now(),
+                            );
+                      final ok = isEdit ? await FirestoreService.updateNews(post) : await FirestoreService.addNews(post);
+                      if (!ok) {
+                        if (ctx.mounted) {
+                          setD(() {
+                            saving = false;
+                            error = 'Không lưu được. Kiểm tra kết nối rồi thử lại.';
+                          });
+                        }
+                        return;
+                      }
+                      if (ctx.mounted) Navigator.pop(ctx);
+                      if (!mounted) return;
+                      setState(() {
+                        final i = _news.indexWhere((x) => x.id == post.id);
+                        if (i >= 0) {
+                          _news[i] = post;
+                        } else {
+                          _news.add(post);
+                        }
+                        _sortNews();
+                      });
+                      _showToast(isEdit ? 'Đã cập nhật tin.' : 'Đã đăng tin lên mục Khám phá.');
+                    },
+              style: ElevatedButton.styleFrom(backgroundColor: AdminUi.accent, foregroundColor: Colors.white),
+              child: Text(saving ? 'Đang lưu…' : (isEdit ? 'Lưu thay đổi' : 'Đăng tin')),
+            ),
+          ],
+        ),
+      ),
     );
   }
 

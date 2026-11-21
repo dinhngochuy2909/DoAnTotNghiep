@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'screens/home_screen.dart';
 import 'services/navigator_key.dart';
+import 'widgets/app_scroll_behavior.dart';
 import 'widgets/device_simulator_wrapper.dart';
 
 void main() {
@@ -17,6 +18,8 @@ class AlobookingApp extends StatelessWidget {
       navigatorKey: rootNavigatorKey,
       title: 'Alobooking - Đặt Sân Thể Thao Thông Minh',
       debugShowCheckedModeBanner: false,
+      // Cho phép kéo bằng chuột để cuộn (dải chip môn, khung giờ...) như vuốt bằng ngón tay
+      scrollBehavior: const AppScrollBehavior(),
       theme: ThemeData(
         useMaterial3: true,
         brightness: Brightness.light,

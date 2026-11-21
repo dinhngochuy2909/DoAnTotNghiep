@@ -24,8 +24,12 @@ class Venue {
   final int courtCount;
 
   /// Nguồn dữ liệu của cụm sân: '' = do chủ sân/admin nhập; 'osm' = nhập từ OpenStreetMap;
-  /// 'overture' = nhập từ Overture Maps (dữ liệu mở về địa điểm).
+  /// 'overture' = nhập từ Overture Maps (dữ liệu mở về địa điểm);
+  /// 'demo' = sân minh họa do hệ thống tạo để trình diễn, KHÔNG phải cơ sở có thật.
   final String source;
+
+  /// Lúc sân được duyệt lần đầu (null = không rõ, ví dụ sân nhập từ dữ liệu mở). Dùng để đưa "Sân mới" lên mục Khám phá.
+  final DateTime? approvedAt;
 
   Venue({
     required this.id,
@@ -48,6 +52,7 @@ class Venue {
     this.rejectReason = '',
     this.courtCount = 0,
     this.source = '',
+    this.approvedAt,
   });
 
   /// Số sân con mặc định cho một cụm sân theo môn, dùng khi chủ sân chưa khai báo số sân thật.
@@ -100,6 +105,9 @@ class Venue {
   /// chưa được cơ sở xác nhận trên AloBooking.
   bool get isImportedListing => source == 'osm' || source == 'overture';
 
+  /// Sân minh họa (dữ liệu demo): không phải cơ sở có thật nên không cho đặt/thanh toán.
+  bool get isDemo => source == 'demo';
+
   /// Ảnh để hiển thị: sân chưa có ảnh thì dùng một ảnh minh họa đúng môn (ổn định theo id).
   String get displayImage => image.trim().isNotEmpty ? image : VenuePhotos.forVenue(type, id);
 
@@ -134,6 +142,7 @@ class Venue {
     String? rejectReason,
     int? courtCount,
     String? source,
+    DateTime? approvedAt,
   }) {
     return Venue(
       id: id ?? this.id,
@@ -156,6 +165,7 @@ class Venue {
       rejectReason: rejectReason ?? this.rejectReason,
       courtCount: courtCount ?? this.courtCount,
       source: source ?? this.source,
+      approvedAt: approvedAt ?? this.approvedAt,
     );
   }
 
@@ -181,6 +191,7 @@ class Venue {
       rejectReason: json['rejectReason'] ?? '',
       courtCount: (json['courtCount'] as num?)?.toInt() ?? 0,
       source: json['source'] ?? '',
+      approvedAt: DateTime.tryParse((json['approvedAt'] ?? '').toString()),
     );
   }
 
@@ -206,6 +217,7 @@ class Venue {
       'rejectReason': rejectReason,
       'courtCount': courtCount,
       'source': source,
+      if (approvedAt != null) 'approvedAt': approvedAt!.toIso8601String(),
     };
   }
 }

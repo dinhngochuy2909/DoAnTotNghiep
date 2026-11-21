@@ -27,7 +27,7 @@ void main() {
     'tablet 800': Size(800, 1000),
     'phone 390': Size(390, 844),
   };
-  const tabs = ['Tổng quan', 'Quản lý sân', 'Đơn đặt sân', 'Khách hàng', 'Thanh toán'];
+  const tabs = ['Tổng quan', 'Quản lý sân', 'Đơn đặt sân', 'Khách hàng', 'Thanh toán', 'Tin tức'];
 
   for (final entry in sizes.entries) {
     for (var tab = 0; tab < tabs.length; tab++) {
