@@ -33,6 +33,8 @@ class _HomeScreenState extends State<HomeScreen> {
   int _currentNavIndex = 0;
   final Set<int> _favorites = {};
   String _selectedType = 'all'; // 'all' | 'badminton' | 'pickleball' | 'football' | 'tennis'
+  final ScrollController _scrollCtrl = ScrollController(); // để chân trang đưa người dùng lên đầu trang
+  final FocusNode _searchFocus = FocusNode();
 
   // ─── PHÂN QUYỀN VÀ TRẠNG THÁI QUẢN TRỊ ───
   bool get _isAdmin => AuthService.isAdmin;
@@ -64,6 +66,52 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     _loadVenues();
   }
+
+  @override
+  void dispose() {
+    _scrollCtrl.dispose();
+    _searchFocus.dispose();
+    super.dispose();
+  }
+
+  void _scrollToTop() {
+    if (!_scrollCtrl.hasClients) return;
+    _scrollCtrl.animateTo(0, duration: const Duration(milliseconds: 450), curve: Curves.easeOutCubic);
+  }
+
+  void _openAccount() {
+    setState(() => _currentNavIndex = 4);
+    Navigator.push(context, MaterialPageRoute(builder: (_) => AccountScreen(venues: _allVenues)));
+  }
+
+  /// Các liên kết ở chân trang điều khiển trang chủ: lên đầu trang, lọc theo môn, mở các màn hình khác.
+  FooterActions _footerActions() => FooterActions(
+        onHome: () {
+          setState(() {
+            _showOnlyMyVenues = false;
+            _selectedType = 'all';
+            _currentNavIndex = 0;
+          });
+          _scrollToTop();
+        },
+        onSearch: () {
+          _scrollToTop();
+          Future.delayed(const Duration(milliseconds: 480), () {
+            if (mounted) _searchFocus.requestFocus();
+          });
+        },
+        onBooked: _openBooked,
+        onFavorites: _openFavorites,
+        onAccount: _openAccount,
+        onTop: _scrollToTop,
+        onSport: (type) {
+          setState(() {
+            _showOnlyMyVenues = false;
+            _selectedType = type;
+          });
+          _scrollToTop();
+        },
+      );
 
   Future<void> _loadVenues() async {
     setState(() => _isLoading = true);
@@ -206,6 +254,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                       : (_isOwner ? 1.15 : 1.25);
 
                                   return CustomScrollView(
+                                    controller: _scrollCtrl,
                                     slivers: [
                                       SliverPadding(
                                         padding: const EdgeInsets.fromLTRB(16, 4, 16, 14),
@@ -223,8 +272,8 @@ class _HomeScreenState extends State<HomeScreen> {
                                         ),
                                       ),
                                       // ===== FOOTER =====
-                                      const SliverToBoxAdapter(
-                                        child: AppFooter(),
+                                      SliverToBoxAdapter(
+                                        child: AppFooter(actions: _footerActions()),
                                       ),
                                     ],
                                   );
@@ -785,6 +834,7 @@ class _HomeScreenState extends State<HomeScreen> {
             const SizedBox(width: 8),
             Expanded(
               child: TextField(
+                focusNode: _searchFocus,
                 onChanged: (val) => setState(() => _searchQuery = val),
                 style: const TextStyle(fontSize: 13, color: Color(0xFF1E293B)),
                 decoration: const InputDecoration(
@@ -855,6 +905,7 @@ class _HomeScreenState extends State<HomeScreen> {
           // Search input field
           Expanded(
             child: TextField(
+              focusNode: _searchFocus,
               onChanged: (val) => setState(() => _searchQuery = val),
               style: const TextStyle(fontSize: 13, color: Color(0xFF1E293B)),
               decoration: const InputDecoration(

@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:alobooking/data/venue_photos.dart';
 import 'package:alobooking/data/venues_data.dart';
 import 'package:alobooking/screens/admin_screen.dart';
 
@@ -278,4 +279,33 @@ void main() {
       }, () => MockClient(server.handle));
     });
   }
+
+  testWidgets('Chọn ảnh minh họa có sẵn: bấm một ảnh thì điền vào ô ảnh và lưu đúng đường dẫn', (tester) async {
+    final server = _FakeNewsServer();
+    await http.runWithClient(() async {
+      await _openTab(tester);
+      await tester.tap(_k('admin-news-add'));
+      await _settle(tester);
+      await _type(tester, 'admin-news-title', 'Giải bóng đá cuối tuần');
+      await tester.enterText(_k('admin-news-body'), 'Đăng ký tại quầy.');
+
+      await tester.ensureVisible(_k('admin-news-photo-sport-football'));
+      await tester.tap(_k('admin-news-photo-sport-football'));
+      await tester.pump();
+      await tester.ensureVisible(_k('admin-news-photo-2'));
+      await tester.tap(_k('admin-news-photo-2'));
+      await tester.pump();
+
+      final expected = VenuePhotos.forSport('football')[2];
+      final box = tester.widget<TextField>(find.descendant(of: _k('admin-news-image'), matching: find.byType(TextField)));
+      expect(box.controller!.text, expected, reason: 'bấm ảnh thì điền đường dẫn ảnh vào ô');
+
+      await tester.tap(_k('admin-news-save'));
+      await _settle(tester);
+      final post = server.requests.singleWhere((r) => r.method == 'POST');
+      final f = (jsonDecode(post.body)['fields'] as Map).cast<String, dynamic>();
+      expect(f['imageUrl']['stringValue'], expected);
+      expect(VenuePhotos.isStock(f['imageUrl']['stringValue'] as String), isTrue, reason: 'ảnh kho nên Khám phá sẽ dán nhãn minh họa');
+    }, () => MockClient(server.handle));
+  });
 }

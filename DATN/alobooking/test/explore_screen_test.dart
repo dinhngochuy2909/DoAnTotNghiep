@@ -8,33 +8,47 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:alobooking/models/news_post.dart';
 import 'package:alobooking/models/venue.dart';
 import 'package:alobooking/screens/explore_screen.dart';
+import 'package:alobooking/screens/news_detail_screen.dart';
 import 'package:alobooking/screens/venue_detail_screen.dart';
 import 'package:alobooking/services/firestore_service.dart';
 
 /// Hôm nay giả định: thứ bảy 21/11/2026, 10:30.
 final _now = DateTime(2026, 11, 21, 10, 30);
 
-Venue _v(int id, String name, {DateTime? approvedAt, String source = ''}) => Venue(
+Venue _v(
+  int id,
+  String name, {
+  DateTime? approvedAt,
+  String source = '',
+  String type = 'badminton',
+  String district = 'Cầu Giấy',
+  String status = 'approved',
+  String price = '80k - 100k/h',
+  List<String> tags = const [],
+}) =>
+    Venue(
       id: id,
       name: name,
-      type: 'badminton',
-      district: 'Cầu Giấy',
+      type: type,
+      district: district,
       distance: '',
-      address: '$id Phố Thử, Cầu Giấy, Hà Nội',
+      address: '$id Phố Thử, $district, Hà Nội',
       hours: '06:00 – 22:00',
-      tags: const [],
+      tags: tags,
       rating: 4.5,
-      price: '80k - 100k/h',
+      price: price,
       lat: 21.0,
       lng: 105.8,
       image: '',
       logo: '',
       source: source,
+      approvalStatus: status,
       approvedAt: approvedAt,
     );
 
-NewsPost _p(String id, String title, DateTime at, {String category = 'promo', bool pinned = false, int venueId = 0, String body = 'Nội dung ngắn'}) =>
-    NewsPost(id: id, title: title, body: body, category: category, pinned: pinned, venueId: venueId, createdAt: at);
+NewsPost _p(String id, String title, DateTime at,
+        {String category = 'promo', bool pinned = false, int venueId = 0, String body = 'Nội dung ngắn', String imageUrl = ''}) =>
+    NewsPost(id: id, title: title, body: body, category: category, pinned: pinned, venueId: venueId, imageUrl: imageUrl, createdAt: at);
 
 ReviewItem _r(String id, int venueId, DateTime at, {String comment = 'Sân sạch, đèn sáng', String user = 'Lan', int stars = 5}) =>
     ReviewItem(id: id, venueId: venueId, userId: 'u$id', userName: user, stars: stars, comment: comment, createdAt: at);
@@ -128,10 +142,238 @@ void main() {
     expect(find.descendant(of: _k('news-card-review-r1'), matching: find.byIcon(Icons.star_rounded)), findsNWidgets(4));
   });
 
-  testWidgets('Sân mới dùng ảnh kho thì ghi rõ "Ảnh minh họa"', (tester) async {
-    await _open(tester);
+  testWidgets('Ảnh kho thì ghi rõ "Ảnh minh họa"; ảnh riêng của tin thì không', (tester) async {
+    await _open(tester, loader: () async => _bundle(posts: [
+          _p('ghim', 'Khai trương cụm sân mới', _now.subtract(const Duration(days: 9)), category: 'event', pinned: true, imageUrl: 'https://example.com/anh-that.jpg'),
+          _p('km', 'Giảm 20% giờ vàng', _now.subtract(const Duration(hours: 3)), category: 'promo', venueId: 2),
+          _p('hq', 'Cập nhật cách đặt sân', _now.subtract(const Duration(days: 1, hours: 2)), category: 'update'),
+        ]));
+    // sân mới dùng ảnh kho của sân
     expect(find.descendant(of: _k('news-card-venue-1'), matching: find.text('Ảnh minh họa')), findsOneWidget);
-    expect(find.descendant(of: _k('news-card-post-km'), matching: find.text('Ảnh minh họa')), findsNothing);
+    // tin khuyến mãi không có ảnh riêng nhưng gắn Sân Beta → dùng ảnh sân (kho) nên cũng ghi minh họa
+    expect(find.descendant(of: _k('news-card-post-km'), matching: find.text('Ảnh minh họa')), findsOneWidget);
+    // ảnh admin tự đăng không phải ảnh kho → không dán nhãn
+    expect(find.descendant(of: _k('news-card-post-ghim'), matching: find.text('Ảnh minh họa')), findsNothing);
+    // tin không ảnh, không gắn sân → nền chuyển sắc, không có ảnh để dán nhãn
+    expect(find.descendant(of: _k('news-card-post-hq'), matching: find.text('Ảnh minh họa')), findsNothing);
+  });
+
+  testWidgets('Banner đầu trang có ảnh minh họa; mọi tin (trừ đánh giá) có ảnh bìa, đánh giá chỉ có ảnh nhỏ của sân', (tester) async {
+    await _open(tester);
+    expect(_k('news-hero'), findsOneWidget);
+    expect(find.descendant(of: _k('news-hero'), matching: find.text('Ảnh minh họa')), findsOneWidget);
+    for (final id in ['post-ghim', 'post-km', 'post-hq', 'venue-1']) {
+      expect(_k('news-cover-$id'), findsOneWidget, reason: 'tin $id phải có ảnh bìa');
+    }
+    expect(_k('news-cover-review-r1'), findsNothing);
+    expect(find.descendant(of: _k('news-card-review-r1'), matching: find.text('Cầu lông · Cầu Giấy · ảnh minh họa')), findsOneWidget);
+  });
+
+  testWidgets('Tin đứng đầu được trình bày lớn hơn (ảnh bìa 16:8), các tin sau 16:7', (tester) async {
+    await _open(tester);
+    final first = tester.getSize(_k('news-cover-post-ghim'));
+    final next = tester.getSize(_k('news-cover-post-km'));
+    expect(first.width / first.height, closeTo(16 / 8, 0.02));
+    expect(next.width / next.height, closeTo(16 / 7, 0.02));
+  });
+
+  testWidgets('Bấm ảnh bìa hoặc tiêu đề mở trang chi tiết với nội dung đầy đủ', (tester) async {
+    final long = 'Dòng đầu. ${List.filled(30, 'Nội dung rất dài của tin.').join(' ')}';
+    await _open(tester, loader: () async => _bundle(posts: [_p('km', 'Giảm 20% giờ vàng', _now.subtract(const Duration(hours: 3)), venueId: 2, body: long)]));
+
+    await tester.tap(_k('news-cover-post-km'));
+    await tester.pumpAndSettle();
+    expect(find.byType(NewsDetailScreen), findsOneWidget);
+    expect(find.text('Giảm 20% giờ vàng'), findsOneWidget);
+    expect(tester.widget<Text>(_k('news-detail-body')).data, long, reason: 'trang chi tiết hiện đủ nội dung, không cắt');
+    expect(tester.widget<Text>(_k('news-detail-body')).maxLines, isNull);
+
+    // từ trang chi tiết sang trang sân
+    await tester.tap(_k('news-detail-venue'));
+    await tester.pumpAndSettle();
+    expect(find.byType(VenueDetailScreen), findsOneWidget);
+    expect(tester.widget<VenueDetailScreen>(find.byType(VenueDetailScreen)).venue.id, 2);
+
+    // quay về, bấm tiêu đề cũng mở chi tiết
+    tester.state<NavigatorState>(find.byType(Navigator)).pop();
+    await tester.pumpAndSettle();
+    tester.state<NavigatorState>(find.byType(Navigator)).pop();
+    await tester.pumpAndSettle();
+    expect(find.byType(NewsDetailScreen), findsNothing);
+    await tester.tap(_k('news-open-post-km'));
+    await tester.pumpAndSettle();
+    expect(find.byType(NewsDetailScreen), findsOneWidget);
+  });
+
+  testWidgets('Trang chi tiết đánh giá: có sao, không ảnh bìa, vẫn tới được sân', (tester) async {
+    await _open(tester);
+    await tester.tap(_k('news-open-review-r1'));
+    await tester.pumpAndSettle();
+    expect(find.byType(NewsDetailScreen), findsOneWidget);
+    expect(find.text('Lan đánh giá Sân Beta'), findsOneWidget);
+    expect(tester.widget<Text>(_k('news-detail-body')).data, 'Sân sạch, đèn sáng');
+    expect(_k('news-detail-venue'), findsOneWidget);
+    // đánh giá này cũng nằm trong danh sách đánh giá của chính sân đó
+    expect(_k('news-detail-review-r1'), findsOneWidget);
+  });
+
+  testWidgets('Dải số liệu đếm từ dữ liệu thật: không tính sân minh họa hay sân chưa duyệt', (tester) async {
+    final venues = [
+      _v(1, 'Sân Alpha'),
+      _v(2, 'Sân Beta'),
+      _v(3, '[Demo] Sân', source: 'demo'),
+      _v(4, 'Sân Chờ Duyệt', status: 'pending'),
+      _v(5, 'Sân Dữ Liệu Mở', source: 'osm', type: 'tennis', district: 'Phường Xuân Đỉnh'),
+    ];
+    await _open(tester, venues: venues, loader: () async => _bundle(reviews: [_r('a', 2, _now), _r('b', 3, _now), _r('c', 4, _now)]));
+    String numberOf(String key) => tester.widget<Text>(find.descendant(of: _k(key), matching: find.byType(Text)).first).data!;
+    expect(numberOf('news-stat-places'), '3');
+    expect(numberOf('news-stat-areas'), '2');
+    expect(numberOf('news-stat-sports'), '2');
+    expect(numberOf('news-stat-reviews'), '1', reason: 'chỉ tính đánh giá của sân công khai');
+  });
+
+  testWidgets('Số liệu lớn có dấu chấm ngăn cách hàng nghìn; chưa có sân nào thì ẩn dải số liệu', (tester) async {
+    await _open(tester, venues: [for (var i = 1; i <= 1234; i++) _v(i, 'Sân $i')]);
+    expect(tester.widget<Text>(find.descendant(of: _k('news-stat-places'), matching: find.byType(Text)).first).data, '1.234');
+    await _open(tester, venues: const []);
+    expect(_k('news-stats'), findsNothing);
+  });
+
+  group('Trang chi tiết tin', () {
+    List<Venue> detailVenues() => [
+          _v(1, 'Sân Alpha', approvedAt: _now.subtract(const Duration(days: 1))),
+          _v(2, 'Sân Beta', tags: const ['Mái che', 'Đèn LED']),
+          _v(3, 'Sân Gamma'),
+          _v(4, 'Sân Delta Tennis', type: 'tennis'),
+          _v(6, '[Demo] Cầu lông 01', source: 'demo'),
+          _v(7, 'Sân Khác Quận', district: 'Đống Đa'),
+          _v(5, 'Sân Dữ Liệu Mở', source: 'osm', district: 'Phường Xuân Đỉnh'),
+        ];
+    NewsBundle detailBundle() => _bundle(
+          posts: [
+            _p('km', 'Giảm 20% giờ vàng', _now.subtract(const Duration(hours: 3)), venueId: 2),
+            _p('mo', 'Tin về sân dữ liệu mở', _now.subtract(const Duration(hours: 5)), category: 'update', venueId: 5),
+            _p('hq', 'Cập nhật cách đặt sân', _now.subtract(const Duration(days: 1, hours: 2)), category: 'update'),
+          ],
+          reviews: [
+            _r('r1', 2, _now.subtract(const Duration(hours: 1)), stars: 4),
+            _r('r2', 2, _now.subtract(const Duration(days: 2)), stars: 5, user: 'Minh (Khách hàng)', comment: 'Sân rộng, sạch'),
+            _r('r3', 3, _now.subtract(const Duration(days: 3)), stars: 3, comment: 'Tạm ổn'),
+          ],
+        );
+
+    testWidgets('Tin gắn sân: thông tin sân thật, đánh giá của đúng sân đó, sân tương tự và tin khác', (tester) async {
+      await _open(tester, venues: detailVenues(), loader: () async => detailBundle());
+      await tester.tap(_k('news-open-post-km'));
+      await tester.pumpAndSettle();
+
+      // ngày giờ đăng đầy đủ: 21/11/2026 10:30 trừ 3 giờ
+      expect(find.text('Đăng bởi AloBooking · 07:30 · 21/11/2026'), findsOneWidget);
+
+      final info = _k('news-detail-venue-info');
+      for (final t in ['Sân Beta', '2 Phố Thử, Cầu Giấy, Hà Nội', '06:00 – 22:00', '80k - 100k/h', '8 sân', 'Mái che', 'Đèn LED']) {
+        expect(find.descendant(of: info, matching: find.text(t)), findsOneWidget, reason: 'thiếu "$t"');
+      }
+      expect(_k('news-detail-imported-note'), findsNothing);
+
+      // đánh giá: chỉ của Sân Beta, trung bình (4+5)/2 = 4.5, người đánh giá đã bỏ phần vai trò
+      expect(_k('news-detail-review-r1'), findsOneWidget);
+      expect(_k('news-detail-review-r2'), findsOneWidget);
+      expect(_k('news-detail-review-r3'), findsNothing, reason: 'r3 là đánh giá của sân khác');
+      expect(tester.widget<Text>(_k('news-detail-avg')).data, '4.5');
+      expect(find.text('2 đánh giá'), findsOneWidget);
+      expect(find.descendant(of: _k('news-detail-review-r2'), matching: find.text('Minh')), findsOneWidget);
+
+      // sân tương tự: cùng môn; không có sân minh họa, sân khác môn hay chính sân này
+      expect(_k('news-similar-3'), findsOneWidget);
+      expect(_k('news-similar-7'), findsOneWidget);
+      expect(_k('news-similar-4'), findsNothing);
+      expect(_k('news-similar-6'), findsNothing);
+      expect(_k('news-similar-2'), findsNothing);
+
+      // tin khác: không có chính tin này, tối đa 3 tin mới nhất (đánh giá 1 giờ, tin 5 giờ, sân mới hôm qua)
+      expect(_k('news-related-post-km'), findsNothing);
+      expect(_k('news-related-review-r1'), findsOneWidget);
+      expect(_k('news-related-post-mo'), findsOneWidget);
+      expect(_k('news-related-venue-1'), findsOneWidget);
+      expect(_k('news-related-post-hq'), findsNothing, reason: 'chỉ hiện tối đa 3 tin khác');
+
+      // sang sân tương tự
+      await tester.tap(_k('news-similar-3'));
+      await tester.pumpAndSettle();
+      expect(tester.widget<VenueDetailScreen>(find.byType(VenueDetailScreen)).venue.id, 3);
+    });
+
+    testWidgets('Sân chưa có đánh giá thì nói thẳng, không bịa số', (tester) async {
+      await _open(tester, venues: detailVenues(), loader: () async => detailBundle());
+      await tester.tap(_k('news-open-post-mo'));
+      await tester.pumpAndSettle();
+      expect(_k('news-detail-no-reviews'), findsOneWidget);
+      expect(_k('news-detail-avg'), findsNothing);
+    });
+
+    testWidgets('Sân từ dữ liệu mở: ghi rõ là tham khảo kèm nguồn, không hiện số sân', (tester) async {
+      await _open(tester, venues: detailVenues(), loader: () async => detailBundle());
+      await tester.tap(_k('news-open-post-mo'));
+      await tester.pumpAndSettle();
+      expect(_k('news-detail-imported-note'), findsOneWidget);
+      expect(find.textContaining('OpenStreetMap contributors'), findsWidgets);
+      expect(find.text('Số sân'), findsNothing);
+      expect(find.descendant(of: _k('news-detail-venue-info'), matching: find.text('80k - 100k/h (tham khảo)')), findsOneWidget);
+    });
+
+    testWidgets('Tin không gắn sân: không có khối thông tin sân/đánh giá nhưng vẫn có tin khác', (tester) async {
+      await _open(tester, venues: detailVenues(), loader: () async => detailBundle());
+      await tester.tap(_k('news-open-post-hq'));
+      await tester.pumpAndSettle();
+      expect(_k('news-detail-venue-info'), findsNothing);
+      expect(_k('news-detail-reviews'), findsNothing);
+      expect(_k('news-detail-similar'), findsNothing);
+      expect(_k('news-detail-related'), findsOneWidget);
+    });
+
+    testWidgets('Bấm tin khác thì thay trang chi tiết (không chất chồng), quay lại là về Khám phá', (tester) async {
+      await _open(tester, venues: detailVenues(), loader: () async => detailBundle());
+      await tester.tap(_k('news-open-post-km'));
+      await tester.pumpAndSettle();
+      await tester.tap(_k('news-related-post-mo'));
+      await tester.pumpAndSettle();
+      expect(find.byType(NewsDetailScreen), findsOneWidget);
+      expect(tester.widget<Text>(_k('news-detail-title')).data, 'Tin về sân dữ liệu mở');
+
+      tester.state<NavigatorState>(find.byType(Navigator)).pop();
+      await tester.pumpAndSettle();
+      expect(find.byType(NewsDetailScreen), findsNothing);
+      expect(find.text('Có gì mới ở AloBooking'), findsOneWidget);
+    });
+
+    testWidgets('Sao chép nội dung tin vào bộ nhớ tạm và báo đã chép', (tester) async {
+      String? copied;
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(SystemChannels.platform, (call) async {
+        if (call.method == 'Clipboard.setData') copied = (call.arguments as Map)['text'] as String?;
+        return null;
+      });
+      addTearDown(() => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(SystemChannels.platform, null));
+
+      await _open(tester, venues: detailVenues(), loader: () async => detailBundle());
+      await tester.tap(_k('news-open-post-km'));
+      await tester.pumpAndSettle();
+      await tester.tap(_k('news-detail-copy'));
+      await tester.pump();
+      expect(copied, 'Giảm 20% giờ vàng\n\nNội dung ngắn');
+      expect(find.text('Đã sao chép nội dung tin'), findsOneWidget);
+    });
+
+    testWidgets('Điện thoại 390px: trang chi tiết đầy đủ không tràn bố cục', (tester) async {
+      // chiều cao lớn để danh sách dựng đủ thẻ (dựng lười); bề rộng 390 mới là thứ cần kiểm tra
+      await _open(tester, venues: detailVenues(), loader: () async => detailBundle(), size: const Size(390, 3200));
+      await tester.tap(_k('news-open-post-km'));
+      await tester.pumpAndSettle();
+      expect(find.byType(NewsDetailScreen), findsOneWidget);
+      expect(_k('news-detail-similar'), findsOneWidget);
+      if (realFont) expect(tester.takeException(), isNull);
+    });
   });
 
   testWidgets('Chip lọc có số lượng; chọn Ưu đãi chỉ còn tin ưu đãi; loại không có tin báo rõ', (tester) async {
@@ -261,7 +503,7 @@ void main() {
   });
 
   testWidgets('Màn rộng: cột tin giữ bề rộng đọc được (≤ 760)', (tester) async {
-    await _open(tester, size: const Size(1600, 1000));
+    await _open(tester, size: const Size(1600, 3200));
     expect(tester.getSize(_k('news-card-post-km')).width, lessThanOrEqualTo(760));
     if (realFont) expect(tester.takeException(), isNull);
   });

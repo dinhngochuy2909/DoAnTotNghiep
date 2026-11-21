@@ -3712,6 +3712,7 @@ class _AdminScreenState extends State<AdminScreen> {
     Venue? linked = (existing == null || existing.venueId == 0) ? null : _venues.where((v) => v.id == existing.venueId).firstOrNull;
     String? error;
     var saving = false;
+    var photoSport = 'badminton';
 
     showDialog(
       context: context,
@@ -3771,6 +3772,58 @@ class _AdminScreenState extends State<AdminScreen> {
                   ),
                   const SizedBox(height: 12),
                   KeyedSubtree(key: const ValueKey('admin-news-image'), child: _dialogTextField('Ảnh (đường dẫn http, không bắt buộc)', imageCtrl, 'https://...')),
+                  const SizedBox(height: 8),
+                  const Text('Hoặc chọn ảnh minh họa có sẵn', style: TextStyle(color: AdminUi.muted, fontSize: 12)),
+                  const SizedBox(height: 6),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 4,
+                    children: [
+                      for (final sp in const [('badminton', 'Cầu lông'), ('pickleball', 'Pickleball'), ('tennis', 'Tennis'), ('basketball', 'Bóng rổ'), ('football', 'Bóng đá')])
+                        ChoiceChip(
+                          key: ValueKey('admin-news-photo-sport-${sp.$1}'),
+                          label: Text(sp.$2),
+                          selected: photoSport == sp.$1,
+                          showCheckmark: false,
+                          onSelected: (_) => setD(() => photoSport = sp.$1),
+                          selectedColor: AdminUi.accent.withValues(alpha: 0.25),
+                          backgroundColor: AdminUi.bg,
+                          side: BorderSide(color: photoSport == sp.$1 ? AdminUi.accent : AdminUi.border),
+                          labelStyle: TextStyle(color: photoSport == sp.$1 ? AdminUi.text : AdminUi.muted, fontSize: 12, fontWeight: FontWeight.w600),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    height: 62,
+                    child: ListView.separated(
+                      key: const ValueKey('admin-news-photos'),
+                      scrollDirection: Axis.horizontal,
+                      itemCount: math.min(12, VenuePhotos.forSport(photoSport).length),
+                      separatorBuilder: (_, _) => const SizedBox(width: 8),
+                      itemBuilder: (_, i) {
+                        final url = VenuePhotos.forSport(photoSport)[i];
+                        final chosen = imageCtrl.text.trim() == url;
+                        return InkWell(
+                          key: ValueKey('admin-news-photo-$i'),
+                          borderRadius: BorderRadius.circular(8),
+                          onTap: () => setD(() => imageCtrl.text = url),
+                          child: Container(
+                            width: 104,
+                            clipBehavior: Clip.antiAlias,
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: chosen ? AdminUi.accent : AdminUi.border, width: chosen ? 2.5 : 1),
+                            ),
+                            child: VenueImageView(imageUrl: url),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  const Text('Ảnh trong kho là ảnh minh họa (Pexels/Unsplash) nên tin sẽ ghi nhãn "Ảnh minh họa". Ảnh riêng của bạn thì không có nhãn.',
+                      style: TextStyle(color: AdminUi.faint, fontSize: 11, height: 1.35)),
                   const SizedBox(height: 12),
                   const Text('Gắn với một sân (không bắt buộc)', style: TextStyle(color: AdminUi.muted, fontSize: 12)),
                   const SizedBox(height: 4),

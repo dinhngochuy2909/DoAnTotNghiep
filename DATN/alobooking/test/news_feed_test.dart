@@ -218,6 +218,78 @@ void main() {
     });
   });
 
+  group('Số liệu và gợi ý cho trang chi tiết', () {
+    test('stats: chỉ đếm sân công khai (đã duyệt, không demo); số đánh giá chỉ của sân đó', () {
+      final venues = [
+        _v(1, 'A'),
+        _v(2, 'B', district: 'Đống Đa', type: 'tennis'),
+        _v(3, '[Demo]', source: 'demo'),
+        _v(4, 'Chờ', status: 'pending'),
+        _v(5, 'Dữ liệu mở', source: 'osm', district: '  '),
+      ];
+      final st = NewsFeed.stats(venues, [
+        _r('1', 1, _now),
+        _r('2', 2, _now),
+        _r('3', 3, _now), // sân demo
+        _r('4', 4, _now), // sân chưa duyệt
+        _r('5', 99, _now), // sân không tồn tại
+        ReviewItem(id: '6', venueId: 1, userId: 'u', userName: 'x', stars: 0, comment: '', createdAt: _now), // sao không hợp lệ
+      ]);
+      expect(st.places, 3);
+      expect(st.districts, 2, reason: 'khu vực trống không tính');
+      expect(st.sports, 2);
+      expect(st.reviews, 2);
+    });
+
+    test('stats: không có dữ liệu thì toàn số 0, không bịa số', () {
+      final st = NewsFeed.stats(const [], const []);
+      expect((st.places, st.districts, st.sports, st.reviews), (0, 0, 0, 0));
+    });
+
+    test('reviewsOf: chỉ đánh giá của sân đó, mới nhất trước, bỏ sao không hợp lệ', () {
+      final list = NewsFeed.reviewsOf(1, [
+        _r('cu', 1, _now.subtract(const Duration(days: 5))),
+        _r('moi', 1, _now.subtract(const Duration(hours: 1))),
+        _r('khac', 2, _now),
+        ReviewItem(id: 'sai', venueId: 1, userId: 'u', userName: 'x', stars: 9, comment: '', createdAt: _now),
+      ]);
+      expect(list.map((r) => r.id), ['moi', 'cu']);
+    });
+
+    test('similarVenues: cùng môn, loại demo/chưa duyệt/chính nó; cùng quận và có giá lên trước', () {
+      final base = _v(1, 'Gốc', district: 'Cầu Giấy');
+      final all = [
+        base,
+        _v(2, 'Cùng quận', district: 'Cầu Giấy'),
+        _v(3, 'Khác quận', district: 'Đống Đa'),
+        _v(4, 'Khác môn', type: 'tennis'),
+        _v(5, '[Demo]', source: 'demo'),
+        _v(6, 'Chờ duyệt', status: 'pending'),
+        _v(7, 'Mở cùng quận', source: 'osm', district: 'Cầu Giấy'),
+        _v(8, 'Cùng quận chưa giá', district: 'Cầu Giấy', price: 'Liên hệ'),
+      ];
+      final ids = NewsFeed.similarVenues(base, all).map((v) => v.id).toList();
+      expect(ids, [2, 8, 7, 3]);
+      expect(NewsFeed.similarVenues(base, all, max: 2).length, 2);
+      expect(NewsFeed.similarVenues(base, [base]), isEmpty);
+    });
+
+    test('relatedEntries: bỏ chính tin đó, cùng loại lên trước rồi mới nhất trước, tối đa max', () {
+      NewsEntry e(String id, NewsKind k, int hoursAgo) => NewsEntry(id: id, kind: k, title: id, time: _now.subtract(Duration(hours: hoursAgo)));
+      final all = [e('a', NewsKind.update, 1), e('b', NewsKind.promo, 2), e('c', NewsKind.update, 3), e('d', NewsKind.event, 4), e('f', NewsKind.update, 5)];
+      expect(NewsFeed.relatedEntries(all[0], all).map((x) => x.id), ['c', 'f', 'b']);
+      expect(NewsFeed.relatedEntries(all[1], all, max: 2).map((x) => x.id), ['a', 'c']);
+      expect(NewsFeed.relatedEntries(all[0], [all[0]]), isEmpty);
+    });
+
+    test('fullDate và reviewerName', () {
+      expect(NewsFeed.fullDate(DateTime(2026, 11, 3, 7, 5)), '07:05 · 03/11/2026');
+      expect(NewsFeed.reviewerName('Lan (Khách hàng)'), 'Lan');
+      expect(NewsFeed.reviewerName('   '), 'Một khách hàng');
+      expect(NewsFeed.reviewerName('Minh (Hà Đông)'), 'Minh (Hà Đông)');
+    });
+  });
+
   group('NewsFeed.ago / dayLabel', () {
     test('ago', () {
       expect(NewsFeed.ago(_now.subtract(const Duration(seconds: 20)), _now), 'Vừa xong');

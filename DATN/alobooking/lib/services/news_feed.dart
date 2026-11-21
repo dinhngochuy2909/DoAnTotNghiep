@@ -134,8 +134,7 @@ class NewsFeed {
       ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
     for (final r in recent.take(maxAutoReviews)) {
       final v = byId[r.venueId]!;
-      final name = r.userName.replaceFirst(_roleSuffix, '').trim();
-      final who = name.isEmpty ? 'Một khách hàng' : name;
+      final who = reviewerName(r.userName);
       out.add(NewsEntry(
         id: 'review-${r.id}',
         kind: NewsKind.review,
@@ -154,6 +153,56 @@ class NewsFeed {
       return b.time.compareTo(a.time);
     });
     return out;
+  }
+
+  /// Tên người đánh giá để hiển thị: bỏ phần vai trò dính kèm, không có tên thì "Một khách hàng".
+  static String reviewerName(String raw) {
+    final n = raw.replaceFirst(_roleSuffix, '').trim();
+    return n.isEmpty ? 'Một khách hàng' : n;
+  }
+
+  /// Sân hiển thị công khai trong Khám phá: đã duyệt và không phải sân minh họa (demo).
+  static bool isPublic(Venue v) => v.isApproved && !v.isDemo;
+
+  /// Số liệu tổng quan, đếm từ dữ liệu thật: địa điểm sân công khai, số quận/huyện, số môn và số đánh giá của khách.
+  static ({int places, int districts, int sports, int reviews}) stats(List<Venue> venues, List<ReviewItem> reviews) {
+    final pub = venues.where(isPublic).toList();
+    final ids = {for (final v in pub) v.id};
+    return (
+      places: pub.length,
+      districts: {for (final v in pub) if (v.district.trim().isNotEmpty) v.district.trim()}.length,
+      sports: {for (final v in pub) if (v.type.trim().isNotEmpty) v.type.trim()}.length,
+      reviews: reviews.where((r) => ids.contains(r.venueId) && r.stars >= 1 && r.stars <= 5).length,
+    );
+  }
+
+  /// Đánh giá của một sân (sao hợp lệ 1–5), mới nhất trước.
+  static List<ReviewItem> reviewsOf(int venueId, List<ReviewItem> reviews) =>
+      reviews.where((r) => r.venueId == venueId && r.stars >= 1 && r.stars <= 5).toList()..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+
+  /// Sân tương tự: cùng môn, ưu tiên cùng quận, rồi sân do chủ sân đăng và có giá niêm yết. Chỉ lấy sân công khai.
+  static List<Venue> similarVenues(Venue v, List<Venue> all, {int max = 6}) {
+    final list = all.where((o) => o.id != v.id && o.type == v.type && isPublic(o)).toList();
+    int rank(Venue o) => (o.district == v.district ? 0 : 4) + (o.isImportedListing ? 2 : 0) + (o.hasListedPrice ? 0 : 1);
+    list.sort((a, b) {
+      final c = rank(a).compareTo(rank(b));
+      return c != 0 ? c : a.id.compareTo(b.id);
+    });
+    return list.take(max).toList();
+  }
+
+  /// Tin liên quan: các tin khác trong dòng tin, tin cùng loại đứng trước (giữ thứ tự mới nhất trước).
+  static List<NewsEntry> relatedEntries(NewsEntry current, List<NewsEntry> all, {int max = 3}) {
+    final others = all.where((e) => e.id != current.id).toList();
+    final same = others.where((e) => e.kind == current.kind);
+    final rest = others.where((e) => e.kind != current.kind);
+    return [...same, ...rest].take(max).toList();
+  }
+
+  /// Ngày giờ đầy đủ: "20:03 · 21/11/2026".
+  static String fullDate(DateTime t) {
+    String two(int n) => n.toString().padLeft(2, '0');
+    return '${two(t.hour)}:${two(t.minute)} · ${two(t.day)}/${two(t.month)}/${t.year}';
   }
 
   /// "Vừa xong", "5 phút trước", "3 giờ trước", "2 ngày trước", hoặc ngày đầy đủ nếu đã quá 7 ngày.
