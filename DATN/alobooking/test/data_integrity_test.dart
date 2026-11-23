@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:alobooking/models/customer.dart';
 import 'package:alobooking/models/user.dart';
 import 'package:alobooking/services/firestore_service.dart';
+import 'package:alobooking/services/venue_cache.dart';
 
 BookingItem b(String id, String status, String amount,
     {String phone = '0901234567', String customer = 'Khách', String userId = ''}) {
@@ -84,6 +85,7 @@ void main() {
   group('Không còn dữ liệu mẫu khi không tải được', () {
     // Trong flutter test mọi yêu cầu mạng trả mã 400 -> mô phỏng lỗi máy chủ
     test('đơn, sân, khách, thanh toán, thông báo đều rỗng và báo lỗi tải', () async {
+      VenueCache.clear(); // không có bản nhớ nào để dùng thay cho dữ liệu lỗi
       FirestoreService.lastLoadFailed = false;
       expect(await FirestoreService.getBookings(), isEmpty);
       expect(await FirestoreService.getVenues(), isEmpty);

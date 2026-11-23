@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:alobooking/models/venue.dart';
 import 'package:alobooking/services/firestore_service.dart';
+import 'package:alobooking/services/venue_cache.dart';
 
 Venue _venue({DateTime? approvedAt}) => Venue(
       id: 77,
@@ -80,6 +81,8 @@ void main() {
   });
 
   test('Tải sân đọc lại ngày duyệt; sân cũ không có trường này thì để trống', () async {
+    VenueCache.clear();
+    addTearDown(VenueCache.clear);
     Map<String, dynamic> doc(int id, {String? approvedAt}) => {
           'name': 'projects/x/databases/(default)/documents/venues/$id',
           'fields': {

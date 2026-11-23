@@ -1,9 +1,27 @@
 import '../models/venue.dart';
+import 'booking_slots.dart';
 import 'firestore_service.dart';
 import 'news_feed.dart';
 import 'weather_service.dart';
 
 enum FeaturedKind { rated, cheapest, mostCourts }
+
+enum GoldenPhase { before, during, after }
+
+/// Trạng thái ca giờ vàng so với bây giờ.
+class GoldenStatus {
+  final GoldenPhase phase;
+
+  /// before: còn bao lâu nữa thì bắt đầu; during: còn bao lâu nữa thì hết; after: còn bao lâu nữa tới ca ngày mai.
+  final Duration remaining;
+
+  /// Vị trí của "bây giờ" trong ngày, từ 0 (0h) đến 1 (24h).
+  final double dayFraction;
+
+  const GoldenStatus(this.phase, this.remaining, this.dayFraction);
+}
+
+enum RainTag { fine, maybe, likely }
 
 /// Một sân được làm nổi bật ở Khám phá kèm lý do. Lý do luôn là một sự thật đếm được từ dữ liệu
 /// (điểm đánh giá của khách, giá niêm yết, số sân đã khai báo), không phải xếp hạng tự đặt.
@@ -99,6 +117,69 @@ class ExploreHighlights {
     return out;
   }
 
+  /// Ca giờ vàng (16:00 – 22:00, cùng cấu hình với màn đặt sân) so với thời điểm [now].
+  static GoldenStatus goldenStatus(DateTime now) {
+    final start = DateTime(now.year, now.month, now.day, BookingSlots.goldenStartHour);
+    final end = DateTime(now.year, now.month, now.day, BookingSlots.goldenEndHour);
+    final fraction = (now.hour * 60 + now.minute) / 1440.0;
+    if (now.isBefore(start)) return GoldenStatus(GoldenPhase.before, start.difference(now), fraction);
+    if (now.isBefore(end)) return GoldenStatus(GoldenPhase.during, end.difference(now), fraction);
+    final tomorrow = start.add(const Duration(days: 1));
+    return GoldenStatus(GoldenPhase.after, tomorrow.difference(now), fraction);
+  }
+
+  /// "2 giờ 15 phút", "1 giờ", "45 phút". Làm tròn lên theo phút để không bao giờ hiện "0 phút".
+  static String durationLabel(Duration d) {
+    final minutes = ((d.inSeconds + 59) ~/ 60).clamp(1, 24 * 60);
+    final h = minutes ~/ 60;
+    final m = minutes % 60;
+    if (h == 0) return '$m phút';
+    return m == 0 ? '$h giờ' : '$h giờ $m phút';
+  }
+
+  /// Câu mô tả ca giờ vàng cho thẻ "Giờ vàng hôm nay".
+  static String goldenMessage(GoldenStatus g) {
+    switch (g.phase) {
+      case GoldenPhase.before:
+        return 'Giờ vàng bắt đầu sau ${durationLabel(g.remaining)}';
+      case GoldenPhase.during:
+        return 'Đang là giờ vàng, còn ${durationLabel(g.remaining)}';
+      case GoldenPhase.after:
+        return 'Giờ vàng hôm nay đã kết thúc, ngày mai bắt đầu lúc ${BookingSlots.goldenStartHour}:00';
+    }
+  }
+
+  /// Số địa điểm sân công khai theo từng môn (đã duyệt, không tính sân minh họa).
+  static Map<String, int> countBySport(List<Venue> venues) {
+    final out = <String, int>{for (final s in sportOrder) s: 0};
+    for (final v in venues) {
+      if (!NewsFeed.isPublic(v) || !out.containsKey(v.type)) continue;
+      out[v.type] = out[v.type]! + 1;
+    }
+    return out;
+  }
+
+  /// "T2".."T7", "CN".
+  static String dayShort(DateTime d) => const ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'][d.weekday - 1];
+
+  /// Mức mưa của một ngày: đẹp trời (xác suất dưới 30% và mưa dưới 1 mm), có thể mưa (dưới 60%), dễ mưa.
+  static RainTag rainTag(DayForecast d) {
+    if (d.rainProb < 30 && d.rainMm < 1) return RainTag.fine;
+    if (d.rainProb < 60) return RainTag.maybe;
+    return RainTag.likely;
+  }
+
+  /// Ngày đẹp nhất để ra sân: khả năng mưa thấp nhất (rồi lượng mưa thấp nhất, rồi ngày gần nhất).
+  /// Chỉ trả về ngày có khả năng mưa dưới 40%; không có thì null để không tô vẽ một ngày "đẹp" không có thật.
+  static DayForecast? bestDay(List<DayForecast> days) {
+    DayForecast? best;
+    for (final d in days) {
+      if (d.rainProb >= 40) continue;
+      if (best == null || d.rainProb < best.rainProb || (d.rainProb == best.rainProb && d.rainMm < best.rainMm)) best = d;
+    }
+    return best;
+  }
+
   /// Lời chào theo giờ trong ngày.
   static String greeting(DateTime now) {
     final h = now.hour;
@@ -121,9 +202,10 @@ class ExploreHighlights {
     return 'Tối nay ít khả năng mưa ($p%): hợp ra sân ngoài trời.';
   }
 
-  /// Chữ ngắn cho viên thời tiết: "☀️ 29°C · Trời quang". Null nếu không có dữ liệu thật.
+  /// Chữ ngắn cho viên thời tiết: "29°C · Trời quang" (biểu tượng bầu trời vẽ riêng bằng SkyIcon).
+  /// Null nếu không có dữ liệu thật.
   static String? weatherChip(WeatherData w) {
     if (!w.isLive) return null;
-    return '${w.emoji} ${w.temperature.round()}°C · ${w.condition}';
+    return '${w.temperature.round()}°C · ${w.condition}';
   }
 }

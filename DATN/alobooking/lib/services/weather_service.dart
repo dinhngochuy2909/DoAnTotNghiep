@@ -8,6 +8,34 @@ class DayRain {
   const DayRain(this.prob, this.mm);
 }
 
+/// Bầu trời ở dạng phân loại, để vẽ biểu tượng thời tiết bằng icon thay vì emoji (emoji hiển thị đen trắng ở một số máy).
+enum Sky { clear, partly, cloudy, fog, rain, storm }
+
+/// Dự báo một ngày: dùng cho lịch "ngày nào ra sân đẹp" ở Khám phá.
+class DayForecast {
+  final DateTime date;
+  final String emoji;
+  final Sky sky;
+  final String condition;
+  final double tempMax;
+  final double tempMin;
+
+  /// Khả năng mưa tối đa trong ngày (%) và tổng lượng mưa (mm).
+  final int rainProb;
+  final double rainMm;
+
+  const DayForecast({
+    required this.date,
+    required this.emoji,
+    this.sky = Sky.partly,
+    required this.condition,
+    required this.tempMax,
+    required this.tempMin,
+    required this.rainProb,
+    required this.rainMm,
+  });
+}
+
 /// Model dữ liệu thời tiết ngoại cảnh cho AloBooking
 class WeatherData {
   final double temperature; // °C
@@ -16,6 +44,9 @@ class WeatherData {
   final String condition; // Trạng thái: Nắng, Mưa, Mát mẻ, Âm u...
   final String description;
   final String emoji;
+
+  /// Bầu trời hiện tại dạng phân loại (để vẽ icon); mặc định ít mây.
+  final Sky sky;
   final bool isOutdoorFavorable;
   final DateTime updatedAt;
 
@@ -34,6 +65,9 @@ class WeatherData {
   final int? eveningRainProb;
   final double? eveningTemp;
 
+  /// Dự báo từng ngày (hôm nay trở đi, tối đa 7 ngày); rỗng nếu không có dữ liệu.
+  final List<DayForecast> daily;
+
   WeatherData({
     required this.temperature,
     required this.rainMm,
@@ -41,6 +75,7 @@ class WeatherData {
     required this.condition,
     required this.description,
     required this.emoji,
+    this.sky = Sky.partly,
     required this.isOutdoorFavorable,
     DateTime? updatedAt,
     this.isLive = true,
@@ -50,6 +85,7 @@ class WeatherData {
     this.rainByDate = const {},
     this.eveningRainProb,
     this.eveningTemp,
+    this.daily = const [],
   }) : updatedAt = updatedAt ?? DateTime.now();
 
   Map<String, dynamic> toMap() {
@@ -140,6 +176,7 @@ class WeatherService {
                 ? 'Đang mưa (${rain.toStringAsFixed(1)} mm), sân ngoài trời trơn trượt, sân trong nhà sẽ đông đúc'
                 : 'Hiện tạnh ráo (${temp.toStringAsFixed(1)}°C), thuận lợi cho người chơi ra sân',
             emoji: _mapConditionToEmoji(code, rain),
+            sky: skyOf(code, rain),
             isOutdoorFavorable: rain < 0.5 && temp >= 18 && temp <= 34,
             feelsLike: feels,
             windKmh: wind,
@@ -147,6 +184,7 @@ class WeatherService {
             rainByDate: _buildRainByDate(data),
             eveningRainProb: evening?.$1,
             eveningTemp: evening?.$2,
+            daily: dailyForecast(data),
           );
           _cache = w;
           _cachedAt = DateTime.now();
@@ -218,6 +256,45 @@ class WeatherService {
     } catch (_) {
       return null;
     }
+  }
+
+  /// Phân loại bầu trời từ mã thời tiết WMO và lượng mưa: dông, mưa, sương mù, quang, ít mây, nhiều mây.
+  static Sky skyOf(int code, double rainMm) {
+    if (code >= 95) return Sky.storm;
+    if (rainMm > 0.0 || (code >= 51 && code <= 67) || (code >= 80 && code <= 82)) return Sky.rain;
+    if (code >= 45 && code <= 48) return Sky.fog;
+    if (code == 0) return Sky.clear;
+    if (code == 3) return Sky.cloudy;
+    return Sky.partly;
+  }
+
+  /// Dự báo từng ngày từ phản hồi Open-Meteo. Ngày nào thiếu số liệu thì bỏ qua, không điền số đoán.
+  static List<DayForecast> dailyForecast(Map<String, dynamic> data) {
+    final out = <DayForecast>[];
+    try {
+      final daily = data['daily'] as Map<String, dynamic>;
+      final dates = (daily['time'] as List).cast<String>();
+      for (var i = 0; i < dates.length && i < 7; i++) {
+        final date = DateTime.tryParse(dates[i]);
+        final tmax = (daily['temperature_2m_max'][i] as num?)?.toDouble();
+        final tmin = (daily['temperature_2m_min'][i] as num?)?.toDouble();
+        final prob = (daily['precipitation_probability_max'][i] as num?)?.toInt();
+        final mm = (daily['precipitation_sum'][i] as num?)?.toDouble();
+        final code = (daily['weather_code'][i] as num?)?.toInt();
+        if (date == null || tmax == null || tmin == null || prob == null || mm == null || code == null) continue;
+        out.add(DayForecast(
+          date: date,
+          emoji: _mapConditionToEmoji(code, mm >= 1 ? mm : 0),
+          sky: skyOf(code, mm >= 1 ? mm : 0),
+          condition: _dayCondition(code, mm, prob),
+          tempMax: tmax,
+          tempMin: tmin,
+          rainProb: prob,
+          rainMm: mm,
+        ));
+      }
+    } catch (_) {}
+    return out;
   }
 
   /// Dự báo ngắn gọn bằng chữ để đưa vào ngữ cảnh chatbot.

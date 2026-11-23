@@ -24,6 +24,7 @@ class _BookedScreenState extends State<BookedScreen> with SingleTickerProviderSt
   List<Venue> _venues = [];
   bool _loading = true;
   bool _failed = false;
+  String _failureText = '';
 
   @override
   void initState() {
@@ -66,7 +67,9 @@ class _BookedScreenState extends State<BookedScreen> with SingleTickerProviderSt
     ]);
     if (!mounted) return;
     final all = results[0] as List<BookingItem>;
+    final failureText = FirestoreService.failureMessage();
     setState(() {
+      _failureText = failureText;
       if (results.length > 1) _venues = results[1] as List<Venue>;
       _mine = all.where((b) => _isMine(b, user)).toList()
         ..sort((a, b) => (_start(b) ?? b.createdAt).compareTo(_start(a) ?? a.createdAt));
@@ -270,7 +273,7 @@ class _BookedScreenState extends State<BookedScreen> with SingleTickerProviderSt
               Text(
                 loggedOut
                     ? 'Lịch đặt sân được lưu theo tài khoản của bạn.'
-                    : (_failed ? 'Kiểm tra kết nối mạng rồi bấm tải lại.' : 'Các lịch đặt sân của bạn sẽ xuất hiện tại đây.'),
+                    : (_failed ? '${_failureText.isEmpty ? 'Kiểm tra kết nối mạng.' : _failureText} Bấm tải lại để thử lại.' : 'Các lịch đặt sân của bạn sẽ xuất hiện tại đây.'),
                 textAlign: TextAlign.center,
                 style: const TextStyle(fontSize: 13, color: Color(0xFF64748B), height: 1.4),
               ),

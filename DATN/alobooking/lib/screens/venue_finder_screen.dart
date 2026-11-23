@@ -42,9 +42,13 @@ class VenueFinderScreen extends StatefulWidget {
   final LocationLoader? locationLoader;
   final DateTime? now;
 
+  /// Môn chọn sẵn khi mở ('all' hoặc 'badminton', 'pickleball', 'football', 'tennis', 'basketball').
+  final String initialSport;
+
   const VenueFinderScreen({
     super.key,
     required this.venues,
+    this.initialSport = 'all',
     this.bookingsLoader,
     this.locationLoader,
     this.now,
@@ -97,7 +101,7 @@ class _VenueFinderScreenState extends State<VenueFinderScreen> {
   // ── bộ lọc ──
   final TextEditingController _searchCtrl = TextEditingController();
   String _query = '';
-  String _sport = 'all';
+  late String _sport = widget.initialSport;
   String? _district;
   String _areaMode = 'radius'; // 'radius' | 'district'
   int? _radiusKm;

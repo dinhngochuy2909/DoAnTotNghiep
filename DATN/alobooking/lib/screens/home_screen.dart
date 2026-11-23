@@ -113,10 +113,12 @@ class _HomeScreenState extends State<HomeScreen> {
         },
       );
 
-  Future<void> _loadVenues() async {
+  /// [force]: bỏ qua danh sách đã nhớ và đọc lại từ máy chủ (nút "Thử lại"). Mở app bình thường dùng bản đã nhớ để
+  /// không tốn lượt đọc Firestore.
+  Future<void> _loadVenues({bool force = false}) async {
     setState(() => _isLoading = true);
     FirestoreService.lastLoadFailed = false;
-    final venues = await FirestoreService.getVenues();
+    final venues = await FirestoreService.getVenues(forceRefresh: force);
     if (!mounted) return;
     setState(() {
       _allVenues = venues;
@@ -125,8 +127,8 @@ class _HomeScreenState extends State<HomeScreen> {
     if (venues.isEmpty && FirestoreService.lastLoadFailed) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Text('Không tải được danh sách sân. Kiểm tra kết nối mạng rồi thử lại.'),
-          action: SnackBarAction(label: 'Thử lại', onPressed: _loadVenues),
+          content: Text('Không tải được danh sách sân. ${FirestoreService.failureMessage()}'),
+          action: SnackBarAction(label: 'Thử lại', onPressed: () => _loadVenues(force: true)),
           duration: const Duration(seconds: 8),
         ),
       );

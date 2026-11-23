@@ -105,7 +105,8 @@ class _AdminScreenState extends State<AdminScreen> {
     super.dispose();
   }
 
-  Future<void> _loadData() async {
+  /// [force]: đọc lại danh sách sân từ máy chủ (nút làm mới). Mở bảng quản trị bình thường dùng danh sách sân đã nhớ.
+  Future<void> _loadData({bool force = false}) async {
     setState(() {
       _isLoading = true;
       _loadError = null;
@@ -113,7 +114,7 @@ class _AdminScreenState extends State<AdminScreen> {
     FirestoreService.lastLoadFailed = false;
     try {
       final results = await Future.wait<Object?>([
-        FirestoreService.getVenues(),
+        FirestoreService.getVenues(forceRefresh: force),
         FirestoreService.getBookings(),
         FirestoreService.getCustomers(),
         FirestoreService.getPayments(),
@@ -128,7 +129,7 @@ class _AdminScreenState extends State<AdminScreen> {
         _customers = FirestoreService.enrichCustomers(results[2] as List<CustomerItem>, _bookings);
         _payments = results[3] as List<PaymentItem>;
         if (FirestoreService.lastLoadFailed) {
-          _loadError = 'Một số dữ liệu chưa tải được từ máy chủ nên danh sách có thể chưa đầy đủ. Bấm làm mới để thử lại.';
+          _loadError = '${FirestoreService.failureMessage()} Một số dữ liệu chưa tải được nên danh sách có thể chưa đầy đủ. Bấm làm mới để thử lại.';
         }
         _rainByDate = (results[4] as WeatherData).rainByDate;
         _news = results[5] as List<NewsPost>;
@@ -140,7 +141,9 @@ class _AdminScreenState extends State<AdminScreen> {
       if (!mounted) return;
       setState(() {
         _isLoading = false;
-        _loadError = 'Không tải được dữ liệu. Kiểm tra kết nối rồi bấm làm mới.';
+        _loadError = FirestoreService.lastLoadFailed
+            ? 'Không tải được dữ liệu. ${FirestoreService.failureMessage()}'
+            : 'Không tải được dữ liệu. Kiểm tra kết nối rồi bấm làm mới.';
       });
     }
   }
@@ -612,7 +615,7 @@ class _AdminScreenState extends State<AdminScreen> {
           IconButton(
             icon: const Icon(Icons.refresh_rounded, color: AdminUi.muted, size: 20),
             tooltip: 'Tải lại dữ liệu',
-            onPressed: _isLoading ? null : _loadData,
+            onPressed: _isLoading ? null : () => _loadData(force: true),
           ),
           PopupMenuButton<String>(
             tooltip: 'Việc cần xử lý',
@@ -832,7 +835,7 @@ class _AdminScreenState extends State<AdminScreen> {
                     const Icon(Icons.error_outline_rounded, color: AdminUi.danger, size: 18),
                     const SizedBox(width: 10),
                     Expanded(child: Text(_loadError!, style: const TextStyle(color: AdminUi.text, fontSize: 13))),
-                    TextButton(onPressed: _loadData, child: const Text('Thử lại')),
+                    TextButton(onPressed: () => _loadData(force: true), child: const Text('Thử lại')),
                   ],
                 ),
               ),

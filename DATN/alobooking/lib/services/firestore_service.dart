@@ -5,6 +5,7 @@ import '../models/customer.dart';
 import '../models/payment.dart';
 import '../models/notification_item.dart';
 import '../models/news_post.dart';
+import 'venue_cache.dart';
 
 class BookingItem {
   final String id;
@@ -109,50 +110,133 @@ class ReviewItem {
       };
 }
 
+/// Vì sao một lần tải từ Firestore thất bại. Thứ tự từ nhẹ đến nặng: khi có nhiều lỗi, giữ lỗi nặng nhất.
+enum LoadFailure {
+  /// Không lỗi.
+  none,
+
+  /// Không kết nối được máy chủ (mất mạng, bị chặn, quá thời gian).
+  network,
+
+  /// Máy chủ trả lỗi khác (5xx, 4xx không phải hết hạn mức).
+  server,
+
+  /// Máy chủ trả 429: hết hạn mức đọc miễn phí trong ngày hoặc đang bị giới hạn tốc độ.
+  quota,
+}
+
 class FirestoreService {
   static const String projectId = 'alobooking-b2484';
 
-  /// true nếu một lần tải gần nhất từ Firestore thất bại (mất mạng/lỗi máy chủ).
-  /// Giao diện dùng cờ này để báo lỗi rõ ràng thay vì hiển thị dữ liệu mẫu.
-  static bool lastLoadFailed = false;
+  /// Lý do thất bại của các lần tải gần nhất (từ lần đặt lại cuối). [LoadFailure.none] nếu không lỗi.
+  static LoadFailure lastFailure = LoadFailure.none;
+
+  /// true nếu một lần tải gần nhất từ Firestore thất bại (mất mạng/lỗi máy chủ/hết hạn mức).
+  /// Giao diện dùng cờ này để báo lỗi rõ ràng thay vì hiển thị dữ liệu mẫu. Gán false để đặt lại.
+  static bool get lastLoadFailed => lastFailure != LoadFailure.none;
+  static set lastLoadFailed(bool failed) {
+    if (!failed) {
+      lastFailure = LoadFailure.none;
+    } else if (lastFailure == LoadFailure.none) {
+      lastFailure = LoadFailure.server;
+    }
+  }
+
+  static LoadFailure _classify(int statusCode) => statusCode == 429 ? LoadFailure.quota : LoadFailure.server;
+
+  /// Ghi nhận một lỗi tải, giữ lỗi nặng nhất.
+  static void _raise(LoadFailure f) {
+    if (f.index > lastFailure.index) lastFailure = f;
+  }
+
+  /// Câu báo lỗi cho người dùng, nói đúng nguyên nhân thay vì lúc nào cũng bảo "kiểm tra mạng".
+  /// Trả về chuỗi rỗng khi không có lỗi.
+  static String failureMessage([LoadFailure? failure]) {
+    switch (failure ?? lastFailure) {
+      case LoadFailure.none:
+        return '';
+      case LoadFailure.network:
+        return 'Không kết nối được máy chủ. Hãy kiểm tra mạng rồi thử lại.';
+      case LoadFailure.server:
+        return 'Máy chủ đang gặp sự cố. Vui lòng thử lại sau.';
+      case LoadFailure.quota:
+        return 'Máy chủ đang quá tải hoặc đã hết lượt đọc dữ liệu trong ngày. Vui lòng thử lại sau.';
+    }
+  }
 
   /// Liệt kê toàn bộ tài liệu của một collection (có phân trang).
   static Future<({bool ok, List<Map<String, dynamic>> docs})> _listDocs(String collection, {int pageSize = 300}) async {
     final docs = <Map<String, dynamic>>[];
     String? pageToken;
-    try {
-      do {
-        final q = pageToken != null && pageToken.isNotEmpty ? '&pageToken=$pageToken' : '';
-        final res = await http.get(Uri.parse('$baseUrl/$collection?pageSize=$pageSize$q'));
-        if (res.statusCode != 200) {
-          // 404/rỗng được coi là collection chưa có dữ liệu, các lỗi khác là lỗi tải
-          if (res.statusCode == 404) return (ok: true, docs: docs);
-          lastLoadFailed = true;
-          return (ok: false, docs: docs);
-        }
+    do {
+      final q = pageToken != null && pageToken.isNotEmpty ? '&pageToken=$pageToken' : '';
+      http.Response res;
+      try {
+        res = await http.get(Uri.parse('$baseUrl/$collection?pageSize=$pageSize$q'));
+      } catch (_) {
+        _raise(LoadFailure.network);
+        return (ok: false, docs: docs);
+      }
+      if (res.statusCode != 200) {
+        // 404/rỗng được coi là collection chưa có dữ liệu, các lỗi khác là lỗi tải
+        if (res.statusCode == 404) return (ok: true, docs: docs);
+        _raise(_classify(res.statusCode));
+        return (ok: false, docs: docs);
+      }
+      try {
         final data = json.decode(res.body);
         final list = data['documents'] as List<dynamic>?;
         if (list != null) docs.addAll(list.cast<Map<String, dynamic>>());
         pageToken = data['nextPageToken'] as String?;
-      } while (pageToken != null && pageToken.isNotEmpty);
-      return (ok: true, docs: docs);
-    } catch (_) {
-      lastLoadFailed = true;
-      return (ok: false, docs: docs);
-    }
+      } catch (_) {
+        _raise(LoadFailure.server);
+        return (ok: false, docs: docs);
+      }
+    } while (pageToken != null && pageToken.isNotEmpty);
+    return (ok: true, docs: docs);
   }
+
   static const String baseUrl =
       'https://firestore.googleapis.com/v1/projects/$projectId/databases/(default)/documents';
 
-  /// Lấy danh sách sân thể thao từ Firestore alobooking-b2484 (hỗ trợ phân trang đầy đủ)
-  static Future<List<Venue>> getVenues() async {
+  /// Lấy danh sách sân thể thao.
+  ///
+  /// Mỗi sân là một lượt đọc trong hạn mức Firestore (50.000 lượt mỗi ngày, app có hơn một nghìn sân), nên danh sách
+  /// được nhớ lại ([VenueCache]): còn mới (30 phút) thì dùng thẳng, không hỏi máy chủ.
+  /// [forceRefresh]: bỏ qua bản nhớ, đọc lại từ máy chủ (nút "Thử lại", "Làm mới").
+  /// Tải lỗi mà đang có bản nhớ (kể cả đã cũ) thì dùng bản đó thay vì trả về danh sách rỗng hoặc dở dang.
+  static Future<List<Venue>> getVenues({bool forceRefresh = false}) async {
+    final cached = VenueCache.read();
+    if (!forceRefresh && cached != null && VenueCache.isFresh(cached.savedAt)) return cached.venues;
+
+    final r = await _fetchVenues();
+    if (r.complete && r.venues.isNotEmpty) {
+      VenueCache.write(r.venues);
+      return r.venues;
+    }
+    if (r.failure != LoadFailure.none) {
+      if (cached != null) return cached.venues;
+      _raise(r.failure);
+    }
+    return r.venues;
+  }
+
+  /// Đọc toàn bộ sân từ Firestore (có phân trang). [complete] = false nếu có trang nào tải lỗi.
+  static Future<({List<Venue> venues, bool complete, LoadFailure failure})> _fetchVenues() async {
+    final List<Venue> allVenues = [];
+    var failure = LoadFailure.none;
     try {
-      final List<Venue> allVenues = [];
       String? pageToken;
 
       do {
         final queryParam = pageToken != null ? '&pageToken=$pageToken' : '';
-        final response = await http.get(Uri.parse('$baseUrl/venues?pageSize=300$queryParam'));
+        http.Response response;
+        try {
+          response = await http.get(Uri.parse('$baseUrl/venues?pageSize=300$queryParam'));
+        } catch (_) {
+          failure = LoadFailure.network;
+          break;
+        }
 
         if (response.statusCode == 200) {
           final data = json.decode(response.body);
@@ -207,19 +291,16 @@ class FirestoreService {
           }
           pageToken = data['nextPageToken'] as String?;
         } else {
-          if (response.statusCode != 404) lastLoadFailed = true;
+          if (response.statusCode != 404) failure = _classify(response.statusCode);
           break;
         }
       } while (pageToken != null && pageToken.isNotEmpty);
-
-      if (allVenues.isNotEmpty) {
-        allVenues.sort((a, b) => a.id.compareTo(b.id));
-        return allVenues;
-      }
     } catch (e) {
-      lastLoadFailed = true;
+      // dữ liệu trả về sai định dạng
+      failure = LoadFailure.server;
     }
-    return <Venue>[];
+    allVenues.sort((a, b) => a.id.compareTo(b.id));
+    return (venues: allVenues, complete: failure == LoadFailure.none, failure: failure);
   }
 
   /// Thêm sân thể thao mới lên Firestore
@@ -261,7 +342,9 @@ class FirestoreService {
         headers: {'Content-Type': 'application/json'},
         body: json.encode(payload),
       );
-      return response.statusCode == 200 || response.statusCode == 201;
+      final ok = response.statusCode == 200 || response.statusCode == 201;
+      if (ok) VenueCache.upsert(venue);
+      return ok;
     } catch (e) {
       return false;
     }
@@ -306,7 +389,9 @@ class FirestoreService {
         headers: {'Content-Type': 'application/json'},
         body: json.encode(payload),
       );
-      return response.statusCode == 200;
+      final ok = response.statusCode == 200;
+      if (ok) VenueCache.upsert(venue);
+      return ok;
     } catch (e) {
       return false;
     }
@@ -316,7 +401,9 @@ class FirestoreService {
   static Future<bool> deleteVenue(int venueId) async {
     try {
       final response = await http.delete(Uri.parse('$baseUrl/venues/$venueId'));
-      return response.statusCode == 200;
+      final ok = response.statusCode == 200;
+      if (ok) VenueCache.removeId(venueId);
+      return ok;
     } catch (e) {
       return false;
     }
@@ -342,7 +429,14 @@ class FirestoreService {
         headers: {'Content-Type': 'application/json'},
         body: json.encode(payload),
       );
-      return response.statusCode == 200;
+      final ok = response.statusCode == 200;
+      if (ok) {
+        VenueCache.update(
+          venueId,
+          (v) => v.copyWith(approvalStatus: newStatus, rejectReason: rejectReason, approvedAt: stamp ?? v.approvedAt),
+        );
+      }
+      return ok;
     } catch (e) {
       return false;
     }
@@ -380,7 +474,7 @@ class FirestoreService {
           }
           pageToken = data['nextPageToken'] as String?;
         } else {
-          if (response.statusCode != 404) lastLoadFailed = true;
+          if (response.statusCode != 404) _raise(_classify(response.statusCode));
           break;
         }
       } while (pageToken != null && pageToken.isNotEmpty);
@@ -390,7 +484,7 @@ class FirestoreService {
         return allBookings;
       }
     } catch (e) {
-      lastLoadFailed = true;
+      _raise(LoadFailure.network);
     }
     return <BookingItem>[];
   }

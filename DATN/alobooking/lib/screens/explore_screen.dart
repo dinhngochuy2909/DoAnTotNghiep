@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../data/venue_photos.dart';
 import '../models/news_post.dart';
 import '../models/venue.dart';
+import '../services/booking_slots.dart';
 import '../services/explore_highlights.dart';
 import '../services/firestore_service.dart';
 import '../services/news_feed.dart';
@@ -11,6 +14,7 @@ import '../widgets/news_visuals.dart';
 import '../widgets/venue_image_view.dart';
 import 'news_detail_screen.dart';
 import 'venue_detail_screen.dart';
+import 'venue_finder_screen.dart';
 
 /// Dữ liệu một lần tải dòng tin: tin admin đăng, đánh giá của khách, và cờ báo tải lỗi một phần/toàn bộ.
 typedef NewsBundle = ({
@@ -82,6 +86,10 @@ class _ExploreScreenState extends State<ExploreScreen> {
   static const _collapseOver = 200;
 
   late DateTime _now;
+
+  /// Đồng hồ cập nhật mỗi 30 giây cho thẻ giờ vàng và lời chào (không dùng cho nhãn "x giờ trước" của tin).
+  late DateTime _clock;
+  Timer? _tick;
   bool _loading = true;
   bool _failed = false;
   List<NewsEntry> _entries = const [];
@@ -99,7 +107,20 @@ class _ExploreScreenState extends State<ExploreScreen> {
   void initState() {
     super.initState();
     _now = widget.now ?? DateTime.now();
+    _clock = _now;
+    // Khi kiểm thử đã cố định giờ thì không chạy đồng hồ.
+    if (widget.now == null) {
+      _tick = Timer.periodic(const Duration(seconds: 30), (_) {
+        if (mounted) setState(() => _clock = DateTime.now());
+      });
+    }
     _load();
+  }
+
+  @override
+  void dispose() {
+    _tick?.cancel();
+    super.dispose();
   }
 
   /// Thời tiết thật của Hà Nội cho lời chào ở banner. Tải riêng, lỗi thì chỉ ẩn phần thời tiết.
@@ -206,8 +227,11 @@ class _ExploreScreenState extends State<ExploreScreen> {
     final out = <Widget>[
       _narrow(_hero()),
       if (!_loading) _narrow(_stats()),
-      if (!_loading && _kind == null && _featured.isNotEmpty)
-        _narrow(_featuredSection()),
+      if (!_loading && _kind == null) ...[
+        _narrow(_planSection()),
+        _narrow(_sportTiles()),
+        if (_featured.isNotEmpty) _narrow(_featuredSection()),
+      ],
       _narrow(_filters()),
     ];
     if (_failed && _entries.isNotEmpty) out.add(_narrow(_failedBanner()));
@@ -276,7 +300,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
     final w = _weather;
     final weather = w == null ? null : ExploreHighlights.weatherChip(w);
     final tip = w == null ? null : ExploreHighlights.weatherTip(w);
-    final evening = _now.hour < 5 || _now.hour >= 18;
+    final evening = _clock.hour < 5 || _clock.hour >= 18;
 
     Widget pill(Widget child, {Key? key}) => Container(
       key: key,
@@ -354,7 +378,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                               ),
                               const SizedBox(width: 5),
                               Text(
-                                ExploreHighlights.greeting(_now),
+                                ExploreHighlights.greeting(_clock),
                                 style: const TextStyle(
                                   color: Colors.white,
                                   fontSize: 11.5,
@@ -367,13 +391,28 @@ class _ExploreScreenState extends State<ExploreScreen> {
                         if (weather != null)
                           pill(
                             key: const ValueKey('news-weather'),
-                            Text(
-                              'Hà Nội · $weather',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 11.5,
-                                fontWeight: FontWeight.w600,
-                              ),
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Text(
+                                  'Hà Nội · ',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                SkyIcon(w!.sky, size: 14, color: Colors.white),
+                                const SizedBox(width: 4),
+                                Text(
+                                  weather,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                       ],
@@ -393,7 +432,9 @@ class _ExploreScreenState extends State<ExploreScreen> {
                   Text(
                     _loading
                         ? 'Đang cập nhật…'
-                        : '${_entries.length} tin gần đây: ưu đãi, sự kiện, sân mới và đánh giá của khách.',
+                        : (_failed && _entries.isEmpty
+                              ? 'Chưa tải được tin. Kéo xuống hoặc bấm làm mới để thử lại.'
+                              : '${_entries.length} tin gần đây: ưu đãi, sự kiện, sân mới và đánh giá của khách.'),
                     style: const TextStyle(
                       color: Color(0xFFE2E8F0),
                       fontSize: 13.5,
@@ -479,6 +520,479 @@ class _ExploreScreenState extends State<ExploreScreen> {
     return _Pulse(
       key: const ValueKey('news-loading'),
       child: Column(children: [card(), card()]),
+    );
+  }
+
+  static const _gold = Color(0xFFF59E0B);
+
+  /// Tên đầy đủ của ngày trong lịch thời tiết: "Hôm nay", "Ngày mai", "Thứ ba, 24/11".
+  String _dayName(DateTime d) {
+    final today = DateTime(_clock.year, _clock.month, _clock.day);
+    final diff = DateTime(d.year, d.month, d.day).difference(today).inDays;
+    if (diff == 0) return 'Hôm nay';
+    if (diff == 1) return 'Ngày mai';
+    const names = [
+      'Thứ hai',
+      'Thứ ba',
+      'Thứ tư',
+      'Thứ năm',
+      'Thứ sáu',
+      'Thứ bảy',
+      'Chủ nhật',
+    ];
+    return '${names[d.weekday - 1]}, ${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}';
+  }
+
+  /// Khối "Lên kế hoạch ra sân": đồng hồ giờ vàng hôm nay và (khi có thời tiết thật) lịch 7 ngày.
+  Widget _planSection() {
+    final week = _weekStrip();
+    return Column(
+      key: const ValueKey('news-plan'),
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _heading('Lên kế hoạch ra sân', icon: Icons.event_available_outlined),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(16),
+          decoration: _cardDecoration(),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _goldenCard(),
+              if (week != null) ...[
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 14),
+                  child: Divider(height: 1, color: _line),
+                ),
+                week,
+              ],
+            ],
+          ),
+        ),
+        const SizedBox(height: 6),
+      ],
+    );
+  }
+
+  Widget _goldenCard() {
+    final g = ExploreHighlights.goldenStatus(_clock);
+    final during = g.phase == GoldenPhase.during;
+    return Column(
+      key: const ValueKey('news-golden'),
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: _gold.withValues(alpha: 0.15),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.wb_twilight_rounded,
+                color: _gold,
+                size: 22,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Giờ vàng hôm nay',
+                    style: TextStyle(
+                      color: _grey,
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    ExploreHighlights.goldenMessage(g),
+                    key: const ValueKey('news-golden-message'),
+                    style: const TextStyle(
+                      color: _ink,
+                      fontSize: 15.5,
+                      fontWeight: FontWeight.w800,
+                      height: 1.3,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        LayoutBuilder(
+          builder: (context, c) {
+            final w = c.maxWidth;
+            const start = BookingSlots.goldenStartHour / 24;
+            const end = BookingSlots.goldenEndHour / 24;
+            double x(double f) => w * f;
+            Widget tick(double f, String label) => Positioned(
+              left: (x(f) - 14).clamp(0, w - 28),
+              top: 22,
+              width: 28,
+              child: Text(
+                label,
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: _grey, fontSize: 10.5),
+              ),
+            );
+            return SizedBox(
+              height: 40,
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    top: 8,
+                    height: 10,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: _line,
+                        borderRadius: BorderRadius.circular(5),
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    left: x(start),
+                    width: x(end - start),
+                    top: 8,
+                    height: 10,
+                    child: Container(
+                      key: const ValueKey('news-golden-window'),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [
+                            Color(0xFFFBBF24),
+                            Color(0xFFF59E0B),
+                            Color(0xFFEA580C),
+                          ],
+                        ),
+                        borderRadius: BorderRadius.circular(5),
+                      ),
+                    ),
+                  ),
+                  tick(6 / 24, '6h'),
+                  tick(12 / 24, '12h'),
+                  tick(start, '${BookingSlots.goldenStartHour}h'),
+                  tick(end, '${BookingSlots.goldenEndHour}h'),
+                  Positioned(
+                    left: (x(g.dayFraction) - 8).clamp(0, w - 16),
+                    top: 5,
+                    child: Container(
+                      key: const ValueKey('news-golden-now'),
+                      width: 16,
+                      height: 16,
+                      decoration: BoxDecoration(
+                        color: during ? _gold : _ink,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 2.5),
+                        boxShadow: const [
+                          BoxShadow(color: Color(0x40000000), blurRadius: 4),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
+        const SizedBox(height: 4),
+        Text(
+          'Ca giờ vàng ${BookingSlots.goldenLabel} có giá cao hơn một chút so với giờ thường.',
+          style: const TextStyle(color: _grey, fontSize: 12.5, height: 1.4),
+        ),
+        const SizedBox(height: 8),
+        TextButton.icon(
+          key: const ValueKey('news-golden-find'),
+          onPressed: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => VenueFinderScreen(venues: widget.venues),
+            ),
+          ),
+          icon: const Icon(Icons.search_rounded, size: 18),
+          label: const Text(
+            'Tìm sân còn trống',
+            style: TextStyle(fontWeight: FontWeight.w700),
+          ),
+          style: TextButton.styleFrom(
+            foregroundColor: _green,
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Lịch thời tiết 7 ngày từ dữ liệu thật; null khi không lấy được thời tiết thật.
+  Widget? _weekStrip() {
+    final w = _weather;
+    if (w == null || !w.isLive || w.daily.isEmpty) return null;
+    final days = w.daily;
+    final best = ExploreHighlights.bestDay(days);
+    final today = DateTime(_clock.year, _clock.month, _clock.day);
+
+    const tagText = {
+      RainTag.fine: 'Đẹp trời',
+      RainTag.maybe: 'Có thể mưa',
+      RainTag.likely: 'Dễ mưa',
+    };
+    const tagColor = {
+      RainTag.fine: Color(0xFF15803D),
+      RainTag.maybe: Color(0xFFB45309),
+      RainTag.likely: Color(0xFFB91C1C),
+    };
+
+    return Column(
+      key: const ValueKey('news-week'),
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Row(
+          children: [
+            Icon(Icons.calendar_month_outlined, size: 18, color: _green),
+            SizedBox(width: 8),
+            Text(
+              'Ngày nào ra sân đẹp?',
+              style: TextStyle(
+                color: _ink,
+                fontSize: 15,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        SizedBox(
+          height: 170,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: days.length,
+            separatorBuilder: (_, _) => const SizedBox(width: 8),
+            itemBuilder: (_, i) {
+              final d = days[i];
+              final tag = ExploreHighlights.rainTag(d);
+              final isBest = identical(d, best);
+              final isToday =
+                  DateTime(d.date.year, d.date.month, d.date.day) == today;
+              return Container(
+                key: ValueKey(
+                  'news-day-${d.date.year}-${d.date.month}-${d.date.day}',
+                ),
+                width: 82,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 6,
+                  vertical: 10,
+                ),
+                decoration: BoxDecoration(
+                  color: isBest ? const Color(0xFFF0FDF4) : Colors.white,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: isBest ? const Color(0xFF16A34A) : _line,
+                    width: isBest ? 2 : 1,
+                  ),
+                ),
+                child: Column(
+                  children: [
+                    Text(
+                      isToday ? 'Hôm nay' : ExploreHighlights.dayShort(d.date),
+                      style: TextStyle(
+                        color: _ink,
+                        fontSize: 12.5,
+                        fontWeight: isToday ? FontWeight.w800 : FontWeight.w700,
+                      ),
+                    ),
+                    Text(
+                      '${d.date.day.toString().padLeft(2, '0')}/${d.date.month.toString().padLeft(2, '0')}',
+                      style: const TextStyle(color: _grey, fontSize: 11),
+                    ),
+                    const SizedBox(height: 4),
+                    SizedBox(
+                      height: 28,
+                      child: Center(child: SkyIcon(d.sky, size: 24)),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '${d.tempMax.round()}°/${d.tempMin.round()}°',
+                      style: const TextStyle(
+                        color: _ink,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(
+                          Icons.water_drop_outlined,
+                          size: 12,
+                          color: Color(0xFF2563EB),
+                        ),
+                        const SizedBox(width: 2),
+                        Text(
+                          '${d.rainProb}%',
+                          style: const TextStyle(
+                            color: Color(0xFF2563EB),
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const Spacer(),
+                    Text(
+                      tagText[tag]!,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: tagColor[tag],
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    if (isBest)
+                      const Text(
+                        '★ Đẹp nhất',
+                        style: TextStyle(
+                          color: Color(0xFF15803D),
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ),
+        const SizedBox(height: 10),
+        Text(
+          best == null
+              ? 'Tuần này ngày nào cũng có khả năng mưa từ 40%: hãy ưu tiên sân có mái che.'
+              : 'Ngày đẹp nhất để ra sân: ${_dayName(best.date)} (khả năng mưa ${best.rainProb}%).',
+          key: const ValueKey('news-week-best'),
+          style: const TextStyle(
+            color: Color(0xFF334155),
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            height: 1.4,
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Ô "Khám phá theo môn": ảnh minh họa, số địa điểm thật của môn đó; bấm mở màn tìm sân với môn đã chọn.
+  Widget _sportTiles() {
+    final counts = ExploreHighlights.countBySport(widget.venues);
+    if (counts.values.every((n) => n == 0)) return const SizedBox.shrink();
+    const sports = [
+      ('badminton', 'Cầu lông', 21),
+      ('pickleball', 'Pickleball', 7),
+      ('tennis', 'Tennis', 33),
+      ('football', 'Bóng đá', 20),
+      ('basketball', 'Bóng rổ', 24),
+    ];
+    return Column(
+      key: const ValueKey('news-sports'),
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _heading('Khám phá theo môn', icon: Icons.sports_tennis_outlined),
+        SizedBox(
+          height: 172,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: sports.length,
+            separatorBuilder: (_, _) => const SizedBox(width: 10),
+            itemBuilder: (_, i) {
+              final (type, name, photo) = sports[i];
+              final n = counts[type] ?? 0;
+              return InkWell(
+                key: ValueKey('news-sport-$type'),
+                borderRadius: BorderRadius.circular(16),
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => VenueFinderScreen(
+                      venues: widget.venues,
+                      initialSport: type,
+                    ),
+                  ),
+                ),
+                child: Container(
+                  width: 138,
+                  clipBehavior: Clip.antiAlias,
+                  decoration: _cardDecoration().copyWith(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      _HoverZoom(
+                        child: VenueImageView(
+                          imageUrl: VenuePhotos.pick(type, photo),
+                        ),
+                      ),
+                      const DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              Color(0x00000000),
+                              Color(0x00000000),
+                              Color(0xCC000000),
+                            ],
+                            stops: [0, 0.4, 1],
+                          ),
+                        ),
+                      ),
+                      const Positioned(
+                        right: 6,
+                        top: 6,
+                        child: StockPhotoLabel(),
+                      ),
+                      Positioned(
+                        left: 12,
+                        right: 8,
+                        bottom: 12,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              name,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                            Text(
+                              '$n địa điểm',
+                              style: const TextStyle(
+                                color: Color(0xFFE2E8F0),
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+        const SizedBox(height: 6),
+      ],
     );
   }
 
@@ -899,7 +1413,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
       key = 'news-error';
       icon = Icons.cloud_off_rounded;
       title = 'Không tải được tin';
-      sub = 'Kiểm tra kết nối mạng rồi thử lại.';
+      sub = FirestoreService.lastLoadFailed ? FirestoreService.failureMessage() : 'Kiểm tra kết nối mạng rồi thử lại.';
     } else if (_entries.isEmpty) {
       key = 'news-empty';
       icon = Icons.newspaper_rounded;

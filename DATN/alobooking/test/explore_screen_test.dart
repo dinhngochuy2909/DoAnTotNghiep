@@ -11,8 +11,10 @@ import 'package:alobooking/models/venue.dart';
 import 'package:alobooking/screens/explore_screen.dart';
 import 'package:alobooking/screens/news_detail_screen.dart';
 import 'package:alobooking/screens/venue_detail_screen.dart';
+import 'package:alobooking/screens/venue_finder_screen.dart';
 import 'package:alobooking/services/firestore_service.dart';
 import 'package:alobooking/services/weather_service.dart';
+import 'package:alobooking/widgets/news_visuals.dart';
 
 /// Hôm nay giả định: thứ bảy 21/11/2026, 10:30.
 final _now = DateTime(2026, 11, 21, 10, 30);
@@ -85,18 +87,21 @@ Future<void> _open(
   List<Venue>? venues,
   NewsLoader? loader,
   WeatherLoader? weather,
-  Size size = const Size(1280, 3200), // đủ cao để mọi thẻ đều được dựng (danh sách dựng lười)
+  DateTime? now,
+  Size size = const Size(1280, 5200), // đủ cao để mọi thẻ đều được dựng (danh sách dựng lười)
 }) async {
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
+  // gỡ màn hình cũ (nếu test mở nhiều lần) để trạng thái khởi tạo lại từ đầu
+  await tester.pumpWidget(const SizedBox());
   await tester.pumpWidget(MaterialApp(
     theme: ThemeData(fontFamily: 'TestSans'),
     home: ExploreScreen(
       venues: venues ?? _venues(),
       newsLoader: loader ?? () async => _bundle(),
       weatherLoader: weather ?? () async => WeatherData.defaultHanoi(),
-      now: _now,
+      now: now ?? _now,
     ),
   ));
   await tester.pump();
@@ -375,7 +380,7 @@ void main() {
 
     testWidgets('Điện thoại 390px: trang chi tiết đầy đủ không tràn bố cục', (tester) async {
       // chiều cao lớn để danh sách dựng đủ thẻ (dựng lười); bề rộng 390 mới là thứ cần kiểm tra
-      await _open(tester, venues: detailVenues(), loader: () async => detailBundle(), size: const Size(390, 3200));
+      await _open(tester, venues: detailVenues(), loader: () async => detailBundle(), size: const Size(390, 5200));
       await tester.tap(_k('news-open-post-km'));
       await tester.pumpAndSettle();
       expect(find.byType(NewsDetailScreen), findsOneWidget);
@@ -400,7 +405,9 @@ void main() {
       await _open(tester, weather: () async => liveWeather());
       await tester.pump(const Duration(milliseconds: 50));
       expect(find.descendant(of: _k('news-greeting'), matching: find.text('Chào buổi sáng')), findsOneWidget, reason: '10:30 là buổi sáng');
-      expect(find.descendant(of: _k('news-weather'), matching: find.text('Hà Nội · ☀️ 28°C · Trời quang')), findsOneWidget);
+      expect(find.descendant(of: _k('news-weather'), matching: find.text('28°C · Trời quang')), findsOneWidget);
+      expect(find.descendant(of: _k('news-weather'), matching: find.text('Hà Nội · ')), findsOneWidget);
+      expect(find.descendant(of: _k('news-weather'), matching: find.byType(SkyIcon)), findsOneWidget, reason: 'biểu tượng vẽ bằng icon, không dùng emoji');
       expect(tester.widget<Text>(_k('news-weather-tip')).data, 'Tối nay dễ mưa (70%): nên chọn sân có mái che.');
     });
 
@@ -433,7 +440,7 @@ void main() {
     });
 
     testWidgets('Điện thoại 390px: banner có thời tiết và gợi ý không tràn bố cục', (tester) async {
-      await _open(tester, weather: () async => liveWeather(), size: const Size(390, 3200));
+      await _open(tester, weather: () async => liveWeather(), size: const Size(390, 5200));
       await tester.pump(const Duration(milliseconds: 50));
       expect(_k('news-weather-tip'), findsOneWidget);
       if (realFont) expect(tester.takeException(), isNull);
@@ -467,7 +474,7 @@ void main() {
     });
 
     testWidgets('Bật "giảm chuyển động" thì thẻ hiện ngay, không hiệu ứng', (tester) async {
-      tester.view.physicalSize = const Size(1280, 3200);
+      tester.view.physicalSize = const Size(1280, 5200);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.reset);
       await tester.pumpWidget(MaterialApp(
@@ -531,8 +538,217 @@ void main() {
     });
 
     testWidgets('Điện thoại 390px: dải sân nổi bật không tràn bố cục', (tester) async {
-      await _open(tester, size: const Size(390, 3200));
+      await _open(tester, size: const Size(390, 5200));
       expect(_k('news-featured'), findsOneWidget);
+      if (realFont) expect(tester.takeException(), isNull);
+    });
+  });
+
+  DayForecast day(int offset, {int prob = 10, double mm = 0, double tmax = 30, double tmin = 22}) => DayForecast(
+        date: DateTime(2026, 11, 21 + offset),
+        emoji: '☀️',
+        condition: 'Trời quang',
+        tempMax: tmax,
+        tempMin: tmin,
+        rainProb: prob,
+        rainMm: mm,
+      );
+
+  WeatherData withDays(List<DayForecast> days) => WeatherData(
+        temperature: 28,
+        rainMm: 0,
+        humidity: 70,
+        condition: 'Trời quang',
+        description: '',
+        emoji: '☀️',
+        isOutdoorFavorable: true,
+        daily: days,
+      );
+
+  group('Lên kế hoạch ra sân: giờ vàng', () {
+    testWidgets('Trước giờ vàng: đếm ngược tới 16:00, có thanh thời gian và mốc "bây giờ"', (tester) async {
+      await _open(tester); // 10:30
+      expect(_k('news-plan'), findsOneWidget);
+      expect(tester.widget<Text>(_k('news-golden-message')).data, 'Giờ vàng bắt đầu sau 5 giờ 30 phút');
+      expect(_k('news-golden-window'), findsOneWidget);
+      expect(_k('news-golden-now'), findsOneWidget);
+      expect(find.text('Ca giờ vàng 16:00 – 22:00 có giá cao hơn một chút so với giờ thường.'), findsOneWidget);
+      for (final t in ['6h', '12h', '16h', '22h']) {
+        expect(find.text(t), findsOneWidget, reason: 'thiếu mốc $t');
+      }
+    });
+
+    testWidgets('Đang trong giờ vàng và sau giờ vàng', (tester) async {
+      await _open(tester, now: DateTime(2026, 11, 21, 17, 15));
+      expect(tester.widget<Text>(_k('news-golden-message')).data, 'Đang là giờ vàng, còn 4 giờ 45 phút');
+      await _open(tester, now: DateTime(2026, 11, 21, 23, 0));
+      expect(tester.widget<Text>(_k('news-golden-message')).data, 'Giờ vàng hôm nay đã kết thúc, ngày mai bắt đầu lúc 16:00');
+    });
+
+    testWidgets('Mốc "bây giờ" nằm đúng vị trí trong ngày và không tràn ra ngoài thanh', (tester) async {
+      await _open(tester, now: DateTime(2026, 11, 21, 12, 0));
+      final bar = tester.getRect(_k('news-golden-window'));
+      final now = tester.getCenter(_k('news-golden-now'));
+      expect(now.dx, lessThan(bar.left), reason: '12h nằm trước ca giờ vàng 16h');
+      await _open(tester, now: DateTime(2026, 11, 21, 19, 0));
+      final bar2 = tester.getRect(_k('news-golden-window'));
+      final now2 = tester.getCenter(_k('news-golden-now'));
+      expect(now2.dx, inInclusiveRange(bar2.left, bar2.right), reason: '19h nằm trong ca giờ vàng');
+      await _open(tester, now: DateTime(2026, 11, 21, 23, 59));
+      expect(tester.getRect(_k('news-golden-now')).right, lessThanOrEqualTo(tester.getRect(_k('news-golden')).right + 0.5));
+    });
+
+    testWidgets('Nút "Tìm sân còn trống" mở màn tìm sân', (tester) async {
+      await _open(tester);
+      await tester.ensureVisible(_k('news-golden-find'));
+      await tester.tap(_k('news-golden-find'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 600));
+      expect(find.byType(VenueFinderScreen), findsOneWidget);
+      expect(tester.widget<VenueFinderScreen>(find.byType(VenueFinderScreen)).initialSport, 'all');
+    });
+
+    testWidgets('Không đặt đồng hồ chạy khi kiểm thử đã cố định giờ; chạy thật thì tự cập nhật và dọn khi đóng', (tester) async {
+      tester.view.physicalSize = const Size(1280, 5200);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(MaterialApp(
+        theme: ThemeData(fontFamily: 'TestSans'),
+        home: ExploreScreen(venues: _venues(), newsLoader: () async => _bundle(), weatherLoader: () async => WeatherData.defaultHanoi()),
+      ));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(_k('news-golden-message'), findsOneWidget);
+      await tester.pump(const Duration(seconds: 31)); // đồng hồ chạy một nhịp
+      expect(_k('news-golden-message'), findsOneWidget);
+      await tester.pumpWidget(const SizedBox()); // đóng màn hình: đồng hồ phải được dọn, không còn bộ đếm treo
+    });
+  });
+
+  group('Lên kế hoạch ra sân: lịch 7 ngày', () {
+    testWidgets('Mỗi ngày một ô: nhãn mưa đúng, ngày đẹp nhất được đánh dấu và nêu rõ', (tester) async {
+      final days = [
+        day(0, prob: 50),
+        day(1, prob: 70, mm: 8),
+        day(2, prob: 5), // đẹp nhất: thứ hai 23/11
+        day(3, prob: 20),
+        day(4, prob: 35),
+        day(5, prob: 80, mm: 12),
+        day(6, prob: 10),
+      ];
+      await _open(tester, weather: () async => withDays(days));
+      await tester.pump(const Duration(milliseconds: 50));
+      expect(_k('news-week'), findsOneWidget);
+      for (final d in days) {
+        expect(_k('news-day-2026-11-${d.date.day}'), findsOneWidget, reason: 'thiếu ngày ${d.date.day}');
+      }
+      expect(find.descendant(of: _k('news-day-2026-11-21'), matching: find.text('Hôm nay')), findsOneWidget);
+      for (final d in days) {
+        expect(find.descendant(of: _k('news-day-2026-11-${d.date.day}'), matching: find.byType(SkyIcon)), findsOneWidget);
+      }
+      expect(find.descendant(of: _k('news-day-2026-11-21'), matching: find.text('Có thể mưa')), findsOneWidget);
+      expect(find.descendant(of: _k('news-day-2026-11-22'), matching: find.text('Dễ mưa')), findsOneWidget);
+      expect(find.descendant(of: _k('news-day-2026-11-23'), matching: find.text('Đẹp trời')), findsOneWidget);
+      expect(find.descendant(of: _k('news-day-2026-11-23'), matching: find.text('★ Đẹp nhất')), findsOneWidget);
+      expect(find.text('★ Đẹp nhất'), findsOneWidget, reason: 'chỉ một ngày được đánh dấu');
+      expect(find.descendant(of: _k('news-day-2026-11-23'), matching: find.text('5%')), findsOneWidget);
+      expect(find.descendant(of: _k('news-day-2026-11-23'), matching: find.text('30°/22°')), findsOneWidget);
+      expect(tester.widget<Text>(_k('news-week-best')).data, 'Ngày đẹp nhất để ra sân: Thứ hai, 23/11 (khả năng mưa 5%).');
+    });
+
+    testWidgets('Ngày mai đẹp nhất thì ghi "Ngày mai"', (tester) async {
+      await _open(tester, weather: () async => withDays([day(0, prob: 60), day(1, prob: 0), day(2, prob: 30)]));
+      await tester.pump(const Duration(milliseconds: 50));
+      expect(tester.widget<Text>(_k('news-week-best')).data, 'Ngày đẹp nhất để ra sân: Ngày mai (khả năng mưa 0%).');
+    });
+
+    testWidgets('Ngày nào cũng có khả năng mưa từ 40% thì nói thẳng, không tô vẽ ngày đẹp', (tester) async {
+      await _open(tester, weather: () async => withDays([day(0, prob: 80), day(1, prob: 60), day(2, prob: 40)]));
+      await tester.pump(const Duration(milliseconds: 50));
+      expect(find.text('★ Đẹp nhất'), findsNothing);
+      expect(tester.widget<Text>(_k('news-week-best')).data, 'Tuần này ngày nào cũng có khả năng mưa từ 40%: hãy ưu tiên sân có mái che.');
+    });
+
+    testWidgets('Không có thời tiết thật hoặc không có dự báo ngày thì ẩn lịch, vẫn còn thẻ giờ vàng', (tester) async {
+      await _open(tester, weather: () async => WeatherData.defaultHanoi());
+      await tester.pump(const Duration(milliseconds: 50));
+      expect(_k('news-week'), findsNothing);
+      expect(_k('news-golden'), findsOneWidget);
+      await _open(tester, weather: () async => withDays(const []));
+      await tester.pump(const Duration(milliseconds: 50));
+      expect(_k('news-week'), findsNothing);
+    });
+
+    testWidgets('Điện thoại 390px: thẻ kế hoạch có giờ vàng và lịch 7 ngày không tràn bố cục', (tester) async {
+      await _open(tester, weather: () async => withDays([for (var i = 0; i < 7; i++) day(i, prob: 10 + i * 10)]), size: const Size(390, 5200));
+      await tester.pump(const Duration(milliseconds: 50));
+      expect(_k('news-week'), findsOneWidget);
+      if (realFont) expect(tester.takeException(), isNull);
+    });
+  });
+
+  group('Khám phá theo môn', () {
+    List<Venue> sportVenues() => [
+          _v(1, 'Cầu lông 1'),
+          _v(2, 'Cầu lông 2'),
+          _v(3, 'Tennis 1', type: 'tennis'),
+          _v(4, '[Demo] Tennis', type: 'tennis', source: 'demo'),
+          _v(5, 'Chờ duyệt', type: 'tennis', status: 'pending'),
+          _v(6, 'Pickleball từ dữ liệu mở', type: 'pickleball', source: 'osm'),
+        ];
+
+    testWidgets('Năm ô môn kèm số địa điểm thật: không đếm sân minh họa hay sân chưa duyệt', (tester) async {
+      await _open(tester, venues: sportVenues());
+      expect(_k('news-sports'), findsOneWidget);
+      expect(find.descendant(of: _k('news-sport-badminton'), matching: find.text('2 địa điểm')), findsOneWidget);
+      expect(find.descendant(of: _k('news-sport-tennis'), matching: find.text('1 địa điểm')), findsOneWidget);
+      expect(find.descendant(of: _k('news-sport-pickleball'), matching: find.text('1 địa điểm')), findsOneWidget);
+      expect(find.descendant(of: _k('news-sport-football'), matching: find.text('0 địa điểm')), findsOneWidget);
+      expect(find.descendant(of: _k('news-sport-basketball'), matching: find.text('0 địa điểm')), findsOneWidget);
+      for (final s in ['badminton', 'pickleball', 'tennis', 'football', 'basketball']) {
+        expect(find.descendant(of: _k('news-sport-$s'), matching: find.text('Ảnh minh họa')), findsOneWidget, reason: '$s dùng ảnh kho nên phải có nhãn');
+      }
+    });
+
+    testWidgets('Bấm một ô môn mở màn tìm sân với môn đã chọn sẵn', (tester) async {
+      await _open(tester, venues: sportVenues());
+      await tester.ensureVisible(_k('news-sport-tennis'));
+      await tester.tap(_k('news-sport-tennis'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 600));
+      final finder = tester.widget<VenueFinderScreen>(find.byType(VenueFinderScreen));
+      expect(finder.initialSport, 'tennis');
+      expect(finder.venues.length, sportVenues().length);
+    });
+
+    testWidgets('Chưa có sân nào thì ẩn; chọn một loại tin thì ẩn cả khối kế hoạch và ô môn', (tester) async {
+      await _open(tester, venues: const []);
+      expect(_k('news-sports'), findsNothing);
+      await _open(tester, venues: sportVenues());
+      expect(_k('news-sports'), findsOneWidget);
+      await tester.tap(_k('news-chip-promo'));
+      await tester.pump();
+      expect(_k('news-sports'), findsNothing);
+      expect(_k('news-plan'), findsNothing);
+      await tester.tap(_k('news-chip-all'));
+      await tester.pump();
+      expect(_k('news-sports'), findsOneWidget);
+      expect(_k('news-plan'), findsOneWidget);
+    });
+
+    testWidgets('Đang tải lần đầu thì chưa hiện khối kế hoạch hay ô môn', (tester) async {
+      final done = Completer<NewsBundle>();
+      await _open(tester, loader: () => done.future);
+      expect(_k('news-plan'), findsNothing);
+      expect(_k('news-sports'), findsNothing);
+      done.complete(_bundle());
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+    });
+
+    testWidgets('Điện thoại 390px: ô môn không tràn bố cục', (tester) async {
+      await _open(tester, venues: sportVenues(), size: const Size(390, 5200));
+      expect(_k('news-sports'), findsOneWidget);
       if (realFont) expect(tester.takeException(), isNull);
     });
   });
@@ -586,6 +802,27 @@ void main() {
     expect(calls, 2);
     expect(_k('news-error'), findsNothing);
     expect(_cardIds(tester).length, 4, reason: '3 tin admin + 1 đánh giá (sân này không có ngày duyệt nên không có "sân mới")');
+  });
+
+  testWidgets('Không tải được tin: banner báo lỗi thay vì ghi "0 tin gần đây"', (tester) async {
+    await _open(tester, loader: () async => (posts: const <NewsPost>[], reviews: const <ReviewItem>[], failed: true), venues: [_v(1, 'Sân Không Ngày')]);
+    expect(find.text('Chưa tải được tin. Kéo xuống hoặc bấm làm mới để thử lại.'), findsOneWidget);
+    expect(find.textContaining('0 tin gần đây'), findsNothing);
+  });
+
+  testWidgets('Tải lỗi do hết hạn mức: nói đúng nguyên nhân, không bảo kiểm tra mạng', (tester) async {
+    FirestoreService.lastFailure = LoadFailure.quota;
+    addTearDown(() => FirestoreService.lastLoadFailed = false);
+    await _open(tester, loader: () async => (posts: const <NewsPost>[], reviews: const <ReviewItem>[], failed: true), venues: const []);
+    expect(_k('news-error'), findsOneWidget);
+    expect(find.textContaining('hết lượt đọc dữ liệu'), findsOneWidget);
+    expect(find.textContaining('Kiểm tra kết nối mạng'), findsNothing);
+  });
+
+  testWidgets('Tải lỗi không rõ nguyên nhân (không có thông tin lỗi): giữ câu nhắc kiểm tra mạng', (tester) async {
+    FirestoreService.lastLoadFailed = false;
+    await _open(tester, loader: () async => (posts: const <NewsPost>[], reviews: const <ReviewItem>[], failed: true), venues: const []);
+    expect(find.textContaining('Kiểm tra kết nối mạng'), findsOneWidget);
   });
 
   testWidgets('Lỗi một phần: vẫn hiện tin đã có kèm dải cảnh báo', (tester) async {
@@ -655,7 +892,7 @@ void main() {
   });
 
   testWidgets('Điện thoại 390px: dòng tin và chip lọc không tràn bố cục', (tester) async {
-    await _open(tester, size: const Size(390, 844));
+    await _open(tester, size: const Size(390, 5200));
     expect(find.text('Có gì mới ở AloBooking'), findsOneWidget);
     expect(_cardIds(tester), isNotEmpty);
     await tester.drag(find.byType(CustomScrollView), const Offset(0, -2000));
@@ -664,7 +901,7 @@ void main() {
   });
 
   testWidgets('Màn rộng: cột tin giữ bề rộng đọc được (≤ 760)', (tester) async {
-    await _open(tester, size: const Size(1600, 3200));
+    await _open(tester, size: const Size(1600, 5200));
     expect(tester.getSize(_k('news-card-post-km')).width, lessThanOrEqualTo(760));
     if (realFont) expect(tester.takeException(), isNull);
   });
