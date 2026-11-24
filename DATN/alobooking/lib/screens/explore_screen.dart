@@ -79,6 +79,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
     NewsKind.newVenue,
     NewsKind.update,
     NewsKind.notice,
+    NewsKind.sport,
     NewsKind.review,
   ];
 
@@ -1681,9 +1682,8 @@ class _ExploreScreenState extends State<ExploreScreen> {
                 ],
                 const SizedBox(height: 10),
                 Text(
-                  e.isAuto
-                      ? 'Tự động từ dữ liệu AloBooking'
-                      : 'Đăng bởi ${e.byline}',
+                  e.creditLine,
+                  key: ValueKey('news-credit-${e.id}'),
                   style: const TextStyle(
                     color: Color(0xFF94A3B8),
                     fontSize: 11.5,

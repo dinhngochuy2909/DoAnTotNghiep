@@ -135,6 +135,17 @@ final List<_Feature> _features = [
   _Feature('winter', 'Mùa đông', -0.1, 0.3, (c) => Seasons.of(c.date) == Season.winter ? 1 : 0),
 ];
 
+/// Một hệ số (log) của mô hình: [prior] là giả định chuyên môn ban đầu, [learned] là giá trị sau khi học,
+/// [dataShare] là tỉ lệ bằng chứng đến từ dữ liệu (0 = hoàn toàn giả định).
+class CoefficientInfo {
+  final String key;
+  final String label;
+  final double prior;
+  final double learned;
+  final double dataShare;
+  const CoefficientInfo(this.key, this.label, this.prior, this.learned, this.dataShare);
+}
+
 /// Nguồn gốc của một yếu tố trong dự đoán.
 enum FactorSource { assumption, mixed, data }
 
@@ -248,6 +259,12 @@ class BookingCountModel {
 
   /// Mức nền (đơn/ngày) ở mốc tham chiếu: thứ hai–thứ năm, mùa xuân, không lễ, thời tiết dễ chịu.
   double get intercept => exp(_b0);
+
+  /// Bảng hệ số để hiển thị/đối chiếu: giả định ban đầu, giá trị đã học, và tỉ lệ bằng chứng từ dữ liệu.
+  List<CoefficientInfo> get coefficientInfo => [
+        for (var j = 0; j < _features.length; j++)
+          CoefficientInfo(_features[j].key, _features[j].label, _features[j].prior, _beta[j], _shares[j]),
+      ];
 
   String get confidenceText {
     if (days < 10) return 'RẤT THẤP (chỉ có $days ngày dữ liệu, kết quả chủ yếu theo giả định chuyên môn)';

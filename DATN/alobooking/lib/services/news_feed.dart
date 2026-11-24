@@ -9,7 +9,8 @@ enum NewsKind {
   promo('Ưu đãi'),
   event('Sự kiện'),
   newVenue('Sân mới'),
-  review('Đánh giá');
+  review('Đánh giá'),
+  sport('Tin thể thao');
 
   final String label;
   const NewsKind(this.label);
@@ -22,6 +23,8 @@ enum NewsKind {
         return NewsKind.event;
       case 'update':
         return NewsKind.update;
+      case NewsPost.sportCategory:
+        return NewsKind.sport;
       default:
         return NewsKind.notice;
     }
@@ -47,6 +50,10 @@ class NewsEntry {
   /// Người đăng / người đánh giá.
   final String byline;
 
+  /// Tin lấy từ báo ngoài: tên báo và đường dẫn bài gốc (rỗng với tin khác).
+  final String sourceName;
+  final String sourceUrl;
+
   const NewsEntry({
     required this.id,
     required this.kind,
@@ -58,10 +65,22 @@ class NewsEntry {
     this.venueId = 0,
     this.stars = 0,
     this.byline = '',
+    this.sourceName = '',
+    this.sourceUrl = '',
   });
 
   /// Mục do hệ thống tự sinh từ dữ liệu, không phải bài admin viết.
   bool get isAuto => kind == NewsKind.newVenue || kind == NewsKind.review;
+
+  /// Tin dẫn từ báo ngoài, có đường dẫn bài gốc hợp lệ.
+  bool get isExternal => kind == NewsKind.sport && NewsPost.isSafeHttpUrl(sourceUrl);
+
+  /// Dòng ghi nguồn dưới mỗi tin: "Nguồn: VnExpress" cho tin báo ngoài, "Đăng bởi …" cho tin admin, ghi rõ tự sinh cho tin tự động.
+  String get creditLine {
+    if (isAuto) return 'Tự động từ dữ liệu AloBooking';
+    if (isExternal) return 'Nguồn: ${sourceName.isEmpty ? Uri.parse(sourceUrl).host : sourceName}';
+    return 'Đăng bởi $byline';
+  }
 }
 
 /// Gộp tin admin đăng với tin tự sinh từ dữ liệu thật thành một dòng tin theo thời gian.
@@ -93,6 +112,8 @@ class NewsFeed {
         pinned: p.pinned,
         venueId: p.venueId,
         byline: p.author,
+        sourceName: p.sourceName,
+        sourceUrl: p.sourceUrl,
       ));
     }
 

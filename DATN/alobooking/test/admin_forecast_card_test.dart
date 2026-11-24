@@ -11,6 +11,7 @@ import 'package:alobooking/data/venues_data.dart';
 import 'package:alobooking/screens/admin_screen.dart';
 import 'package:alobooking/services/admin_stats.dart' show VnWeekday;
 import 'package:alobooking/services/booking_count_service.dart';
+import 'package:alobooking/services/simulated_bookings.dart';
 import 'package:alobooking/services/weather_history_service.dart';
 
 Future<void> _loadRealFont() async {
@@ -85,6 +86,11 @@ MockClient _client() {
       }
       return http.Response(jsonEncode({'documents': []}), 200, headers: _json);
     }
+    if (req.url.host == 'archive-api.open-meteo.com') {
+      final from = DateTime.parse(req.url.queryParameters['start_date']!);
+      final to = DateTime.parse(req.url.queryParameters['end_date']!);
+      return http.Response(jsonEncode(_weather(from, to.difference(from).inDays + 1, withCurrent: false)), 200, headers: _json);
+    }
     if (req.url.host == 'api.open-meteo.com') {
       if (req.url.queryParameters.containsKey('current')) {
         return http.Response(jsonEncode(_weather(today, 7)), 200, headers: _json);
@@ -143,4 +149,62 @@ void main() {
       expect(tester.takeException(), isNull);
     }, _client);
   });
+
+  for (final size in const [Size(1440, 3200), Size(390, 5200)])
+    testWidgets('Chế độ mô phỏng ${size.width.toInt()}px: công tắc bật có biển cảnh báo và bảng đối chiếu đáp án, tắt thì trở lại như cũ', (tester) async {
+      tester.view.physicalSize = size;
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+
+      // đọc file asset là I/O thật nên nạp trước (đồng hồ giả của test không chạy I/O thật)
+      await tester.runAsync(SimulatedBookings.load);
+      await http.runWithClient(() async {
+        await tester.pumpWidget(MaterialApp(home: AdminScreen(initialVenues: sampleVenues)));
+        for (var i = 0; i < 6; i++) {
+          await tester.pump(const Duration(milliseconds: 500));
+        }
+        // mặc định: không dùng mô phỏng
+        expect(find.byKey(const ValueKey('admin-forecast-sim-toggle')), findsOneWidget);
+        expect(find.byKey(const ValueKey('admin-forecast-sim-banner')), findsNothing);
+        expect(find.text('Dự báo 7 ngày tới'), findsOneWidget);
+        expect(find.textContaining('Mô hình học từ 45 ngày'), findsOneWidget);
+
+        final toggle = find.byKey(const ValueKey('admin-forecast-sim-toggle'));
+        await tester.ensureVisible(toggle);
+        await tester.tap(toggle);
+        for (var i = 0; i < 10; i++) {
+          await tester.pump(const Duration(milliseconds: 400));
+        }
+
+        expect(find.byKey(const ValueKey('admin-forecast-sim-banner')), findsOneWidget);
+        expect(find.textContaining('ĐANG DÙNG DỮ LIỆU MÔ PHỎNG'), findsOneWidget);
+        expect(find.textContaining('KHÔNG phải đơn đặt sân thật'), findsOneWidget);
+        expect(find.text('Dự báo 7 ngày tới (dữ liệu mô phỏng)'), findsOneWidget);
+        // mô hình học thêm từ đơn mô phỏng: nhiều ngày hơn 45
+        expect(find.textContaining('Mô hình học từ 45 ngày'), findsNothing);
+        expect(find.textContaining(RegExp(r'Mô hình học từ (3\d\d|[4-9]\d\d) ngày')), findsOneWidget);
+
+        // bảng đối chiếu đáp án
+        expect(find.byKey(const ValueKey('admin-forecast-truth-table')), findsNothing);
+        final truthToggle = find.byKey(const ValueKey('admin-forecast-truth-toggle'));
+        await tester.ensureVisible(truthToggle);
+        await tester.tap(truthToggle);
+        await tester.pump(const Duration(milliseconds: 300));
+        expect(find.byKey(const ValueKey('admin-forecast-truth-table')), findsOneWidget);
+        expect(find.textContaining('Mức nền: đáp án 8.0 đơn/ngày'), findsOneWidget);
+        expect(find.textContaining('Thứ Bảy: đáp án x1.57'), findsOneWidget);
+        expect(find.textContaining('giả định ban đầu x1.25'), findsWidgets);
+
+        // tắt: trở lại như cũ
+        await tester.ensureVisible(toggle);
+        await tester.tap(toggle);
+        for (var i = 0; i < 10; i++) {
+          await tester.pump(const Duration(milliseconds: 400));
+        }
+        expect(find.byKey(const ValueKey('admin-forecast-sim-banner')), findsNothing);
+        expect(find.text('Dự báo 7 ngày tới'), findsOneWidget);
+        expect(find.textContaining('Mô hình học từ 45 ngày'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      }, _client);
+    });
 }

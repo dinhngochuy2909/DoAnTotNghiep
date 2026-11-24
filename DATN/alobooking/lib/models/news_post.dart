@@ -8,7 +8,11 @@ class NewsPost {
     ('notice', 'Thông báo'),
   ];
 
+  /// Loại dành riêng cho tin thể thao lấy từ báo (RSS công khai): không có trong danh sách admin tự chọn khi đăng.
+  static const sportCategory = 'sport';
+
   static String labelOf(String category) {
+    if (category == sportCategory) return 'Tin thể thao';
     for (final c in categories) {
       if (c.$1 == category) return c.$2;
     }
@@ -33,6 +37,11 @@ class NewsPost {
   final String author;
   final DateTime createdAt;
 
+  /// Tin lấy từ báo bên ngoài: tên báo và đường dẫn bài gốc. Chỉ lưu tiêu đề + liên kết + nguồn,
+  /// không chép nội dung bài. Rỗng với tin do admin tự viết.
+  final String sourceName;
+  final String sourceUrl;
+
   const NewsPost({
     required this.id,
     required this.title,
@@ -43,7 +52,17 @@ class NewsPost {
     this.pinned = false,
     this.author = 'AloBooking',
     required this.createdAt,
+    this.sourceName = '',
+    this.sourceUrl = '',
   });
+
+  /// Chỉ coi là tin ngoài khi đường dẫn là http(s) hợp lệ (không mở các dạng khác như javascript:).
+  bool get isExternal => isSafeHttpUrl(sourceUrl);
+
+  static bool isSafeHttpUrl(String url) {
+    final u = Uri.tryParse(url.trim());
+    return u != null && (u.scheme == 'http' || u.scheme == 'https') && u.host.isNotEmpty;
+  }
 
   NewsPost copyWith({
     String? title,
@@ -64,6 +83,8 @@ class NewsPost {
         pinned: pinned ?? this.pinned,
         author: author ?? this.author,
         createdAt: createdAt,
+        sourceName: sourceName,
+        sourceUrl: sourceUrl,
       );
 
   /// Đọc một tài liệu Firestore; trả về null nếu thiếu tiêu đề hoặc ngày đăng không hợp lệ
@@ -83,6 +104,8 @@ class NewsPost {
       pinned: f['pinned']?['booleanValue'] == true,
       author: s('author').isEmpty ? 'AloBooking' : s('author'),
       createdAt: created,
+      sourceName: s('sourceName').trim(),
+      sourceUrl: s('sourceUrl').trim(),
     );
   }
 
@@ -95,5 +118,7 @@ class NewsPost {
         'pinned': {'booleanValue': pinned},
         'author': {'stringValue': author},
         'createdAt': {'stringValue': createdAt.toIso8601String()},
+        if (sourceName.isNotEmpty) 'sourceName': {'stringValue': sourceName},
+        if (sourceUrl.isNotEmpty) 'sourceUrl': {'stringValue': sourceUrl},
       };
 }

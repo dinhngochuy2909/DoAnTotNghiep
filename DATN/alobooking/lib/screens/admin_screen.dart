@@ -16,6 +16,7 @@ import '../services/admin_stats.dart';
 import '../services/booking_slots.dart';
 import '../services/booking_count_service.dart';
 import '../services/demand_forecast_service.dart';
+import '../services/simulated_bookings.dart';
 import '../services/weather_service.dart';
 
 class AdminScreen extends StatefulWidget {
@@ -63,6 +64,12 @@ class _AdminScreenState extends State<AdminScreen> {
   /// Mô hình đếm đơn (thứ, lễ, mùa, mưa, nhiệt độ) và ngày đang mở xem chi tiết trong thẻ dự báo.
   BookingCountReport? _countReport;
   int? _forecastOpenDay;
+
+  /// Chế độ thử với đơn MÔ PHỎNG (chỉ đưa vào mô hình dự đoán, không ghi Firestore, không tính vào số liệu khác).
+  bool _useSimulated = false;
+  SimulatedBookings? _sim;
+  bool _countBusy = false;
+  bool _showTruth = false;
   DateTime? _lastLoaded;
   String? _loadError;
   DemandModel? _model;
@@ -160,11 +167,141 @@ class _AdminScreenState extends State<AdminScreen> {
   /// Chạy nền để không làm chậm bảng quản trị; lỗi thì giữ thẻ dự báo ở mức ước lượng cũ.
   Future<void> _refreshCountReport() async {
     final bookings = _bookings;
+    final useSim = _useSimulated;
+    if (mounted) setState(() => _countBusy = true);
     try {
-      final report = await BookingCountService.build(bookings);
-      if (!mounted || !identical(bookings, _bookings)) return;
-      setState(() => _countReport = report);
-    } catch (_) {}
+      var input = bookings;
+      if (useSim) {
+        _sim ??= await SimulatedBookings.load();
+        final sim = _sim;
+        if (sim == null) {
+          if (!mounted) return;
+          setState(() {
+            _useSimulated = false;
+            _countBusy = false;
+          });
+          _showToast('Không đọc được dữ liệu mô phỏng.', isError: true);
+          return;
+        }
+        input = [...bookings, ...sim.bookings];
+      }
+      final report = await BookingCountService.build(input);
+      if (!mounted || !identical(bookings, _bookings) || useSim != _useSimulated) return;
+      setState(() {
+        _countReport = report;
+        _countBusy = false;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _countBusy = false);
+    }
+  }
+
+  void _toggleSimulated(bool on) {
+    setState(() {
+      _useSimulated = on;
+      _forecastOpenDay = null;
+      _showTruth = false;
+    });
+    _refreshCountReport();
+  }
+
+  /// Công tắc, biển cảnh báo và bảng đối chiếu đáp án của chế độ mô phỏng (đặt trên thẻ dự báo).
+  Widget _simulationPanel(BookingCountReport? report) {
+    final sim = _sim;
+    final on = _useSimulated;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Switch(
+              key: const ValueKey('admin-forecast-sim-toggle'),
+              value: on,
+              onChanged: _toggleSimulated,
+              activeThumbColor: AdminUi.warn,
+            ),
+            const SizedBox(width: 6),
+            const Expanded(
+              child: Text('Thử với dữ liệu mô phỏng', style: TextStyle(color: AdminUi.text, fontSize: 13, fontWeight: FontWeight.w500)),
+            ),
+            if (_countBusy)
+              const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: AdminUi.muted)),
+          ],
+        ),
+        if (on)
+          Container(
+            key: const ValueKey('admin-forecast-sim-banner'),
+            width: double.infinity,
+            margin: const EdgeInsets.only(top: 6, bottom: 8),
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: AdminUi.warn.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: AdminUi.warn.withValues(alpha: 0.6)),
+            ),
+            child: Text(
+              sim == null
+                  ? 'ĐANG DÙNG DỮ LIỆU MÔ PHỎNG (không phải đơn đặt sân thật). Đang nạp dữ liệu…'
+                  : 'ĐANG DÙNG DỮ LIỆU MÔ PHỎNG: ${sim.retained} đơn do chương trình tự sinh (${sim.days} ngày, ${sim.from} đến ${sim.to}) '
+                      'trộn với đơn thật đang có. Đây KHÔNG phải đơn đặt sân thật, chỉ để minh họa cách mô hình học và kiểm tra nó có tìm lại được '
+                      'quy luật đã gài hay không. Doanh thu và số đơn ở các thẻ khác không bị ảnh hưởng.',
+              style: const TextStyle(color: AdminUi.text, fontSize: 12, height: 1.45),
+            ),
+          ),
+        if (on && sim != null && report != null && report.model.hasData) ...[
+          InkWell(
+            key: const ValueKey('admin-forecast-truth-toggle'),
+            onTap: () => setState(() => _showTruth = !_showTruth),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              child: Row(
+                children: [
+                  Icon(_showTruth ? Icons.expand_less : Icons.expand_more, size: 18, color: AdminUi.muted),
+                  const SizedBox(width: 4),
+                  const Expanded(
+                    child: Text('Mô hình có tìm lại được đáp án đã gài không?',
+                        style: TextStyle(color: AdminUi.accent, fontSize: 12.5, fontWeight: FontWeight.w600)),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          if (_showTruth)
+            Container(
+              key: const ValueKey('admin-forecast-truth-table'),
+              width: double.infinity,
+              padding: const EdgeInsets.all(10),
+              margin: const EdgeInsets.only(bottom: 8),
+              decoration: BoxDecoration(color: AdminUi.border.withValues(alpha: 0.35), borderRadius: BorderRadius.circular(8)),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Mức nền: đáp án ${math.exp(sim.truth['intercept'] ?? 0).toStringAsFixed(1)} đơn/ngày, mô hình học ${report.model.intercept.toStringAsFixed(1)}.',
+                    style: AdminUi.caption,
+                  ),
+                  const SizedBox(height: 4),
+                  for (final c in report.model.coefficientInfo)
+                    if (sim.truth.containsKey(c.key))
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 3),
+                        child: Text(
+                          '${c.label}: đáp án x${math.exp(sim.truth[c.key]!).toStringAsFixed(2)} · giả định ban đầu x${math.exp(c.prior).toStringAsFixed(2)} · '
+                          'học được x${math.exp(c.learned).toStringAsFixed(2)} (dữ liệu ${(c.dataShare * 100).round()}%)',
+                          style: AdminUi.caption,
+                        ),
+                      ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'x1.00 là không ảnh hưởng. Yếu tố ít bằng chứng (như một kỳ Tết) hoặc trùng nhau (nóng và mùa hè) có thể lệch khá xa đáp án.',
+                    style: AdminUi.caption,
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ],
+    );
   }
 
   void _showToast(String msg, {bool isError = false}) {
@@ -1145,13 +1282,14 @@ class _AdminScreenState extends State<AdminScreen> {
     }
 
     return AdminCard(
-      title: 'Dự báo 7 ngày tới',
+      title: _useSimulated ? 'Dự báo 7 ngày tới (dữ liệu mô phỏng)' : 'Dự báo 7 ngày tới',
       subtitle: report != null && report.model.hasData
           ? 'Số đơn dự kiến theo thứ, ngày lễ, mùa, mưa, nhiệt độ. Bấm một ngày để xem lý do'
           : 'Nhu cầu và tỷ lệ hủy dự kiến (mô hình thống kê)',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          _simulationPanel(report),
           for (var i = 0; i < days.length; i++) ...[
             if (i > 0) const Divider(height: 1, color: AdminUi.border),
             InkWell(
@@ -3710,7 +3848,7 @@ class _AdminScreenState extends State<AdminScreen> {
                 ),
                 const SizedBox(height: 3),
                 Text(
-                  '${_newsStamp(p.createdAt)}${venueName != null ? ' · Gắn sân: $venueName' : ''}',
+                  '${_newsStamp(p.createdAt)}${p.isExternal ? ' · Nguồn: ${p.sourceName.isEmpty ? Uri.parse(p.sourceUrl).host : p.sourceName}' : ''}${venueName != null ? ' · Gắn sân: $venueName' : ''}',
                   style: AdminUi.caption,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -3718,12 +3856,14 @@ class _AdminScreenState extends State<AdminScreen> {
               ],
             ),
           ),
-          IconButton(
-            key: ValueKey('admin-news-edit-${p.id}'),
-            tooltip: 'Sửa',
-            icon: const Icon(Icons.edit_outlined, size: 19, color: AdminUi.muted),
-            onPressed: () => _openNewsDialog(existing: p),
-          ),
+          // Tin dẫn từ báo ngoài chỉ có tiêu đề + liên kết: admin xóa được nhưng không sửa nội dung của báo
+          if (!p.isExternal)
+            IconButton(
+              key: ValueKey('admin-news-edit-${p.id}'),
+              tooltip: 'Sửa',
+              icon: const Icon(Icons.edit_outlined, size: 19, color: AdminUi.muted),
+              onPressed: () => _openNewsDialog(existing: p),
+            ),
           IconButton(
             key: ValueKey('admin-news-delete-${p.id}'),
             tooltip: 'Xóa',

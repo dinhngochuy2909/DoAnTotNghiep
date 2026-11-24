@@ -101,6 +101,12 @@ class NewsKindStyle {
       Icons.star_outline_rounded,
       [Color(0xFFF59E0B), Color(0xFFEA580C)],
     ),
+    NewsKind.sport: NewsKindStyle(
+      Color(0xFF0EA5E9),
+      Color(0xFF0369A1),
+      Icons.sports_score_rounded,
+      [Color(0xFF0EA5E9), Color(0xFF2563EB)],
+    ),
   };
 
   static NewsKindStyle of(NewsKind kind) => _styles[kind]!;

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:url_launcher/url_launcher.dart';
 
+import '../models/news_post.dart';
 import '../models/venue.dart';
 import '../services/firestore_service.dart';
 import '../services/news_feed.dart';
@@ -97,6 +99,23 @@ class NewsDetailScreen extends StatelessWidget {
     );
   }
 
+  /// Cách mở liên kết ngoài (đặt lại được trong test để không mở trình duyệt thật).
+  static Future<bool> Function(Uri url) launcher = (url) => launchUrl(url, mode: LaunchMode.externalApplication);
+
+  /// Mở bài gốc ở tab/ứng dụng ngoài. Chỉ mở đường dẫn http(s); lỗi thì báo cho người dùng.
+  Future<void> _openSource(BuildContext context, NewsEntry e) async {
+    final messenger = ScaffoldMessenger.of(context);
+    var ok = false;
+    if (NewsPost.isSafeHttpUrl(e.sourceUrl)) {
+      try {
+        ok = await launcher(Uri.parse(e.sourceUrl.trim()));
+      } catch (_) {}
+    }
+    if (!ok) {
+      messenger.showSnackBar(const SnackBar(content: Text('Không mở được bài gốc. Bạn có thể sao chép tiêu đề và tìm trên báo.'), duration: Duration(seconds: 3)));
+    }
+  }
+
   Widget _gap() => const SizedBox(height: 14);
 
   Widget _head(BuildContext context, NewsEntry e, Venue? v, bool isReview, String timeLabel) {
@@ -132,12 +151,31 @@ class NewsDetailScreen extends StatelessWidget {
                   const SizedBox(height: 14),
                   Text(e.body.trim(), key: const ValueKey('news-detail-body'), style: const TextStyle(color: Color(0xFF334155), fontSize: 15.5, height: 1.6)),
                 ],
+                if (e.isExternal) ...[
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.icon(
+                      key: const ValueKey('news-detail-source'),
+                      onPressed: () => _openSource(context, e),
+                      icon: const Icon(Icons.open_in_new_rounded, size: 18),
+                      label: Text('Đọc bài gốc tại ${e.sourceName.isEmpty ? Uri.parse(e.sourceUrl).host : e.sourceName}'),
+                      style: FilledButton.styleFrom(backgroundColor: _green, padding: const EdgeInsets.symmetric(vertical: 14)),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  const Text(
+                    'AloBooking chỉ dẫn tiêu đề và liên kết. Nội dung bài viết thuộc về báo gốc.',
+                    key: ValueKey('news-detail-source-note'),
+                    style: TextStyle(color: Color(0xFF94A3B8), fontSize: 11.5, height: 1.4),
+                  ),
+                ],
                 const SizedBox(height: 16),
                 Row(
                   children: [
                     Expanded(
                       child: Text(
-                        '${e.isAuto ? 'Tự động từ dữ liệu AloBooking' : 'Đăng bởi ${e.byline}'} · ${NewsFeed.fullDate(e.time)}',
+                        '${e.creditLine} · ${NewsFeed.fullDate(e.time)}',
                         key: const ValueKey('news-detail-meta'),
                         style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12, height: 1.4),
                       ),
