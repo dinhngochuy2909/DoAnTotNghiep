@@ -1,4 +1,6 @@
 import 'dart:math' as math;
+import 'booking_count_model.dart' show WeatherInput;
+import 'booking_count_service.dart';
 import 'demand_forecast_service.dart';
 import 'weather_service.dart';
 import 'booking_slots.dart';
@@ -676,13 +678,26 @@ Giá mỗi sân ghi dạng "giá giờ thường - giá giờ vàng": ca giờ v
     }
     String? forecastText;
     if (intent.topics.contains('forecast')) {
+      Map<String, DayRain> rain = const {};
+      Map<String, WeatherInput> wx = const {};
       try {
         final w = await WeatherService.getCurrentWeather();
-        forecastText = DemandForecastService.buildPromptSection(_bookings, intent.date,
-            rainByDate: w.rainByDate, sport: intent.sport);
-      } catch (_) {
-        forecastText = DemandForecastService.buildPromptSection(_bookings, intent.date, sport: intent.sport);
-      }
+        rain = w.rainByDate;
+        wx = BookingCountService.forecastWeather(w.daily);
+      } catch (_) {}
+      // Số đơn dự kiến từ mô hình đếm đơn (cùng con số với thẻ dự báo ở Admin); lỗi thì dùng ước lượng cũ
+      BookingCountReport? counts;
+      try {
+        counts = await BookingCountService.build(_bookings);
+      } catch (_) {}
+      forecastText = DemandForecastService.buildPromptSection(
+        _bookings,
+        intent.date,
+        rainByDate: rain,
+        sport: intent.sport,
+        volumeFor: counts == null ? null : (d) => counts!.volumeFor(d, weather: wx[VnCalendar.key(d)]),
+        volumeNote: counts != null && counts.model.hasData ? counts.honestyNote : null,
+      );
       b.writeln('\n$forecastText');
     }
     b.writeln('=== HẾT TRI THỨC ===');

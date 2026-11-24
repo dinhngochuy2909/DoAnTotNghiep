@@ -163,7 +163,7 @@ class ExploreHighlights {
   static String dayShort(DateTime d) => const ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'][d.weekday - 1];
 
   /// Mức mưa của một ngày: đẹp trời (xác suất dưới 30% và mưa dưới 1 mm), có thể mưa (dưới 60%), dễ mưa.
-  static RainTag rainTag(DayForecast d) {
+  static RainTag rainTag(DayWeather d) {
     if (d.rainProb < 30 && d.rainMm < 1) return RainTag.fine;
     if (d.rainProb < 60) return RainTag.maybe;
     return RainTag.likely;
@@ -171,8 +171,8 @@ class ExploreHighlights {
 
   /// Ngày đẹp nhất để ra sân: khả năng mưa thấp nhất (rồi lượng mưa thấp nhất, rồi ngày gần nhất).
   /// Chỉ trả về ngày có khả năng mưa dưới 40%; không có thì null để không tô vẽ một ngày "đẹp" không có thật.
-  static DayForecast? bestDay(List<DayForecast> days) {
-    DayForecast? best;
+  static DayWeather? bestDay(List<DayWeather> days) {
+    DayWeather? best;
     for (final d in days) {
       if (d.rainProb >= 40) continue;
       if (best == null || d.rainProb < best.rainProb || (d.rainProb == best.rainProb && d.rainMm < best.rainMm)) best = d;

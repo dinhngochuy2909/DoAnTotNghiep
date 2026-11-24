@@ -10,13 +10,13 @@ import 'package:alobooking/services/venue_cache.dart';
 
 /// Máy chủ Firestore giả: phát sân theo từng trang, đếm số yêu cầu, và có thể giả lập lỗi.
 class _FakeServer {
-  _FakeServer({this.perPage = 2, int venues = 5}) {
+  _FakeServer({int venues = 5}) {
     for (var i = 1; i <= venues; i++) {
       docs.add(_doc(i));
     }
   }
 
-  final int perPage;
+  final int perPage = 2;
   final List<Map<String, dynamic>> docs = [];
   final List<http.Request> requests = [];
 

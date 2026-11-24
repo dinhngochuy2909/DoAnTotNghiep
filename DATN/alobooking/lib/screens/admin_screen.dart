@@ -14,6 +14,7 @@ import 'package:flutter/services.dart';
 import '../widgets/admin_ui.dart';
 import '../services/admin_stats.dart';
 import '../services/booking_slots.dart';
+import '../services/booking_count_service.dart';
 import '../services/demand_forecast_service.dart';
 import '../services/weather_service.dart';
 
@@ -57,6 +58,11 @@ class _AdminScreenState extends State<AdminScreen> {
 
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   Map<String, DayRain> _rainByDate = {};
+  List<DayWeather> _dailyWeather = [];
+
+  /// Mô hình đếm đơn (thứ, lễ, mùa, mưa, nhiệt độ) và ngày đang mở xem chi tiết trong thẻ dự báo.
+  BookingCountReport? _countReport;
+  int? _forecastOpenDay;
   DateTime? _lastLoaded;
   String? _loadError;
   DemandModel? _model;
@@ -132,11 +138,13 @@ class _AdminScreenState extends State<AdminScreen> {
           _loadError = '${FirestoreService.failureMessage()} Một số dữ liệu chưa tải được nên danh sách có thể chưa đầy đủ. Bấm làm mới để thử lại.';
         }
         _rainByDate = (results[4] as WeatherData).rainByDate;
+        _dailyWeather = (results[4] as WeatherData).daily;
         _news = results[5] as List<NewsPost>;
         _sortNews();
         _lastLoaded = DateTime.now();
         _isLoading = false;
       });
+      _refreshCountReport();
     } catch (_) {
       if (!mounted) return;
       setState(() {
@@ -146,6 +154,17 @@ class _AdminScreenState extends State<AdminScreen> {
             : 'Không tải được dữ liệu. Kiểm tra kết nối rồi bấm làm mới.';
       });
     }
+  }
+
+  /// Huấn luyện mô hình đếm đơn sau khi tải xong dữ liệu (cần thêm thời tiết thật của các ngày đã có đơn).
+  /// Chạy nền để không làm chậm bảng quản trị; lỗi thì giữ thẻ dự báo ở mức ước lượng cũ.
+  Future<void> _refreshCountReport() async {
+    final bookings = _bookings;
+    try {
+      final report = await BookingCountService.build(bookings);
+      if (!mounted || !identical(bookings, _bookings)) return;
+      setState(() => _countReport = report);
+    } catch (_) {}
   }
 
   void _showToast(String msg, {bool isError = false}) {
@@ -1101,11 +1120,17 @@ class _AdminScreenState extends State<AdminScreen> {
 
   Widget _buildForecastCard() {
     final model = _demandModel;
+    final report = _countReport;
+    final wx = BookingCountService.forecastWeather(_dailyWeather);
     final now = DateTime.now();
     final start = DateTime(now.year, now.month, now.day);
     final days = [
       for (var i = 0; i < 7; i++)
-        model.forecastDay(start.add(Duration(days: i)), rain: _rainByDate[VnCalendar.key(start.add(Duration(days: i)))]),
+        model.forecastDay(
+          start.add(Duration(days: i)),
+          rain: _rainByDate[VnCalendar.key(start.add(Duration(days: i)))],
+          volume: report?.volumeFor(start.add(Duration(days: i)), weather: wx[VnCalendar.key(start.add(Duration(days: i)))]),
+        ),
     ];
     Color levelColor(String l) {
       switch (l) {
@@ -1121,13 +1146,17 @@ class _AdminScreenState extends State<AdminScreen> {
 
     return AdminCard(
       title: 'Dự báo 7 ngày tới',
-      subtitle: 'Nhu cầu và tỷ lệ hủy dự kiến (mô hình thống kê)',
+      subtitle: report != null && report.model.hasData
+          ? 'Số đơn dự kiến theo thứ, ngày lễ, mùa, mưa, nhiệt độ. Bấm một ngày để xem lý do'
+          : 'Nhu cầu và tỷ lệ hủy dự kiến (mô hình thống kê)',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           for (var i = 0; i < days.length; i++) ...[
             if (i > 0) const Divider(height: 1, color: AdminUi.border),
-            Padding(
+            InkWell(
+              onTap: () => setState(() => _forecastOpenDay = _forecastOpenDay == i ? null : i),
+              child: Padding(
               padding: const EdgeInsets.symmetric(vertical: 9),
               child: Row(
                 children: [
@@ -1160,10 +1189,17 @@ class _AdminScreenState extends State<AdminScreen> {
                   ),
                   Expanded(
                     flex: 3,
-                    child: Text(
-                      days[i].expectedBookings == null ? '—' : '~${days[i].expectedBookings!.round()} đơn',
-                      textAlign: TextAlign.right,
-                      style: const TextStyle(color: AdminUi.text, fontSize: 13),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(
+                          days[i].expectedBookings == null ? '—' : '~${days[i].expectedBookings!.round()} đơn',
+                          textAlign: TextAlign.right,
+                          style: const TextStyle(color: AdminUi.text, fontSize: 13),
+                        ),
+                        if (days[i].low != null && days[i].high != null)
+                          Text('${days[i].low!.round()}–${days[i].high!.round()}', style: AdminUi.caption),
+                      ],
                     ),
                   ),
                   Expanded(
@@ -1173,13 +1209,39 @@ class _AdminScreenState extends State<AdminScreen> {
                   ),
                 ],
               ),
+              ),
             ),
+            if (_forecastOpenDay == i)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: AdminUi.border.withValues(alpha: 0.35),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      for (final f in days[i].factors)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 4),
+                          child: Text('• $f', style: AdminUi.caption),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
           ],
           const SizedBox(height: 10),
           Text(
-            'Học từ ${model.n} đơn lịch sử. Mọi đơn mới đều chuyển khoản trước nên tỉ lệ hủy được dự báo theo nhóm trả trước. '
-            'Ảnh hưởng của mưa và ngày lễ là giả định chuyên môn, chưa kiểm chứng bằng dữ liệu. '
-            'Độ tin cậy: ${model.confidenceText.split(' (').first.toLowerCase()}.',
+            report != null && report.model.hasData
+                ? '${report.honestyNote} Mưa, nhiệt độ, mùa và ngày lễ chưa đủ dữ liệu để học thì đang theo giả định chuyên môn '
+                    '(ghi rõ ở từng yếu tố). Mọi đơn mới đều chuyển khoản trước nên tỉ lệ hủy được dự báo theo nhóm trả trước.'
+                : 'Học từ ${model.n} đơn lịch sử. Mọi đơn mới đều chuyển khoản trước nên tỉ lệ hủy được dự báo theo nhóm trả trước. '
+                    'Ảnh hưởng của mưa và ngày lễ là giả định chuyên môn, chưa kiểm chứng bằng dữ liệu. '
+                    'Độ tin cậy: ${model.confidenceText.split(' (').first.toLowerCase()}.',
             style: AdminUi.caption,
           ),
         ],

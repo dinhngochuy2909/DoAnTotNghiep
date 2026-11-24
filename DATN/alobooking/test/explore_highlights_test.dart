@@ -228,7 +228,7 @@ void main() {
     });
   });
 
-  DayForecast day(int offset, {int prob = 10, double mm = 0}) => DayForecast(
+  DayWeather day(int offset, {int prob = 10, double mm = 0}) => DayWeather(
         date: DateTime(2026, 11, 21 + offset),
         emoji: '☀️',
         condition: 'Trời quang',

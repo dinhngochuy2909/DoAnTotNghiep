@@ -12,7 +12,7 @@ class DayRain {
 enum Sky { clear, partly, cloudy, fog, rain, storm }
 
 /// Dự báo một ngày: dùng cho lịch "ngày nào ra sân đẹp" ở Khám phá.
-class DayForecast {
+class DayWeather {
   final DateTime date;
   final String emoji;
   final Sky sky;
@@ -24,7 +24,7 @@ class DayForecast {
   final int rainProb;
   final double rainMm;
 
-  const DayForecast({
+  const DayWeather({
     required this.date,
     required this.emoji,
     this.sky = Sky.partly,
@@ -66,7 +66,7 @@ class WeatherData {
   final double? eveningTemp;
 
   /// Dự báo từng ngày (hôm nay trở đi, tối đa 7 ngày); rỗng nếu không có dữ liệu.
-  final List<DayForecast> daily;
+  final List<DayWeather> daily;
 
   WeatherData({
     required this.temperature,
@@ -269,8 +269,8 @@ class WeatherService {
   }
 
   /// Dự báo từng ngày từ phản hồi Open-Meteo. Ngày nào thiếu số liệu thì bỏ qua, không điền số đoán.
-  static List<DayForecast> dailyForecast(Map<String, dynamic> data) {
-    final out = <DayForecast>[];
+  static List<DayWeather> dailyForecast(Map<String, dynamic> data) {
+    final out = <DayWeather>[];
     try {
       final daily = data['daily'] as Map<String, dynamic>;
       final dates = (daily['time'] as List).cast<String>();
@@ -282,7 +282,7 @@ class WeatherService {
         final mm = (daily['precipitation_sum'][i] as num?)?.toDouble();
         final code = (daily['weather_code'][i] as num?)?.toInt();
         if (date == null || tmax == null || tmin == null || prob == null || mm == null || code == null) continue;
-        out.add(DayForecast(
+        out.add(DayWeather(
           date: date,
           emoji: _mapConditionToEmoji(code, mm >= 1 ? mm : 0),
           sky: skyOf(code, mm >= 1 ? mm : 0),

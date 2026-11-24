@@ -136,6 +136,29 @@ class PeriodForecast {
   const PeriodForecast(this.name, this.bookings, this.cancelRate);
 }
 
+/// Số đơn của một ngày do mô hình đếm đơn (BookingCountModel) tính, dùng thay cho ước lượng nhân hệ số của [DemandModel]
+/// để cả thẻ dự báo ở Admin lẫn chatbot cùng một con số.
+class VolumeOverride {
+  final double expected, low, high;
+
+  /// So với một ngày điển hình trong lịch sử (1.0 = bình thường).
+  final double multiplier;
+
+  /// Các dòng giải thích yếu tố (đã ghi rõ học từ dữ liệu hay giả định).
+  final List<String> factorLines;
+
+  /// Độ tin cậy của riêng phần số đơn (ví dụ "THẤP (học từ 12 ngày…)").
+  final String? confidence;
+  const VolumeOverride({
+    required this.expected,
+    required this.low,
+    required this.high,
+    required this.multiplier,
+    this.factorLines = const [],
+    this.confidence,
+  });
+}
+
 class DayForecast {
   final DateTime date;
   final HolidayInfo? holiday;
@@ -449,41 +472,45 @@ class DemandModel {
     return sum / cnt;
   }
 
-  DayForecast forecastDay(DateTime day, {DayRain? rain, String? sport}) {
+  /// [volume]: số đơn đã tính bằng mô hình đếm đơn; có thì thay cho ước lượng nhu cầu nhân hệ số bên dưới
+  /// (phần tỉ lệ hủy vẫn do mô hình này tính).
+  DayForecast forecastDay(DateTime day, {DayRain? rain, String? sport, VolumeOverride? volume}) {
     final date = DateTime(day.year, day.month, day.day);
     final holiday = VnCalendar.holidayOn(date);
     final weekend = VnCalendar.isWeekend(date);
     final offDay = VnCalendar.isDayOff(date);
+    final demandFactors = <String>[];
     final factors = <String>[];
 
     // ── Nhu cầu ──
     var dayMult = 1.0;
     if (offDay && (holiday == null || holiday.demandFactor >= 1)) {
       dayMult *= weekendMult;
-      factors.add(
+      demandFactors.add(
           '${weekend ? 'Cuối tuần' : 'Ngày nghỉ lễ'}: nhu cầu x${weekendMult.toStringAsFixed(2)} '
           '[${weekendMultLearned ? 'học từ dữ liệu, kết hợp giả định' : 'giả định chuyên môn'}]');
     }
     if (holiday != null) {
       if (holiday.demandFactor < 1) {
         dayMult *= holiday.demandFactor;
-        factors.add('${holiday.name}: nhu cầu x${holiday.demandFactor.toStringAsFixed(2)} [giả định, người dân nghỉ Tết/du lịch]');
+        demandFactors.add('${holiday.name}: nhu cầu x${holiday.demandFactor.toStringAsFixed(2)} [giả định, người dân nghỉ Tết/du lịch]');
       } else if (!holiday.dayOff) {
         dayMult *= holiday.demandFactor;
-        factors.add('${holiday.name}: phong trào tăng nhẹ x${holiday.demandFactor.toStringAsFixed(2)} [giả định]');
+        demandFactors.add('${holiday.name}: phong trào tăng nhẹ x${holiday.demandFactor.toStringAsFixed(2)} [giả định]');
       } else if (!weekend) {
         dayMult *= 1.05;
-        factors.add('${holiday.name} (nghỉ lễ): thêm x1.05 [giả định]');
+        demandFactors.add('${holiday.name} (nghỉ lễ): thêm x1.05 [giả định]');
       }
     }
     final wFactor = _weatherDemandFactor(rain, sport);
     if (rain != null) {
-      factors.add('Dự báo mưa ${rain.prob.round()}% (${rain.mm.toStringAsFixed(1)} mm): nhu cầu x${wFactor.toStringAsFixed(2)} '
+      demandFactors.add('Dự báo mưa ${rain.prob.round()}% (${rain.mm.toStringAsFixed(1)} mm): nhu cầu x${wFactor.toStringAsFixed(2)} '
           '[giả định${ForecastAssumptions.isOutdoor(sport) ? ', sân ngoài trời nhạy hơn' : ''}]');
     } else {
-      factors.add('Chưa có dự báo thời tiết cho ngày này (quá 7 ngày hoặc lỗi mạng): không điều chỉnh theo mưa');
+      demandFactors.add('Chưa có dự báo thời tiết cho ngày này (quá 7 ngày hoặc lỗi mạng): không điều chỉnh theo mưa');
     }
-    final mult = dayMult * wFactor;
+    factors.addAll(volume != null ? volume.factorLines : demandFactors);
+    final mult = volume?.multiplier ?? dayMult * wFactor;
 
     String level;
     if (mult >= 1.4) {
@@ -499,7 +526,11 @@ class DemandModel {
     }
 
     double? total, lo, hi;
-    if (hasEnoughForVolume && baseWeekdayPerDay != null) {
+    if (volume != null) {
+      total = volume.expected;
+      lo = volume.low;
+      hi = volume.high;
+    } else if (hasEnoughForVolume && baseWeekdayPerDay != null) {
       total = baseWeekdayPerDay! * mult;
       final sd = sqrt(total);
       lo = max(0, total - 1.28 * sd);
@@ -565,7 +596,7 @@ class DemandModel {
       cancelRateCash: cashRate,
       cancelRatePrepaid: prepaidRate,
       periods: periods,
-      confidence: confidenceText,
+      confidence: volume?.confidence == null ? confidenceText : 'số đơn: ${volume!.confidence}; tỉ lệ hủy: $confidenceText',
       factors: factors,
     );
   }
@@ -592,30 +623,42 @@ class DemandModel {
 
 class DemandForecastService {
   /// Dựng văn bản dự đoán cho RAG: ngày được hỏi (chi tiết) + tổng quan 7 ngày tới.
+  ///
+  /// [volumeFor]: nếu có, số đơn từng ngày lấy từ mô hình đếm đơn (thời tiết, thứ, mùa, lễ) thay cho ước lượng cũ;
+  /// [volumeNote] là câu nói rõ độ tin cậy của mô hình đó, được đưa vào lưu ý cuối.
   static String buildPromptSection(
     List<BookingItem> bookings,
     DateTime target, {
     Map<String, DayRain> rainByDate = const {},
     String? sport,
     DateTime? today,
+    VolumeOverride? Function(DateTime date)? volumeFor,
+    String? volumeNote,
   }) {
     final model = DemandModel.fit(bookings);
     final now = today ?? DateTime.now();
     final start = DateTime(now.year, now.month, now.day);
     final b = StringBuffer();
 
-    final detail = model.forecastDay(target, rain: rainByDate[VnCalendar.key(target)], sport: sport);
+    final detail = model.forecastDay(target, rain: rainByDate[VnCalendar.key(target)], sport: sport, volume: volumeFor?.call(target));
     b.writeln(detail.toPromptText());
 
     b.writeln('## TỔNG QUAN 7 NGÀY TỚI');
     for (var i = 0; i < 7; i++) {
       final d = start.add(Duration(days: i));
-      b.writeln('- ${model.forecastDay(d, rain: rainByDate[VnCalendar.key(d)], sport: sport).oneLine}');
+      b.writeln('- ${model.forecastDay(d, rain: rainByDate[VnCalendar.key(d)], sport: sport, volume: volumeFor?.call(d)).oneLine}');
     }
     b.writeln();
-    b.writeln('LƯU Ý KHI TRẢ LỜI: đây là ước lượng thống kê dựa trên ${model.n} đơn lịch sử + giả định chuyên môn về mưa/ngày lễ. '
-        'Phải nói rõ là "dự đoán/ước tính", nêu độ tin cậy, nêu yếu tố chính (đặc biệt cách thanh toán nếu hỏi về hủy), '
-        'và không hứa chắc chắn. Ứng dụng chỉ nhận chuyển khoản trước nên không gợi ý tiền mặt.');
+    if (volumeNote != null) {
+      b.writeln('LƯU Ý KHI TRẢ LỜI: số đơn dự kiến lấy từ mô hình hồi quy Poisson theo thứ trong tuần, ngày lễ/Tết, mùa, mưa và nhiệt độ. $volumeNote '
+          'Tỉ lệ hủy lấy từ mô hình riêng học trên ${model.n} đơn lịch sử. '
+          'Phải nói rõ là "dự đoán/ước tính", nêu độ tin cậy, nêu yếu tố chính, và không hứa chắc chắn. '
+          'Ứng dụng chỉ nhận chuyển khoản trước nên không gợi ý tiền mặt.');
+    } else {
+      b.writeln('LƯU Ý KHI TRẢ LỜI: đây là ước lượng thống kê dựa trên ${model.n} đơn lịch sử + giả định chuyên môn về mưa/ngày lễ. '
+          'Phải nói rõ là "dự đoán/ước tính", nêu độ tin cậy, nêu yếu tố chính (đặc biệt cách thanh toán nếu hỏi về hủy), '
+          'và không hứa chắc chắn. Ứng dụng chỉ nhận chuyển khoản trước nên không gợi ý tiền mặt.');
+    }
     return b.toString();
   }
 }

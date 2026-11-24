@@ -544,7 +544,7 @@ void main() {
     });
   });
 
-  DayForecast day(int offset, {int prob = 10, double mm = 0, double tmax = 30, double tmin = 22}) => DayForecast(
+  DayWeather day(int offset, {int prob = 10, double mm = 0, double tmax = 30, double tmin = 22}) => DayWeather(
         date: DateTime(2026, 11, 21 + offset),
         emoji: '☀️',
         condition: 'Trời quang',
@@ -554,7 +554,7 @@ void main() {
         rainMm: mm,
       );
 
-  WeatherData withDays(List<DayForecast> days) => WeatherData(
+  WeatherData withDays(List<DayWeather> days) => WeatherData(
         temperature: 28,
         rainMm: 0,
         humidity: 70,
