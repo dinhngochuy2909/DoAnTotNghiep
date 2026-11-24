@@ -61,7 +61,7 @@ class ExploreScreen extends StatefulWidget {
 }
 
 class _ExploreScreenState extends State<ExploreScreen> {
-  static const _green = Color(0xFF15803D);
+  static const _green = Color(0xFF0369A1);
   static const _ink = Color(0xFF0F172A);
   static const _grey = Color(0xFF64748B);
   static const _line = Color(0xFFE2E8F0);
@@ -294,7 +294,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xFF166534), Color(0xFF0D9488)],
+          colors: [Color(0xFF075985), Color(0xFF0891B2)],
         ),
       ),
     );
@@ -323,7 +323,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
         borderRadius: BorderRadius.circular(20),
         boxShadow: const [
           BoxShadow(
-            color: Color(0x33166534),
+            color: Color(0x33075985),
             blurRadius: 18,
             offset: Offset(0, 8),
           ),
@@ -341,8 +341,8 @@ class _ExploreScreenState extends State<ExploreScreen> {
                   begin: Alignment.centerLeft,
                   end: Alignment.centerRight,
                   colors: [
-                    Color(0xE6064E3B),
-                    Color(0xB3166534),
+                    Color(0xE60C4A6E),
+                    Color(0xB3075985),
                     Color(0x33000000),
                   ],
                   stops: [0, 0.55, 1],
@@ -793,7 +793,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                   vertical: 10,
                 ),
                 decoration: BoxDecoration(
-                  color: isBest ? const Color(0xFFF0FDF4) : Colors.white,
+                  color: isBest ? const Color(0xFFF0F9FF) : Colors.white,
                   borderRadius: BorderRadius.circular(14),
                   border: Border.all(
                     color: isBest ? const Color(0xFF16A34A) : _line,
@@ -861,7 +861,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                       const Text(
                         '★ Đẹp nhất',
                         style: TextStyle(
-                          color: Color(0xFF15803D),
+                          color: Color(0xFF0369A1),
                           fontSize: 10.5,
                           fontWeight: FontWeight.w800,
                         ),

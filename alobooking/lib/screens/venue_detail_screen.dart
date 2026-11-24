@@ -151,7 +151,7 @@ class _VenueDetailScreenState extends State<VenueDetailScreen> with SingleTicker
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Row(
           children: [
-            const Icon(Icons.chat_bubble_outline, color: Color(0xFF065F46)),
+            const Icon(Icons.chat_bubble_outline, color: Color(0xFF075985)),
             const SizedBox(width: 8),
             Expanded(
               child: Text(
@@ -173,7 +173,7 @@ class _VenueDetailScreenState extends State<VenueDetailScreen> with SingleTicker
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.support_agent, color: Color(0xFF10B981)),
+                  const Icon(Icons.support_agent, color: Color(0xFF0EA5E9)),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
@@ -203,7 +203,7 @@ class _VenueDetailScreenState extends State<VenueDetailScreen> with SingleTicker
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF065F46),
+              backgroundColor: const Color(0xFF075985),
               foregroundColor: Colors.white,
             ),
             onPressed: () {
@@ -232,7 +232,7 @@ class _VenueDetailScreenState extends State<VenueDetailScreen> with SingleTicker
             SliverAppBar(
               expandedHeight: 280,
               pinned: true,
-              backgroundColor: const Color(0xFF15803D),
+              backgroundColor: const Color(0xFF0369A1),
               leading: Padding(
                 padding: const EdgeInsets.all(8.0),
                 child: CircleAvatar(
@@ -367,7 +367,7 @@ class _VenueDetailScreenState extends State<VenueDetailScreen> with SingleTicker
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
                             decoration: BoxDecoration(
-                              color: const Color(0xFF10B981), // Teal green
+                              color: const Color(0xFF0EA5E9), // Teal green
                               borderRadius: BorderRadius.circular(20),
                               boxShadow: const [
                                 BoxShadow(color: Colors.black26, blurRadius: 4, offset: Offset(0, 2)),
@@ -398,7 +398,7 @@ class _VenueDetailScreenState extends State<VenueDetailScreen> with SingleTicker
                             child: Container(
                               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
                               decoration: BoxDecoration(
-                                color: const Color(0xFF064E3B), // Dark green
+                                color: const Color(0xFF0C4A6E), // Dark green
                                 borderRadius: BorderRadius.circular(20),
                                 boxShadow: const [
                                   BoxShadow(color: Colors.black26, blurRadius: 4, offset: Offset(0, 2)),
@@ -492,7 +492,7 @@ class _VenueDetailScreenState extends State<VenueDetailScreen> with SingleTicker
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFFF0FDF4),
+                                  color: const Color(0xFFF0F9FF),
                                   borderRadius: BorderRadius.circular(12),
                                   border: Border.all(color: const Color(0xFF0284C7)),
                                 ),
@@ -526,7 +526,7 @@ class _VenueDetailScreenState extends State<VenueDetailScreen> with SingleTicker
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Icon(Icons.location_on, color: Color(0xFF15803D), size: 18),
+                        const Icon(Icons.location_on, color: Color(0xFF0369A1), size: 18),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
@@ -545,7 +545,7 @@ class _VenueDetailScreenState extends State<VenueDetailScreen> with SingleTicker
                     // Giờ mở cửa
                     Row(
                       children: [
-                        const Icon(Icons.access_time_filled, color: Color(0xFF15803D), size: 17),
+                        const Icon(Icons.access_time_filled, color: Color(0xFF0369A1), size: 17),
                         const SizedBox(width: 8),
                         Text(
                           v.hours,
@@ -561,7 +561,7 @@ class _VenueDetailScreenState extends State<VenueDetailScreen> with SingleTicker
                     // Hotline / Liên hệ
                     Row(
                       children: [
-                        const Icon(Icons.phone, color: Color(0xFF15803D), size: 17),
+                        const Icon(Icons.phone, color: Color(0xFF0369A1), size: 17),
                         const SizedBox(width: 8),
                         InkWell(
                           onTap: () {
@@ -593,9 +593,9 @@ class _VenueDetailScreenState extends State<VenueDetailScreen> with SingleTicker
                 TabBar(
                   controller: _tabController,
                   isScrollable: true,
-                  labelColor: const Color(0xFF10B981),
+                  labelColor: const Color(0xFF0EA5E9),
                   unselectedLabelColor: const Color(0xFF64748B),
-                  indicatorColor: const Color(0xFF10B981),
+                  indicatorColor: const Color(0xFF0EA5E9),
                   indicatorWeight: 3,
                   labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                   unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.normal, fontSize: 13),
@@ -638,7 +638,7 @@ class _VenueDetailScreenState extends State<VenueDetailScreen> with SingleTicker
                 const Text('Giá thuê từ', style: TextStyle(color: Color(0xFF64748B), fontSize: 11)),
                 Text(
                   widget.venue.price,
-                  style: const TextStyle(color: Color(0xFF15803D), fontWeight: FontWeight.bold, fontSize: 16),
+                  style: const TextStyle(color: Color(0xFF0369A1), fontWeight: FontWeight.bold, fontSize: 16),
                 ),
               ],
             ),
@@ -677,7 +677,7 @@ class _VenueDetailScreenState extends State<VenueDetailScreen> with SingleTicker
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(icon, size: 18, color: const Color(0xFF15803D)),
+              Icon(icon, size: 18, color: const Color(0xFF0369A1)),
               const SizedBox(width: 10),
               SizedBox(width: 92, child: Text(label, style: const TextStyle(fontSize: 12.5, color: Color(0xFF64748B)))),
               Expanded(
@@ -778,7 +778,7 @@ class _VenueDetailScreenState extends State<VenueDetailScreen> with SingleTicker
             children: [
               Row(
                 children: [
-                  Icon(Icons.event_busy_rounded, color: Color(0xFF15803D), size: 16),
+                  Icon(Icons.event_busy_rounded, color: Color(0xFF0369A1), size: 16),
                   SizedBox(width: 8),
                   Text('Hủy lịch và hoàn tiền',
                       style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF0F172A))),
@@ -806,7 +806,7 @@ class _VenueDetailScreenState extends State<VenueDetailScreen> with SingleTicker
   // 4. Tab ĐÁNH GIÁ: đánh giá thật của khách đã chơi
   Widget _buildTabReviews() {
     if (_reviewsLoading) {
-      return const Center(child: CircularProgressIndicator(color: Color(0xFF15803D)));
+      return const Center(child: CircularProgressIndicator(color: Color(0xFF0369A1)));
     }
     final avg = _reviews.isEmpty ? null : _reviews.fold<int>(0, (a, r) => a + r.stars) / _reviews.length;
     final shown = avg ?? (widget.venue.rating > 0 ? widget.venue.rating : null);
@@ -819,15 +819,15 @@ class _VenueDetailScreenState extends State<VenueDetailScreen> with SingleTicker
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: const Color(0xFFF0FDF4),
+            color: const Color(0xFFF0F9FF),
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0xFF86EFAC)),
+            border: Border.all(color: const Color(0xFF7DD3FC)),
           ),
           child: Row(
             children: [
               Text(
                 shown == null ? '—' : shown.toStringAsFixed(1),
-                style: const TextStyle(fontSize: 32, fontWeight: FontWeight.w900, color: Color(0xFF15803D)),
+                style: const TextStyle(fontSize: 32, fontWeight: FontWeight.w900, color: Color(0xFF0369A1)),
               ),
               const SizedBox(width: 16),
               Expanded(
@@ -872,10 +872,10 @@ class _VenueDetailScreenState extends State<VenueDetailScreen> with SingleTicker
                         children: [
                           CircleAvatar(
                             radius: 14,
-                            backgroundColor: const Color(0xFF15803D).withValues(alpha: 0.12),
+                            backgroundColor: const Color(0xFF0369A1).withValues(alpha: 0.12),
                             child: Text(
                               r.userName.isEmpty ? '?' : r.userName.substring(0, 1).toUpperCase(),
-                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF15803D)),
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF0369A1)),
                             ),
                           ),
                           const SizedBox(width: 8),
@@ -911,7 +911,7 @@ class _VenueDetailScreenState extends State<VenueDetailScreen> with SingleTicker
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 15, color: const Color(0xFF15803D)),
+          Icon(icon, size: 15, color: const Color(0xFF0369A1)),
           const SizedBox(width: 6),
           Text(label, style: const TextStyle(fontSize: 12, color: Color(0xFF334155))),
         ],

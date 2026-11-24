@@ -113,7 +113,7 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
             Expanded(child: Text(message)),
           ],
         ),
-        backgroundColor: const Color(0xFF16A34A),
+        backgroundColor: const Color(0xFF0284C7),
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         margin: const EdgeInsets.all(16),
@@ -135,10 +135,10 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              Color(0xFF064E3B),
-              Color(0xFF065F46),
-              Color(0xFF047857),
-              Color(0xFF059669),
+              Color(0xFF0C4A6E),
+              Color(0xFF075985),
+              Color(0xFF0369A1),
+              Color(0xFF0284C7),
             ],
             stops: [0.0, 0.3, 0.6, 1.0],
           ),
@@ -191,7 +191,7 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
             border: Border.all(color: Colors.white.withOpacity(0.3), width: 2),
             boxShadow: [
               BoxShadow(
-                color: const Color(0xFF10B981).withOpacity(0.4),
+                color: const Color(0xFF0EA5E9).withOpacity(0.4),
                 blurRadius: 30,
                 spreadRadius: 5,
               ),
@@ -377,7 +377,7 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
                   child: Checkbox(
                     value: _agreeTerms,
                     onChanged: (val) => setState(() => _agreeTerms = val ?? false),
-                    activeColor: const Color(0xFF16A34A),
+                    activeColor: const Color(0xFF0284C7),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
                     side: const BorderSide(color: Color(0xFFCBD5E1)),
                   ),
@@ -394,7 +394,7 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
                           TextSpan(
                             text: 'Điều khoản sử dụng',
                             style: GoogleFonts.inter(
-                              color: const Color(0xFF16A34A),
+                              color: const Color(0xFF0284C7),
                               fontWeight: FontWeight.w600,
                               decoration: TextDecoration.underline,
                             ),
@@ -403,7 +403,7 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
                           TextSpan(
                             text: 'Chính sách bảo mật',
                             style: GoogleFonts.inter(
-                              color: const Color(0xFF16A34A),
+                              color: const Color(0xFF0284C7),
                               fontWeight: FontWeight.w600,
                               decoration: TextDecoration.underline,
                             ),
@@ -424,9 +424,9 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
               child: ElevatedButton(
                 onPressed: _isLoading ? null : _handleRegister,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF16A34A),
+                  backgroundColor: const Color(0xFF0284C7),
                   foregroundColor: Colors.white,
-                  disabledBackgroundColor: const Color(0xFF16A34A).withOpacity(0.6),
+                  disabledBackgroundColor: const Color(0xFF0284C7).withOpacity(0.6),
                   elevation: 0,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
@@ -489,9 +489,9 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
             style: GoogleFonts.inter(
               fontSize: 14,
               fontWeight: FontWeight.w700,
-              color: const Color(0xFF6EE7B7),
+              color: const Color(0xFF7DD3FC),
               decoration: TextDecoration.underline,
-              decorationColor: const Color(0xFF6EE7B7),
+              decorationColor: const Color(0xFF7DD3FC),
             ),
           ),
         ),
@@ -528,7 +528,7 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Color(0xFF16A34A), width: 1.5),
+        borderSide: const BorderSide(color: Color(0xFF0284C7), width: 1.5),
       ),
       errorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),

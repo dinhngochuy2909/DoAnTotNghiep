@@ -15,7 +15,9 @@ class AdminUi {
   static const faint = Color(0xFF6B7A96);
 
   // Ngữ nghĩa
-  static const accent = Color(0xFF10B981);
+  static const accent = Color(0xFF0EA5E9);
+  /// Xanh lá dành riêng cho trạng thái thành công/đã duyệt/đã xác nhận (màu chủ đạo là xanh biển).
+  static const success = Color(0xFF10B981);
   static const info = Color(0xFF3B82F6);
   static const warn = Color(0xFFF59E0B);
   static const danger = Color(0xFFEF4444);
@@ -27,7 +29,7 @@ class AdminUi {
       case 'Pickleball':
         return info;
       case 'Cầu lông':
-        return accent;
+        return success;
       case 'Bóng đá':
         return const Color(0xFFF97316);
       case 'Tennis':

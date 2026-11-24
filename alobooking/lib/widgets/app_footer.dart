@@ -27,7 +27,7 @@ class FooterActions {
 }
 
 class AppFooter extends StatelessWidget {
-  static const _accent = Color(0xFF4ADE80);
+  static const _accent = Color(0xFF38BDF8);
 
   final FooterActions actions;
 
@@ -43,7 +43,7 @@ class AppFooter extends StatelessWidget {
     return Container(
       decoration: const BoxDecoration(
         gradient: LinearGradient(
-          colors: [Color(0xFF0F2419), Color(0xFF14532D), Color(0xFF166534)],
+          colors: [Color(0xFF0A2236), Color(0xFF0C4A6E), Color(0xFF075985)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),

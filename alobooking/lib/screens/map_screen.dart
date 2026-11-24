@@ -128,7 +128,7 @@ class _MapScreenState extends State<MapScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text('🎯 Đang kích hoạt định vị GPS... Vui lòng cho phép quyền vị trí trên trình duyệt!'),
-        backgroundColor: Color(0xFF15803D),
+        backgroundColor: Color(0xFF0369A1),
         duration: Duration(seconds: 2),
       ),
     );
@@ -139,7 +139,7 @@ class _MapScreenState extends State<MapScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFF1F5F9),
       appBar: AppBar(
-        backgroundColor: const Color(0xFF15803D),
+        backgroundColor: const Color(0xFF0369A1),
         foregroundColor: Colors.white,
         elevation: 0,
         title: Column(
@@ -232,7 +232,7 @@ class _MapScreenState extends State<MapScreen> {
       floatingActionButton: _isFullScreenMap
           ? FloatingActionButton.extended(
               onPressed: _locateUserNow,
-              backgroundColor: const Color(0xFF15803D),
+              backgroundColor: const Color(0xFF0369A1),
               foregroundColor: Colors.white,
               icon: const Icon(Icons.my_location_rounded),
               label: const Text('Vị trí của tôi', style: TextStyle(fontWeight: FontWeight.w700)),
@@ -259,10 +259,10 @@ class _MapScreenState extends State<MapScreen> {
               margin: const EdgeInsets.only(right: 8),
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
               decoration: BoxDecoration(
-                color: selected ? const Color(0xFF16A34A) : const Color(0xFFF1F5F9),
+                color: selected ? const Color(0xFF0284C7) : const Color(0xFFF1F5F9),
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(
-                  color: selected ? const Color(0xFF15803D) : const Color(0xFFE2E8F0),
+                  color: selected ? const Color(0xFF0369A1) : const Color(0xFFE2E8F0),
                   width: 1,
                 ),
               ),
@@ -311,7 +311,7 @@ class _MapScreenState extends State<MapScreen> {
               content: Text(
                 '📍 Đã xác định vị trí của bạn: ${lat.toStringAsFixed(4)}, ${lng.toStringAsFixed(4)} • Đang hiển thị các sân từ gần đến xa nhất!',
               ),
-              backgroundColor: const Color(0xFF16A34A),
+              backgroundColor: const Color(0xFF0284C7),
               duration: const Duration(seconds: 3),
             ),
           );
@@ -333,12 +333,12 @@ class _MapScreenState extends State<MapScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             decoration: BoxDecoration(
               gradient: const LinearGradient(
-                colors: [Color(0xFF15803D), Color(0xFF16A34A)],
+                colors: [Color(0xFF0369A1), Color(0xFF0284C7)],
               ),
               borderRadius: BorderRadius.circular(14),
               boxShadow: [
                 BoxShadow(
-                  color: const Color(0xFF16A34A).withOpacity(0.25),
+                  color: const Color(0xFF0284C7).withOpacity(0.25),
                   blurRadius: 8,
                   offset: const Offset(0, 3),
                 ),
@@ -440,12 +440,12 @@ class _MapScreenState extends State<MapScreen> {
         color: Colors.white,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
-          color: isSelected ? const Color(0xFF16A34A) : const Color(0xFFE2E8F0),
+          color: isSelected ? const Color(0xFF0284C7) : const Color(0xFFE2E8F0),
           width: isSelected ? 2 : 1,
         ),
         boxShadow: [
           BoxShadow(
-            color: isSelected ? const Color(0xFF16A34A).withOpacity(0.12) : Colors.black.withOpacity(0.04),
+            color: isSelected ? const Color(0xFF0284C7).withOpacity(0.12) : Colors.black.withOpacity(0.04),
             blurRadius: 10,
             offset: const Offset(0, 3),
           ),
@@ -526,20 +526,20 @@ class _MapScreenState extends State<MapScreen> {
                           margin: const EdgeInsets.only(bottom: 4),
                           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFDCFCE7),
+                            color: const Color(0xFFE0F2FE),
                             borderRadius: BorderRadius.circular(4),
                           ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Icon(Icons.near_me_rounded, size: 10, color: Color(0xFF15803D)),
+                              const Icon(Icons.near_me_rounded, size: 10, color: Color(0xFF0369A1)),
                               const SizedBox(width: 3),
                               Text(
                                 'Cách bạn $distanceStr',
                                 style: const TextStyle(
                                   fontSize: 10,
                                   fontWeight: FontWeight.w700,
-                                  color: Color(0xFF15803D),
+                                  color: Color(0xFF0369A1),
                                 ),
                               ),
                             ],
@@ -576,11 +576,11 @@ class _MapScreenState extends State<MapScreen> {
                             ),
                           ),
                           const SizedBox(width: 10),
-                          const Icon(Icons.access_time_rounded, size: 12, color: Color(0xFF059669)),
+                          const Icon(Icons.access_time_rounded, size: 12, color: Color(0xFF0284C7)),
                           const SizedBox(width: 3),
                           Text(
                             v.hours,
-                            style: const TextStyle(fontSize: 11, color: Color(0xFF059669), fontWeight: FontWeight.w500),
+                            style: const TextStyle(fontSize: 11, color: Color(0xFF0284C7), fontWeight: FontWeight.w500),
                           ),
                         ],
                       ),
@@ -593,7 +593,7 @@ class _MapScreenState extends State<MapScreen> {
                             style: const TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.w800,
-                              color: Color(0xFF16A34A),
+                              color: Color(0xFF0284C7),
                             ),
                           ),
                           ElevatedButton(
@@ -602,7 +602,7 @@ class _MapScreenState extends State<MapScreen> {
                               MaterialPageRoute(builder: (_) => VisualBookingScreen(venue: v)),
                             ),
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF16A34A),
+                              backgroundColor: const Color(0xFF0284C7),
                               foregroundColor: Colors.white,
                               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                               minimumSize: Size.zero,

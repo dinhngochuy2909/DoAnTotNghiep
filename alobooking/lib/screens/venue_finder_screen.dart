@@ -60,9 +60,9 @@ class VenueFinderScreen extends StatefulWidget {
 
 class _VenueFinderScreenState extends State<VenueFinderScreen> {
   // ── màu ──
-  static const _green = Color(0xFF15803D);
-  static const _accent = Color(0xFF16A34A);
-  static const _tint = Color(0xFFDCFCE7);
+  static const _green = Color(0xFF0369A1);
+  static const _accent = Color(0xFF0284C7);
+  static const _tint = Color(0xFFE0F2FE);
   static const _ink = Color(0xFF0F172A);
   static const _grey = Color(0xFF64748B);
   static const _line = Color(0xFFE2E8F0);

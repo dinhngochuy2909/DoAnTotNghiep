@@ -21,8 +21,8 @@ class _Vb {
   static const border = Color(0xFF2C2C31);
   static const text = Color(0xFFF4F4F5);
   static const textDim = Color(0xFFA1A1AA);
-  static const accent = Color(0xFF4ADE80); // xanh lá sáng
-  static const selected = Color(0xFF166534); // ô đang chọn
+  static const accent = Color(0xFF38BDF8); // xanh lá sáng
+  static const selected = Color(0xFF075985); // ô đang chọn
   static const booked = Color(0xFFB91C1C); // ô đã đặt
   static const locked = Color(0xFF3F3F46); // ô khoá
   static const gold = Color(0xFFFACC15);
@@ -301,7 +301,7 @@ class _VisualBookingScreenState extends State<VisualBookingScreen> {
         actions: [
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx),
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF15803D)),
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0369A1)),
             child: const Text('Đã hiểu', style: TextStyle(color: Colors.white)),
           ),
         ],
@@ -417,9 +417,9 @@ class _VisualBookingScreenState extends State<VisualBookingScreen> {
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF0F2A1A),
+                    color: const Color(0xFF0C2A45),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: const Color(0xFF166534)),
+                    border: Border.all(color: const Color(0xFF075985)),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -440,7 +440,7 @@ class _VisualBookingScreenState extends State<VisualBookingScreen> {
                           return Container(
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                             decoration: BoxDecoration(
-                              color: const Color(0xFF15803D),
+                              color: const Color(0xFF0369A1),
                               borderRadius: BorderRadius.circular(6),
                             ),
                             child: Text(
@@ -504,9 +504,9 @@ class _VisualBookingScreenState extends State<VisualBookingScreen> {
                   width: double.infinity,
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF0F2A1A),
+                    color: const Color(0xFF0C2A45),
                     borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: const Color(0xFF166534)),
+                    border: Border.all(color: const Color(0xFF075985)),
                   ),
                   child: const Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -518,7 +518,7 @@ class _VisualBookingScreenState extends State<VisualBookingScreen> {
                           'Chuyển khoản ngân hàng bằng mã VietQR, không nhận tiền mặt. '
                           'Sau khi xác nhận, bạn sẽ nhận mã QR kèm nội dung chuyển khoản; '
                           'đơn được xác nhận khi chủ sân nhận được tiền.',
-                          style: TextStyle(fontSize: 12.5, height: 1.4, color: Color(0xFFBBF7D0)),
+                          style: TextStyle(fontSize: 12.5, height: 1.4, color: Color(0xFFBAE6FD)),
                         ),
                       ),
                     ],
@@ -770,7 +770,7 @@ class _VisualBookingScreenState extends State<VisualBookingScreen> {
               setState(() => _selectedSlots.clear());
               _loadExistingBookings();
             },
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF15803D)),
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0369A1)),
             child: const Text('Tôi đã chuyển khoản', style: TextStyle(color: Colors.white)),
           ),
         ],
@@ -892,7 +892,7 @@ class _VisualBookingScreenState extends State<VisualBookingScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                 decoration: BoxDecoration(
                   gradient: const LinearGradient(
-                    colors: [Color(0xFF15803D), Color(0xFF16A34A)],
+                    colors: [Color(0xFF0369A1), Color(0xFF0284C7)],
                   ),
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(color: const Color(0xFFFDE047), width: 1.2),
@@ -1039,7 +1039,7 @@ class _VisualBookingScreenState extends State<VisualBookingScreen> {
                         Text(
                           dayOfWeek,
                           style: TextStyle(
-                            color: isSelected ? const Color(0xFF052E16) : _Vb.textDim,
+                            color: isSelected ? const Color(0xFF082F49) : _Vb.textDim,
                             fontSize: 10.5,
                             fontWeight: FontWeight.bold,
                           ),

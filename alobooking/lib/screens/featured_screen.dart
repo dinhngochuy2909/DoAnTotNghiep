@@ -18,7 +18,7 @@ class FeaturedScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: const Color(0xFFF1F5F9),
       appBar: AppBar(
-        backgroundColor: const Color(0xFF15803D),
+        backgroundColor: const Color(0xFF0369A1),
         foregroundColor: Colors.white,
         elevation: 0,
         title: const Text(
@@ -185,12 +185,12 @@ class FeaturedScreen extends StatelessWidget {
                     venue.price,
                     style: const TextStyle(
                         fontSize: 13,
-                        color: Color(0xFF16A34A),
+                        color: Color(0xFF0284C7),
                         fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 4),
                   const Icon(Icons.calendar_today_outlined,
-                      size: 16, color: Color(0xFF16A34A)),
+                      size: 16, color: Color(0xFF0284C7)),
                 ],
               ),
             ),

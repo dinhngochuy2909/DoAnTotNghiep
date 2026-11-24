@@ -196,7 +196,7 @@ class _HomeScreenState extends State<HomeScreen> {
       floatingActionButton: _isOwner
           ? FloatingActionButton.extended(
               onPressed: () => _showVenueDialog(null),
-              backgroundColor: const Color(0xFF16A34A),
+              backgroundColor: const Color(0xFF0284C7),
               elevation: 4,
               icon: const Icon(Icons.add_circle, color: Colors.white, size: 20),
               label: const Text(
@@ -242,7 +242,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       Expanded(
                         child: _isLoading
                             ? const Center(
-                                child: CircularProgressIndicator(color: Color(0xFF16A34A)),
+                                child: CircularProgressIndicator(color: Color(0xFF0284C7)),
                               )
                             : LayoutBuilder(
                                 builder: (context, constraints) {
@@ -307,9 +307,9 @@ class _HomeScreenState extends State<HomeScreen> {
       return Container(
         padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
         decoration: const BoxDecoration(
-          color: Color(0xFF15803D),
+          color: Color(0xFF0369A1),
           gradient: LinearGradient(
-            colors: [Color(0xFF15803D), Color(0xFF16A34A), Color(0xFF047857)],
+            colors: [Color(0xFF0369A1), Color(0xFF0284C7), Color(0xFF0369A1)],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
@@ -324,7 +324,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   width: 38,
                   height: 38,
                   decoration: BoxDecoration(
-                    color: const Color(0xFF166534),
+                    color: const Color(0xFF075985),
                     shape: BoxShape.circle,
                     border: Border.all(color: Colors.white.withOpacity(0.35), width: 1.5),
                   ),
@@ -395,18 +395,18 @@ class _HomeScreenState extends State<HomeScreen> {
                         MaterialPageRoute(builder: (_) => const LoginScreen()),
                       );
                     },
-                    icon: const Icon(Icons.login, color: Color(0xFF15803D), size: 14),
+                    icon: const Icon(Icons.login, color: Color(0xFF0369A1), size: 14),
                     label: const Text(
                       'Đăng nhập',
                       style: TextStyle(
-                        color: Color(0xFF15803D),
+                        color: Color(0xFF0369A1),
                         fontWeight: FontWeight.w900,
                         fontSize: 11.5,
                       ),
                     ),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.white,
-                      foregroundColor: const Color(0xFF15803D),
+                      foregroundColor: const Color(0xFF0369A1),
                       elevation: 2,
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                       minimumSize: Size.zero,
@@ -417,18 +417,18 @@ class _HomeScreenState extends State<HomeScreen> {
                 else if (_isOwner)
                   ElevatedButton.icon(
                     onPressed: () => _showVenueDialog(null),
-                    icon: const Icon(Icons.add, color: Color(0xFF15803D), size: 15),
+                    icon: const Icon(Icons.add, color: Color(0xFF0369A1), size: 15),
                     label: const Text(
                       'Thêm sân',
                       style: TextStyle(
-                        color: Color(0xFF15803D),
+                        color: Color(0xFF0369A1),
                         fontWeight: FontWeight.w900,
                         fontSize: 11.5,
                       ),
                     ),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFFFEF08A),
-                      foregroundColor: const Color(0xFF15803D),
+                      foregroundColor: const Color(0xFF0369A1),
                       elevation: 2,
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                       minimumSize: Size.zero,
@@ -454,7 +454,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     ),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF10B981),
+                      backgroundColor: const Color(0xFF0EA5E9),
                       foregroundColor: Colors.white,
                       elevation: 2,
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -494,9 +494,9 @@ class _HomeScreenState extends State<HomeScreen> {
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
       decoration: const BoxDecoration(
-        color: Color(0xFF15803D), // Deep emerald green matching screenshot
+        color: Color(0xFF0369A1), // Deep emerald green matching screenshot
         gradient: LinearGradient(
-          colors: [Color(0xFF15803D), Color(0xFF16A34A), Color(0xFF047857)],
+          colors: [Color(0xFF0369A1), Color(0xFF0284C7), Color(0xFF0369A1)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -512,7 +512,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 width: 44,
                 height: 44,
                 decoration: BoxDecoration(
-                  color: const Color(0xFF166534),
+                  color: const Color(0xFF075985),
                   shape: BoxShape.circle,
                   border: Border.all(color: Colors.white.withOpacity(0.3), width: 1.5),
                 ),
@@ -569,7 +569,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF10B981),
+                      color: const Color(0xFF0EA5E9),
                       borderRadius: BorderRadius.circular(20),
                       boxShadow: [
                         BoxShadow(
@@ -603,11 +603,11 @@ class _HomeScreenState extends State<HomeScreen> {
               if (_isOwner) ...[
                 ElevatedButton.icon(
                   onPressed: () => _showVenueDialog(null),
-                  icon: const Icon(Icons.add_circle, color: Color(0xFF15803D), size: 18),
+                  icon: const Icon(Icons.add_circle, color: Color(0xFF0369A1), size: 18),
                   label: const Text(
                     '+ THÊM SÂN MỚI',
                     style: TextStyle(
-                      color: Color(0xFF15803D),
+                      color: Color(0xFF0369A1),
                       fontWeight: FontWeight.w900,
                       fontSize: 12.5,
                       letterSpacing: 0.3,
@@ -615,7 +615,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFFFEF08A), // Bright golden yellow
-                    foregroundColor: const Color(0xFF15803D),
+                    foregroundColor: const Color(0xFF0369A1),
                     elevation: 3,
                     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
@@ -633,18 +633,18 @@ class _HomeScreenState extends State<HomeScreen> {
                       MaterialPageRoute(builder: (_) => const LoginScreen()),
                     );
                   },
-                  icon: const Icon(Icons.login, color: Color(0xFF15803D), size: 16),
+                  icon: const Icon(Icons.login, color: Color(0xFF0369A1), size: 16),
                   label: const Text(
                     'ĐĂNG NHẬP / ĐĂNG KÝ',
                     style: TextStyle(
-                      color: Color(0xFF15803D),
+                      color: Color(0xFF0369A1),
                       fontWeight: FontWeight.w900,
                       fontSize: 12,
                     ),
                   ),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.white,
-                    foregroundColor: const Color(0xFF15803D),
+                    foregroundColor: const Color(0xFF0369A1),
                     elevation: 3,
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
@@ -696,7 +696,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                     decoration: BoxDecoration(
-                      color: _showOnlyMyVenues ? const Color(0xFF15803D) : const Color(0xFF0F172A),
+                      color: _showOnlyMyVenues ? const Color(0xFF0369A1) : const Color(0xFF0F172A),
                       borderRadius: BorderRadius.circular(20),
                       boxShadow: [
                         BoxShadow(
@@ -737,7 +737,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF0D9488),
+                      color: const Color(0xFF0891B2),
                       borderRadius: BorderRadius.circular(20),
                       boxShadow: [
                         BoxShadow(
@@ -833,7 +833,7 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         child: Row(
           children: [
-            const Icon(Icons.search, color: Color(0xFF16A34A), size: 22),
+            const Icon(Icons.search, color: Color(0xFF0284C7), size: 22),
             const SizedBox(width: 8),
             Expanded(
               child: TextField(
@@ -858,7 +858,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     Icons.tune,
                     color: _selectedType != 'all'
                         ? const Color(0xFFEF4444)
-                        : const Color(0xFF16A34A),
+                        : const Color(0xFF0284C7),
                     size: 20,
                   ),
                   if (_selectedType != 'all')
@@ -902,7 +902,7 @@ class _HomeScreenState extends State<HomeScreen> {
       child: Row(
         children: [
           // Green logo inside search
-          const Icon(Icons.sports_tennis, color: Color(0xFF16A34A), size: 20),
+          const Icon(Icons.sports_tennis, color: Color(0xFF0284C7), size: 20),
           const SizedBox(width: 8),
 
           // Search input field
@@ -928,7 +928,7 @@ class _HomeScreenState extends State<HomeScreen> {
               Icons.tune,
               color: _selectedType != 'all'
                   ? const Color(0xFFEF4444)
-                  : const Color(0xFF16A34A),
+                  : const Color(0xFF0284C7),
               size: 18,
             ),
             splashRadius: 18,
@@ -989,12 +989,12 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, color: const Color(0xFF15803D), size: 16),
+            Icon(icon, color: const Color(0xFF0369A1), size: 16),
             const SizedBox(width: 4),
             Text(
               label,
               style: const TextStyle(
-                color: Color(0xFF15803D),
+                color: Color(0xFF0369A1),
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
               ),
@@ -1064,7 +1064,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF10B981),
+                            color: const Color(0xFF0EA5E9),
                             borderRadius: BorderRadius.circular(10),
                           ),
                           child: Text(
@@ -1122,7 +1122,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
                 ),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF10B981), // Emerald green
+                  backgroundColor: const Color(0xFF0EA5E9), // Emerald green
                   foregroundColor: Colors.white,
                   elevation: 2,
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
@@ -1192,10 +1192,10 @@ class _HomeScreenState extends State<HomeScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 margin: const EdgeInsets.only(right: 8),
                 decoration: BoxDecoration(
-                  color: _showOnlyMyVenues ? const Color(0xFF15803D) : Colors.white,
+                  color: _showOnlyMyVenues ? const Color(0xFF0369A1) : Colors.white,
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(
-                    color: _showOnlyMyVenues ? const Color(0xFF15803D) : const Color(0xFF16A34A),
+                    color: _showOnlyMyVenues ? const Color(0xFF0369A1) : const Color(0xFF0284C7),
                     width: 1.5,
                   ),
                   boxShadow: [
@@ -1211,14 +1211,14 @@ class _HomeScreenState extends State<HomeScreen> {
                   children: [
                     Icon(
                       _showOnlyMyVenues ? Icons.check_circle : Icons.stadium_outlined,
-                      color: _showOnlyMyVenues ? Colors.white : const Color(0xFF15803D),
+                      color: _showOnlyMyVenues ? Colors.white : const Color(0xFF0369A1),
                       size: 16,
                     ),
                     const SizedBox(width: 5),
                     Text(
                       'Sân của tôi ($myVenuesCount)',
                       style: TextStyle(
-                        color: _showOnlyMyVenues ? Colors.white : const Color(0xFF15803D),
+                        color: _showOnlyMyVenues ? Colors.white : const Color(0xFF0369A1),
                         fontWeight: FontWeight.bold,
                         fontSize: 12,
                       ),
@@ -1235,19 +1235,19 @@ class _HomeScreenState extends State<HomeScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 margin: const EdgeInsets.only(right: 8),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF0FDF4),
+                  color: const Color(0xFFF0F9FF),
                   borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: const Color(0xFF22C55E), width: 1.2),
+                  border: Border.all(color: const Color(0xFF0EA5E9), width: 1.2),
                 ),
                 child: const Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.add_circle, color: Color(0xFF16A34A), size: 16),
+                    Icon(Icons.add_circle, color: Color(0xFF0284C7), size: 16),
                     SizedBox(width: 4),
                     Text(
                       '+ Đăng Sân Mới',
                       style: TextStyle(
-                        color: Color(0xFF16A34A),
+                        color: Color(0xFF0284C7),
                         fontWeight: FontWeight.bold,
                         fontSize: 12,
                       ),
@@ -1272,10 +1272,10 @@ class _HomeScreenState extends State<HomeScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                 margin: const EdgeInsets.only(right: 8),
                 decoration: BoxDecoration(
-                  color: isSelected ? const Color(0xFF16A34A) : Colors.white,
+                  color: isSelected ? const Color(0xFF0284C7) : Colors.white,
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(
-                    color: isSelected ? const Color(0xFF16A34A) : const Color(0xFFE2E8F0),
+                    color: isSelected ? const Color(0xFF0284C7) : const Color(0xFFE2E8F0),
                   ),
                   boxShadow: [
                     BoxShadow(
@@ -1316,17 +1316,17 @@ class _HomeScreenState extends State<HomeScreen> {
                 decoration: BoxDecoration(
                   color: const Color(0xFFF8FAFC),
                   borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: const Color(0xFF0D9488), width: 1.2),
+                  border: Border.all(color: const Color(0xFF0891B2), width: 1.2),
                 ),
                 child: const Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.insights, color: Color(0xFF0D9488), size: 16),
+                    Icon(Icons.insights, color: Color(0xFF0891B2), size: 16),
                     SizedBox(width: 4),
                     Text(
                       'Doanh Thu & Khách',
                       style: TextStyle(
-                        color: Color(0xFF0D9488),
+                        color: Color(0xFF0891B2),
                         fontWeight: FontWeight.bold,
                         fontSize: 12,
                       ),
@@ -1438,12 +1438,12 @@ class _HomeScreenState extends State<HomeScreen> {
                           horizontal: 16, vertical: 10),
                       decoration: BoxDecoration(
                         color: selected
-                            ? const Color(0xFF16A34A)
+                            ? const Color(0xFF0284C7)
                             : const Color(0xFFF1F5F9),
                         borderRadius: BorderRadius.circular(10),
                         border: Border.all(
                           color: selected
-                              ? const Color(0xFF16A34A)
+                              ? const Color(0xFF0284C7)
                               : const Color(0xFFE2E8F0),
                         ),
                       ),
@@ -1496,7 +1496,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         setState(() => _selectedType = tempType);
                       },
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF16A34A),
+                        backgroundColor: const Color(0xFF0284C7),
                         foregroundColor: Colors.white,
                         shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(10)),
@@ -1644,7 +1644,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF10B981), // Bright green
+                          color: const Color(0xFF0EA5E9), // Bright green
                           borderRadius: BorderRadius.circular(10),
                         ),
                         child: const Text(
@@ -1872,7 +1872,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     const Text(
                       '· Đã xác thực',
                       style: TextStyle(
-                        color: Color(0xFF16A34A),
+                        color: Color(0xFF0284C7),
                         fontSize: 10.5,
                         fontWeight: FontWeight.w500,
                       ),
@@ -1982,7 +1982,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           Text(
                             venue.price.isNotEmpty ? venue.price : '100.000đ - 250.000đ/ca',
                             style: const TextStyle(
-                              color: Color(0xFF16A34A),
+                              color: Color(0xFF0284C7),
                               fontSize: 13.5,
                               fontWeight: FontWeight.w900,
                             ),
@@ -2041,7 +2041,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     decoration: BoxDecoration(
                       color: venue.isPending
                           ? const Color(0xFFFEF3C7)
-                          : (venue.isRejected ? const Color(0xFFFEE2E2) : const Color(0xFFDCFCE7)),
+                          : (venue.isRejected ? const Color(0xFFFEE2E2) : const Color(0xFFE0F2FE)),
                       borderRadius: BorderRadius.circular(6),
                       border: Border.all(
                         color: venue.isPending
@@ -2060,7 +2060,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           size: 12,
                           color: venue.isPending
                               ? const Color(0xFFB45309)
-                              : (venue.isRejected ? const Color(0xFFB91C1C) : const Color(0xFF15803D)),
+                              : (venue.isRejected ? const Color(0xFFB91C1C) : const Color(0xFF0369A1)),
                         ),
                         const SizedBox(width: 4),
                         Text(
@@ -2072,7 +2072,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             fontWeight: FontWeight.bold,
                             color: venue.isPending
                                 ? const Color(0xFFB45309)
-                                : (venue.isRejected ? const Color(0xFFB91C1C) : const Color(0xFF15803D)),
+                                : (venue.isRejected ? const Color(0xFFB91C1C) : const Color(0xFF0369A1)),
                           ),
                         ),
                       ],
@@ -2170,15 +2170,15 @@ class _HomeScreenState extends State<HomeScreen> {
                       color: _isOwner
                           ? const Color(0xFF0284C7)
                           : (_currentNavIndex == 2
-                              ? const Color(0xFF16A34A)
+                              ? const Color(0xFF0284C7)
                               : Colors.white),
                       shape: BoxShape.circle,
                       border: Border.all(
-                          color: _isOwner ? const Color(0xFF0284C7) : const Color(0xFF16A34A),
+                          color: _isOwner ? const Color(0xFF0284C7) : const Color(0xFF0284C7),
                           width: 2.2),
                       boxShadow: [
                         BoxShadow(
-                          color: (_isOwner ? const Color(0xFF0284C7) : const Color(0xFF16A34A)).withOpacity(0.35),
+                          color: (_isOwner ? const Color(0xFF0284C7) : const Color(0xFF0284C7)).withOpacity(0.35),
                           blurRadius: 8,
                           offset: const Offset(0, 3),
                         ),
@@ -2191,7 +2191,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             ? Colors.white
                             : (_currentNavIndex == 2
                                 ? Colors.white
-                                : const Color(0xFF16A34A)),
+                                : const Color(0xFF0284C7)),
                         size: _isOwner ? 25 : 22,
                       ),
                     ),
@@ -2202,7 +2202,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   child: Text(
                     _isOwner ? 'Quản Lý Sân' : 'Khám phá',
                     style: TextStyle(
-                      color: _isOwner ? const Color(0xFF0284C7) : const Color(0xFF16A34A),
+                      color: _isOwner ? const Color(0xFF0284C7) : const Color(0xFF0284C7),
                       fontSize: 10,
                       fontWeight: FontWeight.bold,
                     ),
@@ -2254,14 +2254,14 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             Icon(
               icon,
-              color: selected ? const Color(0xFF16A34A) : const Color(0xFF64748B),
+              color: selected ? const Color(0xFF0284C7) : const Color(0xFF64748B),
               size: 22,
             ),
             const SizedBox(height: 2),
             Text(
               label,
               style: TextStyle(
-                color: selected ? const Color(0xFF16A34A) : const Color(0xFF64748B),
+                color: selected ? const Color(0xFF0284C7) : const Color(0xFF64748B),
                 fontSize: 10,
                 fontWeight: selected ? FontWeight.bold : FontWeight.w500,
               ),
@@ -2287,14 +2287,14 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             Icon(
               icon,
-              color: selected ? const Color(0xFF16A34A) : const Color(0xFF64748B),
+              color: selected ? const Color(0xFF0284C7) : const Color(0xFF64748B),
               size: 22,
             ),
             const SizedBox(height: 2),
             Text(
               label,
               style: TextStyle(
-                color: selected ? const Color(0xFF16A34A) : const Color(0xFF64748B),
+                color: selected ? const Color(0xFF0284C7) : const Color(0xFF64748B),
                 fontSize: 10,
                 fontWeight: selected ? FontWeight.bold : FontWeight.w500,
               ),
@@ -2323,14 +2323,14 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             Icon(
               Icons.person_outline,
-              color: selected ? const Color(0xFF16A34A) : const Color(0xFF64748B),
+              color: selected ? const Color(0xFF0284C7) : const Color(0xFF64748B),
               size: 22,
             ),
             const SizedBox(height: 2),
             Text(
               'Tài khoản',
               style: TextStyle(
-                color: selected ? const Color(0xFF16A34A) : const Color(0xFF64748B),
+                color: selected ? const Color(0xFF0284C7) : const Color(0xFF64748B),
                 fontSize: 10,
                 fontWeight: selected ? FontWeight.bold : FontWeight.w500,
               ),
@@ -2417,13 +2417,13 @@ class _HomeScreenState extends State<HomeScreen> {
           IconButton(
             tooltip: 'Mở rộng thanh quản trị',
             onPressed: () => setState(() => _isSidebarExpanded = true),
-            icon: const Icon(Icons.menu_open, color: Color(0xFF10B981), size: 24),
+            icon: const Icon(Icons.menu_open, color: Color(0xFF0EA5E9), size: 24),
           ),
           const SizedBox(height: 20),
           IconButton(
             tooltip: 'Thêm sân mới',
             onPressed: () => _showVenueDialog(null),
-            icon: const Icon(Icons.add_circle, color: Color(0xFF10B981), size: 24),
+            icon: const Icon(Icons.add_circle, color: Color(0xFF0EA5E9), size: 24),
           ),
           const SizedBox(height: 14),
           IconButton(
@@ -2480,7 +2480,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 height: 36,
                 decoration: BoxDecoration(
                   gradient: const LinearGradient(
-                    colors: [Color(0xFF10B981), Color(0xFF047857)],
+                    colors: [Color(0xFF0EA5E9), Color(0xFF0369A1)],
                   ),
                   borderRadius: BorderRadius.circular(8),
                 ),
@@ -2506,7 +2506,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     Text(
                       'ALOBOOKING ADMIN',
                       style: TextStyle(
-                        color: Color(0xFF10B981),
+                        color: Color(0xFF0EA5E9),
                         fontSize: 10,
                         fontWeight: FontWeight.w700,
                       ),
@@ -2541,10 +2541,10 @@ class _HomeScreenState extends State<HomeScreen> {
               children: [
                 CircleAvatar(
                   radius: 17,
-                  backgroundColor: const Color(0xFF10B981).withOpacity(0.2),
+                  backgroundColor: const Color(0xFF0EA5E9).withOpacity(0.2),
                   child: const Text(
                     'AD',
-                    style: TextStyle(color: Color(0xFF10B981), fontWeight: FontWeight.bold, fontSize: 12),
+                    style: TextStyle(color: Color(0xFF0EA5E9), fontWeight: FontWeight.bold, fontSize: 12),
                   ),
                 ),
                 const SizedBox(width: 9),
@@ -2570,7 +2570,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             width: 6,
                             height: 6,
                             decoration: const BoxDecoration(
-                              color: Color(0xFF10B981),
+                              color: Color(0xFF0EA5E9),
                               shape: BoxShape.circle,
                             ),
                           ),
@@ -2599,12 +2599,12 @@ class _HomeScreenState extends State<HomeScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
               decoration: BoxDecoration(
                 gradient: const LinearGradient(
-                  colors: [Color(0xFF10B981), Color(0xFF059669)],
+                  colors: [Color(0xFF0EA5E9), Color(0xFF0284C7)],
                 ),
                 borderRadius: BorderRadius.circular(10),
                 boxShadow: [
                   BoxShadow(
-                    color: const Color(0xFF10B981).withOpacity(0.35),
+                    color: const Color(0xFF0EA5E9).withOpacity(0.35),
                     blurRadius: 10,
                     offset: const Offset(0, 3),
                   ),
@@ -2640,7 +2640,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   'Tổng Sân',
                   '${_allVenues.length}',
                   Icons.sports_tennis,
-                  const Color(0xFF10B981),
+                  const Color(0xFF0EA5E9),
                 ),
               ),
               const SizedBox(width: 6),
@@ -2701,7 +2701,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: _buildAdminToolButton(
                       icon: Icons.sports_tennis,
                       label: 'Sân Bãi',
-                      color: const Color(0xFF10B981),
+                      color: const Color(0xFF0EA5E9),
                       onTap: () {
                         Navigator.push(
                           context,
@@ -2753,7 +2753,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: _buildAdminToolButton(
                       icon: Icons.payments_outlined,
                       label: 'Thu Ngân',
-                      color: const Color(0xFF34D399),
+                      color: const Color(0xFF38BDF8),
                       onTap: () {
                         Navigator.push(
                           context,
@@ -2793,18 +2793,18 @@ class _HomeScreenState extends State<HomeScreen> {
                     decoration: BoxDecoration(
                       color: const Color(0xFF1E293B),
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: const Color(0xFF10B981).withOpacity(0.5)),
+                      border: Border.all(color: const Color(0xFF0EA5E9).withOpacity(0.5)),
                     ),
                     alignment: Alignment.center,
                     child: const Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.dashboard_customize, color: Color(0xFF10B981), size: 15),
+                        Icon(Icons.dashboard_customize, color: Color(0xFF0EA5E9), size: 15),
                         SizedBox(width: 6),
                         Text(
                           'TRUNG TÂM QUẢN TRỊ TOÀN DIỆN ↗',
                           style: TextStyle(
-                            color: Color(0xFF10B981),
+                            color: Color(0xFF0EA5E9),
                             fontSize: 11,
                             fontWeight: FontWeight.bold,
                             letterSpacing: 0.5,
@@ -2848,7 +2848,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: const Text(
                   'Xem tất cả ↗',
                   style: TextStyle(
-                    color: Color(0xFF10B981),
+                    color: Color(0xFF0EA5E9),
                     fontSize: 10.5,
                     fontWeight: FontWeight.w600,
                   ),
@@ -2995,7 +2995,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: const Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.shield_outlined, color: Color(0xFF10B981), size: 14),
+                    Icon(Icons.shield_outlined, color: Color(0xFF0EA5E9), size: 14),
                     SizedBox(width: 6),
                     Text(
                       'Tài khoản: Super Admin',
@@ -3143,12 +3143,12 @@ class _HomeScreenState extends State<HomeScreen> {
                       Container(
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
-                          color: isEdit ? const Color(0xFF0284C7).withOpacity(0.12) : const Color(0xFF10B981).withOpacity(0.12),
+                          color: isEdit ? const Color(0xFF0284C7).withOpacity(0.12) : const Color(0xFF0EA5E9).withOpacity(0.12),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Icon(
                           isEdit ? Icons.edit : Icons.add_business,
-                          color: isEdit ? const Color(0xFF0284C7) : const Color(0xFF10B981),
+                          color: isEdit ? const Color(0xFF0284C7) : const Color(0xFF0EA5E9),
                           size: 22,
                         ),
                       ),
@@ -3359,18 +3359,18 @@ class _HomeScreenState extends State<HomeScreen> {
                                 Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                                   decoration: BoxDecoration(
-                                    color: const Color(0xFFDCFCE7),
+                                    color: const Color(0xFFE0F2FE),
                                     borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(color: const Color(0xFF16A34A).withOpacity(0.4)),
+                                    border: Border.all(color: const Color(0xFF0284C7).withOpacity(0.4)),
                                   ),
                                   child: const Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
-                                      Icon(Icons.check_circle, color: Color(0xFF16A34A), size: 12),
+                                      Icon(Icons.check_circle, color: Color(0xFF0284C7), size: 12),
                                       SizedBox(width: 4),
                                       Text(
                                         'Đã tải ảnh từ máy',
-                                        style: TextStyle(color: Color(0xFF16A34A), fontSize: 10.5, fontWeight: FontWeight.bold),
+                                        style: TextStyle(color: Color(0xFF0284C7), fontSize: 10.5, fontWeight: FontWeight.bold),
                                       ),
                                     ],
                                   ),
@@ -3459,7 +3459,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                     style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
                                   ),
                                   style: ElevatedButton.styleFrom(
-                                    backgroundColor: const Color(0xFF10B981),
+                                    backgroundColor: const Color(0xFF0EA5E9),
                                     foregroundColor: Colors.white,
                                     padding: const EdgeInsets.symmetric(vertical: 11),
                                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
@@ -3520,7 +3520,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                       style: TextStyle(
                                         fontSize: 11,
                                         fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                                        color: isSelected ? const Color(0xFF15803D) : const Color(0xFF334155),
+                                        color: isSelected ? const Color(0xFF0369A1) : const Color(0xFF334155),
                                       ),
                                     ),
                                     onPressed: () {
@@ -3529,10 +3529,10 @@ class _HomeScreenState extends State<HomeScreen> {
                                       });
                                     },
                                     backgroundColor: isSelected
-                                        ? const Color(0xFFDCFCE7)
+                                        ? const Color(0xFFE0F2FE)
                                         : const Color(0xFFF1F5F9),
                                     side: BorderSide(
-                                      color: isSelected ? const Color(0xFF16A34A) : Colors.transparent,
+                                      color: isSelected ? const Color(0xFF0284C7) : Colors.transparent,
                                       width: 1.2,
                                     ),
                                   ),
@@ -3663,7 +3663,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         icon: const Icon(Icons.check, size: 18),
                         label: Text(isEdit ? 'LƯU CẬP NHẬT' : 'THÊM SÂN MỚI'),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF10B981),
+                          backgroundColor: const Color(0xFF0EA5E9),
                           foregroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
@@ -3752,7 +3752,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 children: [
                   const Row(
                     children: [
-                      Icon(Icons.analytics, color: Color(0xFF10B981), size: 24),
+                      Icon(Icons.analytics, color: Color(0xFF0EA5E9), size: 24),
                       SizedBox(width: 10),
                       Text(
                         'BÁO CÁO & THỐNG KÊ DOANH THU',
@@ -3773,7 +3773,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   children: [
                     header,
                     const Divider(height: 20),
-                    const SizedBox(height: 120, child: Center(child: CircularProgressIndicator(color: Color(0xFF10B981)))),
+                    const SizedBox(height: 120, child: Center(child: CircularProgressIndicator(color: Color(0xFF0EA5E9)))),
                   ],
                 );
               }
@@ -3804,7 +3804,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     const SizedBox(height: 10),
                     Row(
                       children: [
-                        Expanded(child: _buildMetricTile('Doanh thu', AdminStats.fmtCompact(st.revenue), const Color(0xFF10B981))),
+                        Expanded(child: _buildMetricTile('Doanh thu', AdminStats.fmtCompact(st.revenue), const Color(0xFF0EA5E9))),
                         const SizedBox(width: 8),
                         Expanded(child: _buildMetricTile('Đơn đặt sân', '${st.orders}', const Color(0xFF38BDF8))),
                         const SizedBox(width: 8),
@@ -3851,7 +3851,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                       child: Row(
                         children: [
-                          const Icon(Icons.access_time_filled, color: Color(0xFF10B981), size: 18),
+                          const Icon(Icons.access_time_filled, color: Color(0xFF0EA5E9), size: 18),
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
@@ -3950,7 +3950,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     children: [
                       Row(
                         children: [
-                          const Icon(Icons.receipt_long, color: Color(0xFF10B981), size: 24),
+                          const Icon(Icons.receipt_long, color: Color(0xFF0EA5E9), size: 24),
                           const SizedBox(width: 10),
                           Text(
                             'QUẢN LÝ ĐƠN ĐẶT SÂN (${bookings.length})',
@@ -4024,7 +4024,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                           ),
                                           Text(
                                             'Tổng tiền: ${item.amount} (${item.paymentMethod})',
-                                            style: const TextStyle(color: Color(0xFF10B981), fontWeight: FontWeight.bold, fontSize: 11),
+                                            style: const TextStyle(color: Color(0xFF0EA5E9), fontWeight: FontWeight.bold, fontSize: 11),
                                           ),
                                         ],
                                       ),

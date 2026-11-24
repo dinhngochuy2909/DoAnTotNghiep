@@ -29,7 +29,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFF1F5F9),
       appBar: AppBar(
-        backgroundColor: const Color(0xFF15803D),
+        backgroundColor: const Color(0xFF0369A1),
         foregroundColor: Colors.white,
         elevation: 0,
         title: Row(
@@ -187,7 +187,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                         venue.price,
                         style: const TextStyle(
                             fontSize: 12,
-                            color: Color(0xFF16A34A),
+                            color: Color(0xFF0284C7),
                             fontWeight: FontWeight.w600),
                       ),
                     ],

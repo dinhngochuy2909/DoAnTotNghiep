@@ -150,8 +150,8 @@ class _OwnerScreenState extends State<OwnerScreen> with SingleTickerProviderStat
       data: ThemeData.dark(useMaterial3: true).copyWith(
         scaffoldBackgroundColor: const Color(0xFF0F172A),
         colorScheme: const ColorScheme.dark(
-          primary: Color(0xFF10B981),
-          secondary: Color(0xFF34D399),
+          primary: Color(0xFF0EA5E9),
+          secondary: Color(0xFF38BDF8),
           surface: Color(0xFF1E293B),
         ),
       ),
@@ -159,7 +159,7 @@ class _OwnerScreenState extends State<OwnerScreen> with SingleTickerProviderStat
         backgroundColor: const Color(0xFF0F172A), // Dark slate premium theme
         appBar: _buildOwnerAppBar(),
         body: _isLoading
-            ? const Center(child: CircularProgressIndicator(color: Color(0xFF10B981)))
+            ? const Center(child: CircularProgressIndicator(color: Color(0xFF0EA5E9)))
             : TabBarView(
                 controller: _tabController,
                 children: [
@@ -413,7 +413,7 @@ class _OwnerScreenState extends State<OwnerScreen> with SingleTickerProviderStat
                       icon: const Icon(Icons.add_circle, size: 18),
                       label: const Text('ĐĂNG KÝ SÂN MỚI', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5)),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF10B981),
+                        backgroundColor: const Color(0xFF0EA5E9),
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
@@ -561,7 +561,7 @@ class _OwnerScreenState extends State<OwnerScreen> with SingleTickerProviderStat
                     const SizedBox(height: 4),
                     Row(
                       children: [
-                        Text('Giá thuê: ${v.price}', style: const TextStyle(color: Color(0xFF10B981), fontWeight: FontWeight.bold, fontSize: 12.5)),
+                        Text('Giá thuê: ${v.price}', style: const TextStyle(color: Color(0xFF0EA5E9), fontWeight: FontWeight.bold, fontSize: 12.5)),
                         const SizedBox(width: 12),
                         Text('Giờ mở: ${v.hours}', style: const TextStyle(color: Color(0xFF64748B), fontSize: 11.5)),
                       ],
@@ -671,7 +671,7 @@ class _OwnerScreenState extends State<OwnerScreen> with SingleTickerProviderStat
                   'Doanh Thu Sân Của Tôi',
                   AdminStats.fmtMoney(totalRev),
                   Icons.monetization_on_outlined,
-                  const Color(0xFF10B981),
+                  const Color(0xFF0EA5E9),
                   change == null
                       ? '30 ngày qua: ${AdminStats.fmtMoney(month.revenue)}'
                       : '${change >= 0 ? '+' : ''}${change.toStringAsFixed(1)}% so với 30 ngày trước',
@@ -730,7 +730,7 @@ class _OwnerScreenState extends State<OwnerScreen> with SingleTickerProviderStat
                           width: 8,
                           height: 8,
                           decoration: const BoxDecoration(
-                            color: Color(0xFF10B981),
+                            color: Color(0xFF0EA5E9),
                             shape: BoxShape.circle,
                           ),
                         ),
@@ -790,7 +790,7 @@ class _OwnerScreenState extends State<OwnerScreen> with SingleTickerProviderStat
                             Text('Mã: ${p.id} • ${p.time}', style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 11)),
                           ],
                         ),
-                        Text(p.amount, style: const TextStyle(color: Color(0xFF10B981), fontWeight: FontWeight.bold, fontSize: 13.5)),
+                        Text(p.amount, style: const TextStyle(color: Color(0xFF0EA5E9), fontWeight: FontWeight.bold, fontSize: 13.5)),
                       ],
                     ),
                   );
@@ -914,7 +914,7 @@ class _OwnerScreenState extends State<OwnerScreen> with SingleTickerProviderStat
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
-                          Text(b.amount, style: const TextStyle(color: Color(0xFF10B981), fontWeight: FontWeight.bold, fontSize: 14)),
+                          Text(b.amount, style: const TextStyle(color: Color(0xFF0EA5E9), fontWeight: FontWeight.bold, fontSize: 14)),
                           const SizedBox(height: 3),
                           Text(b.status, style: TextStyle(color: statusColor, fontSize: 11, fontWeight: FontWeight.bold)),
                         ],
@@ -1085,7 +1085,7 @@ class _OwnerScreenState extends State<OwnerScreen> with SingleTickerProviderStat
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
-                        Text(c.totalSpent, style: const TextStyle(color: Color(0xFF10B981), fontWeight: FontWeight.bold, fontSize: 13.5)),
+                        Text(c.totalSpent, style: const TextStyle(color: Color(0xFF0EA5E9), fontWeight: FontWeight.bold, fontSize: 13.5)),
                         const SizedBox(height: 2),
                         Text('${c.bookingsCount} lượt đặt', style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 11)),
                       ],
@@ -1512,7 +1512,7 @@ class _OwnerScreenState extends State<OwnerScreen> with SingleTickerProviderStat
                   Navigator.pop(ctx);
                 },
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF10B981),
+                  backgroundColor: const Color(0xFF0EA5E9),
                   foregroundColor: Colors.white,
                 ),
                 child: Text(isEdit ? 'Lưu & Gửi Duyệt' : 'Gửi Đăng Ký Sân'),

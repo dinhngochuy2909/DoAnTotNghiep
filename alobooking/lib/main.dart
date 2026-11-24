@@ -25,8 +25,8 @@ class AlobookingApp extends StatelessWidget {
         brightness: Brightness.light,
         scaffoldBackgroundColor: const Color(0xFFF1F5F9),
         colorScheme: const ColorScheme.light(
-          primary: Color(0xFF16A34A),
-          secondary: Color(0xFF10B981),
+          primary: Color(0xFF0284C7),
+          secondary: Color(0xFF0EA5E9),
           surface: Colors.white,
         ),
         fontFamily: 'Be Vietnam Pro',

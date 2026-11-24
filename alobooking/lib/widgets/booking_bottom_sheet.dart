@@ -18,10 +18,10 @@ class BookingBottomSheet {
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: const Color(0xFFDCFCE7),
+                color: const Color(0xFFE0F2FE),
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: const Icon(Icons.lock_outline, color: Color(0xFF15803D), size: 24),
+              child: const Icon(Icons.lock_outline, color: Color(0xFF0369A1), size: 24),
             ),
             const SizedBox(width: 10),
             const Expanded(
@@ -45,12 +45,12 @@ class BookingBottomSheet {
               ),
               child: const Row(
                 children: [
-                  Icon(Icons.visibility_outlined, color: Color(0xFF16A34A), size: 20),
+                  Icon(Icons.visibility_outlined, color: Color(0xFF0284C7), size: 20),
                   SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       'Bạn đang ở chế độ Khách xem sân',
-                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF15803D)),
+                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0369A1)),
                     ),
                   ),
                 ],
@@ -98,7 +98,7 @@ class BookingBottomSheet {
                   icon: const Icon(Icons.login, size: 16),
                   label: const Text('Đăng nhập', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF16A34A),
+                    backgroundColor: const Color(0xFF0284C7),
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                     padding: const EdgeInsets.symmetric(vertical: 11),

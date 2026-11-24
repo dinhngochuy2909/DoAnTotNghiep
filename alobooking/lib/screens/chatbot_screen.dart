@@ -42,10 +42,10 @@ class _ChatbotScreenState extends State<ChatbotScreen> with TickerProviderStateM
   Map<String, dynamic> _cachedContext = {};
   bool _contextLoaded = false;
 
-  static const Color _primaryGreen = Color(0xFF0D6A38);
-  static const Color _lightGreen = Color(0xFF16A34A);
+  static const Color _primaryGreen = Color(0xFF075985);
+  static const Color _lightGreen = Color(0xFF0284C7);
   static const Color _userBubbleColor = Color(0xFF1A5276);
-  static const Color _aiBubbleColor = Color(0xFF1E8449);
+  static const Color _aiBubbleColor = Color(0xFF0369A1);
 
   final List<Map<String, String>> _quickReplies = [
     {'emoji': '❓', 'text': 'Chính sách hủy sân & dời lịch'},
@@ -771,7 +771,7 @@ Bạn cần tìm sân nào?''';
                   style: const TextStyle(
                     fontSize: 11.5,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF005A36),
+                    color: Color(0xFF004E7C),
                   ),
                 ),
               ],
@@ -806,7 +806,7 @@ Bạn cần tìm sân nào?''';
                       ),
                     ),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF0D6A38),
+                      backgroundColor: const Color(0xFF075985),
                       padding: const EdgeInsets.symmetric(vertical: 7, horizontal: 4),
                       minimumSize: Size.zero,
                       tapTargetSize: MaterialTapTargetSize.shrinkWrap,
@@ -833,7 +833,7 @@ Bạn cần tìm sân nào?''';
                       padding: const EdgeInsets.symmetric(vertical: 7, horizontal: 2),
                       minimumSize: Size.zero,
                       tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      side: const BorderSide(color: Color(0xFF0D6A38), width: 1),
+                      side: const BorderSide(color: Color(0xFF075985), width: 1),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(7),
                       ),
@@ -842,7 +842,7 @@ Bạn cần tìm sân nào?''';
                       'Chi tiết',
                       style: TextStyle(
                         fontSize: 10,
-                        color: Color(0xFF0D6A38),
+                        color: Color(0xFF075985),
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -858,7 +858,7 @@ Bạn cần tìm sân nào?''';
 
   Widget _buildMessageText(String text, bool isUser) {
     final baseColor = isUser ? Colors.white : const Color(0xFF1E293B);
-    final boldColor = isUser ? Colors.white : const Color(0xFF0D6A38);
+    final boldColor = isUser ? Colors.white : const Color(0xFF075985);
     final base = TextStyle(color: baseColor, fontSize: 13.5, height: 1.5);
     final bold = TextStyle(color: boldColor, fontSize: 13.5, fontWeight: FontWeight.bold, height: 1.5);
 

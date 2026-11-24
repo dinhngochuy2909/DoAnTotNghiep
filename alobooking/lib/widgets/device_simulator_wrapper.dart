@@ -83,10 +83,10 @@ class _DeviceSimulatorWrapperState extends State<DeviceSimulatorWrapper> {
                       colors: [Color(0xFF0F172A), Color(0xFF1E293B)],
                     ),
                     borderRadius: BorderRadius.circular(30),
-                    border: Border.all(color: const Color(0xFF10B981), width: 1.5),
+                    border: Border.all(color: const Color(0xFF0EA5E9), width: 1.5),
                     boxShadow: [
                       BoxShadow(
-                        color: const Color(0xFF10B981).withOpacity(0.35),
+                        color: const Color(0xFF0EA5E9).withOpacity(0.35),
                         blurRadius: 14,
                         offset: const Offset(0, 4),
                       ),
@@ -95,7 +95,7 @@ class _DeviceSimulatorWrapperState extends State<DeviceSimulatorWrapper> {
                   child: const Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.phone_iphone, color: Color(0xFF34D399), size: 20),
+                      Icon(Icons.phone_iphone, color: Color(0xFF38BDF8), size: 20),
                       SizedBox(width: 8),
                       Text(
                         '📱 Xem Demo iPhone 18 Pro Max',
@@ -235,7 +235,7 @@ class _DeviceSimulatorWrapperState extends State<DeviceSimulatorWrapper> {
                               offset: const Offset(0, 16),
                             ),
                             BoxShadow(
-                              color: const Color(0xFF10B981).withOpacity(0.2),
+                              color: const Color(0xFF0EA5E9).withOpacity(0.2),
                               blurRadius: 35,
                               spreadRadius: 2,
                             ),
@@ -306,7 +306,7 @@ class _DeviceSimulatorWrapperState extends State<DeviceSimulatorWrapper> {
                                               ),
                                               child: Container(
                                                 decoration: BoxDecoration(
-                                                  color: const Color(0xFF22C55E),
+                                                  color: const Color(0xFF0EA5E9),
                                                   borderRadius: BorderRadius.circular(1.5),
                                                 ),
                                               ),
@@ -366,7 +366,7 @@ class _DeviceSimulatorWrapperState extends State<DeviceSimulatorWrapper> {
                                               height: 6,
                                               margin: const EdgeInsets.only(right: 12),
                                               decoration: BoxDecoration(
-                                                color: const Color(0xFF047857).withOpacity(0.8),
+                                                color: const Color(0xFF0369A1).withOpacity(0.8),
                                                 shape: BoxShape.circle,
                                               ),
                                             ),
@@ -446,9 +446,9 @@ class _DeviceSimulatorWrapperState extends State<DeviceSimulatorWrapper> {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
           decoration: BoxDecoration(
-            color: selected ? const Color(0xFF065F46) : const Color(0xFF1E293B),
+            color: selected ? const Color(0xFF075985) : const Color(0xFF1E293B),
             borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: selected ? const Color(0xFF10B981) : const Color(0xFF334155)),
+            border: Border.all(color: selected ? const Color(0xFF0EA5E9) : const Color(0xFF334155)),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
@@ -456,7 +456,7 @@ class _DeviceSimulatorWrapperState extends State<DeviceSimulatorWrapper> {
               Icon(
                 dev == DeviceType.ipadPro ? Icons.tablet_mac : Icons.phone_iphone,
                 size: 14,
-                color: selected ? const Color(0xFF6EE7B7) : const Color(0xFF94A3B8),
+                color: selected ? const Color(0xFF7DD3FC) : const Color(0xFF94A3B8),
               ),
               const SizedBox(width: 5),
               Text(
@@ -498,7 +498,7 @@ class _DeviceSimulatorWrapperState extends State<DeviceSimulatorWrapper> {
                 padding: const EdgeInsets.all(7),
                 decoration: BoxDecoration(
                   gradient: const LinearGradient(
-                    colors: [Color(0xFF10B981), Color(0xFF047857)],
+                    colors: [Color(0xFF0EA5E9), Color(0xFF0369A1)],
                   ),
                   borderRadius: BorderRadius.circular(8),
                 ),
@@ -524,7 +524,7 @@ class _DeviceSimulatorWrapperState extends State<DeviceSimulatorWrapper> {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF10B981),
+                          color: const Color(0xFF0EA5E9),
                           borderRadius: BorderRadius.circular(10),
                         ),
                         child: const Text(
@@ -562,7 +562,7 @@ class _DeviceSimulatorWrapperState extends State<DeviceSimulatorWrapper> {
               onPressed: () => setState(() => _isLandscape = !_isLandscape),
               icon: Icon(
                 Icons.screen_rotation,
-                color: _isLandscape ? const Color(0xFF34D399) : const Color(0xFF94A3B8),
+                color: _isLandscape ? const Color(0xFF38BDF8) : const Color(0xFF94A3B8),
                 size: 20,
               ),
               splashRadius: 20,

@@ -45,8 +45,8 @@ class _FloatingChatButtonState extends State<FloatingChatButton> with SingleTick
   bool _dragging = false;
   Size _area = Size.zero;
 
-  static const Color _primaryGreen = Color(0xFF0D6A38);
-  static const Color _lightGreen = Color(0xFF16A34A);
+  static const Color _primaryGreen = Color(0xFF075985);
+  static const Color _lightGreen = Color(0xFF0284C7);
 
   @override
   void initState() {
@@ -216,7 +216,7 @@ class _FloatingChatButtonState extends State<FloatingChatButton> with SingleTick
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: Color(0x660D6A38),
+                        color: Color(0x66075985),
                         blurRadius: 12,
                         offset: Offset(0, 4),
                       ),

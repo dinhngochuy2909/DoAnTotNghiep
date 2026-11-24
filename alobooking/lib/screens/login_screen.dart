@@ -104,10 +104,10 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              Color(0xFF064E3B),
-              Color(0xFF065F46),
-              Color(0xFF047857),
-              Color(0xFF059669),
+              Color(0xFF0C4A6E),
+              Color(0xFF075985),
+              Color(0xFF0369A1),
+              Color(0xFF0284C7),
             ],
             stops: [0.0, 0.3, 0.6, 1.0],
           ),
@@ -184,7 +184,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
             border: Border.all(color: Colors.white.withOpacity(0.3), width: 2),
             boxShadow: [
               BoxShadow(
-                color: const Color(0xFF10B981).withOpacity(0.4),
+                color: const Color(0xFF0EA5E9).withOpacity(0.4),
                 blurRadius: 30,
                 spreadRadius: 5,
               ),
@@ -328,7 +328,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                   style: GoogleFonts.inter(
                     fontSize: 13,
                     fontWeight: FontWeight.w500,
-                    color: const Color(0xFF16A34A),
+                    color: const Color(0xFF0284C7),
                   ),
                 ),
               ),
@@ -342,9 +342,9 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
               child: ElevatedButton(
                 onPressed: _isLoading ? null : _handleLogin,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF16A34A),
+                  backgroundColor: const Color(0xFF0284C7),
                   foregroundColor: Colors.white,
-                  disabledBackgroundColor: const Color(0xFF16A34A).withOpacity(0.6),
+                  disabledBackgroundColor: const Color(0xFF0284C7).withOpacity(0.6),
                   elevation: 0,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
@@ -384,7 +384,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                 children: [
                   const Row(
                     children: [
-                      Icon(Icons.verified_user_outlined, size: 15, color: Color(0xFF16A34A)),
+                      Icon(Icons.verified_user_outlined, size: 15, color: Color(0xFF0284C7)),
                       SizedBox(width: 6),
                       Text(
                         'Tài khoản Demo (4 Phân Quyền):',
@@ -404,8 +404,8 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                       ActionChip(
                         avatar: const Text('👑', style: TextStyle(fontSize: 12)),
                         label: const Text('Admin', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                        backgroundColor: const Color(0xFFDCFCE7),
-                        labelStyle: const TextStyle(color: Color(0xFF15803D)),
+                        backgroundColor: const Color(0xFFE0F2FE),
+                        labelStyle: const TextStyle(color: Color(0xFF0369A1)),
                         onPressed: () {
                           _emailController.text = 'admin@alobooking.com';
                           _passwordController.text = 'admin123';
@@ -538,9 +538,9 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
             style: GoogleFonts.inter(
               fontSize: 14,
               fontWeight: FontWeight.w700,
-              color: const Color(0xFF6EE7B7),
+              color: const Color(0xFF7DD3FC),
               decoration: TextDecoration.underline,
-              decorationColor: const Color(0xFF6EE7B7),
+              decorationColor: const Color(0xFF7DD3FC),
             ),
           ),
         ),
@@ -610,7 +610,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Color(0xFF16A34A), width: 1.5),
+        borderSide: const BorderSide(color: Color(0xFF0284C7), width: 1.5),
       ),
       errorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),

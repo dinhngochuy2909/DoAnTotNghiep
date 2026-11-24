@@ -4,7 +4,7 @@ import '../data/info_pages.dart';
 
 /// Trang thông tin mở từ chân trang: giới thiệu, hướng dẫn, câu hỏi thường gặp, điều khoản, chính sách...
 class InfoPageScreen extends StatelessWidget {
-  static const _green = Color(0xFF15803D);
+  static const _green = Color(0xFF0369A1);
   static const _ink = Color(0xFF0F172A);
   static const _body = Color(0xFF334155);
   static const _grey = Color(0xFF64748B);
@@ -91,11 +91,11 @@ class InfoPageScreen extends StatelessWidget {
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xFF14532D), Color(0xFF15803D), Color(0xFF0D9488)],
+          colors: [Color(0xFF0C4A6E), Color(0xFF0369A1), Color(0xFF0891B2)],
         ),
         boxShadow: const [
           BoxShadow(
-            color: Color(0x33166534),
+            color: Color(0x33075985),
             blurRadius: 16,
             offset: Offset(0, 8),
           ),
@@ -129,7 +129,7 @@ class InfoPageScreen extends StatelessWidget {
             Text(
               page.note,
               key: const ValueKey('info-note'),
-              style: const TextStyle(color: Color(0xFFBBF7D0), fontSize: 12),
+              style: const TextStyle(color: Color(0xFFBAE6FD), fontSize: 12),
             ),
           ],
           const SizedBox(height: 10),
@@ -137,7 +137,7 @@ class InfoPageScreen extends StatelessWidget {
             page.intro,
             key: const ValueKey('info-intro'),
             style: const TextStyle(
-              color: Color(0xFFF0FDF4),
+              color: Color(0xFFF0F9FF),
               fontSize: 14.5,
               height: 1.55,
             ),
@@ -213,7 +213,7 @@ class InfoPageScreen extends StatelessWidget {
               margin: const EdgeInsets.only(top: 1),
               alignment: Alignment.center,
               decoration: const BoxDecoration(
-                color: Color(0xFFDCFCE7),
+                color: Color(0xFFE0F2FE),
                 shape: BoxShape.circle,
               ),
               child: Text(
@@ -231,7 +231,7 @@ class InfoPageScreen extends StatelessWidget {
               child: Icon(
                 Icons.check_circle_rounded,
                 size: 20,
-                color: Color(0xFF16A34A),
+                color: Color(0xFF0284C7),
               ),
             ),
           const SizedBox(width: 12),
@@ -326,10 +326,10 @@ class InfoPageScreen extends StatelessWidget {
                   key: ValueKey('info-more-${p.id.name}'),
                   avatar: Icon(p.icon, size: 16, color: _green),
                   label: Text(p.title),
-                  backgroundColor: const Color(0xFFF0FDF4),
-                  side: const BorderSide(color: Color(0xFFBBF7D0)),
+                  backgroundColor: const Color(0xFFF0F9FF),
+                  side: const BorderSide(color: Color(0xFFBAE6FD)),
                   labelStyle: const TextStyle(
-                    color: Color(0xFF166534),
+                    color: Color(0xFF075985),
                     fontSize: 12.5,
                     fontWeight: FontWeight.w600,
                   ),

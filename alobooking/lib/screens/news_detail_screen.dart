@@ -13,7 +13,7 @@ import 'venue_detail_screen.dart';
 /// Trang đọc đầy đủ một tin trong Khám phá: ảnh bìa lớn, toàn bộ nội dung, thông tin sân gắn kèm,
 /// đánh giá thật của khách về sân đó, sân tương tự và các tin khác. Mọi số liệu đều lấy từ dữ liệu thật.
 class NewsDetailScreen extends StatelessWidget {
-  static const _green = Color(0xFF15803D);
+  static const _green = Color(0xFF0369A1);
   static const _ink = Color(0xFF0F172A);
   static const _grey = Color(0xFF64748B);
   static const _line = Color(0xFFE2E8F0);
@@ -290,8 +290,8 @@ class NewsDetailScreen extends StatelessWidget {
                   for (final t in v.tags.where((t) => t.trim().isNotEmpty).take(8))
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-                      decoration: BoxDecoration(color: const Color(0xFFF0FDF4), borderRadius: BorderRadius.circular(8), border: Border.all(color: const Color(0xFFBBF7D0))),
-                      child: Text(t.trim(), style: const TextStyle(color: Color(0xFF166534), fontSize: 12, fontWeight: FontWeight.w600)),
+                      decoration: BoxDecoration(color: const Color(0xFFF0F9FF), borderRadius: BorderRadius.circular(8), border: Border.all(color: const Color(0xFFBAE6FD))),
+                      child: Text(t.trim(), style: const TextStyle(color: Color(0xFF075985), fontSize: 12, fontWeight: FontWeight.w600)),
                     ),
                 ],
               ),

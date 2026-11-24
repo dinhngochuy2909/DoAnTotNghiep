@@ -44,7 +44,7 @@ class _AccountScreenState extends State<AccountScreen> {
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           title: const Row(
             children: [
-              Icon(Icons.tune, color: Color(0xFF15803D)),
+              Icon(Icons.tune, color: Color(0xFF0369A1)),
               SizedBox(width: 8),
               Text('Cá nhân hóa trải nghiệm', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
             ],
@@ -105,7 +105,7 @@ class _AccountScreenState extends State<AccountScreen> {
             ),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF15803D),
+                backgroundColor: const Color(0xFF0369A1),
                 foregroundColor: Colors.white,
               ),
               onPressed: () {
@@ -158,8 +158,8 @@ class _AccountScreenState extends State<AccountScreen> {
                     final n = notifs[idx];
                     return ListTile(
                       leading: CircleAvatar(
-                        backgroundColor: const Color(0xFF15803D).withOpacity(0.12),
-                        child: const Icon(Icons.sports, color: Color(0xFF15803D), size: 18),
+                        backgroundColor: const Color(0xFF0369A1).withOpacity(0.12),
+                        child: const Icon(Icons.sports, color: Color(0xFF0369A1), size: 18),
                       ),
                       title: Text(n.title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                       subtitle: Text(n.message, style: const TextStyle(fontSize: 11.5, color: Color(0xFF64748B))),
@@ -187,7 +187,7 @@ class _AccountScreenState extends State<AccountScreen> {
     final narrow = MediaQuery.of(context).size.width < 760;
 
     return Scaffold(
-      backgroundColor: const Color(0xFF065F46), // Dark green background like screenshot
+      backgroundColor: const Color(0xFF075985), // Dark green background like screenshot
       body: narrow
           ? _buildSidebar(userName, userEmail, narrow: true)
           : Row(
@@ -197,7 +197,7 @@ class _AccountScreenState extends State<AccountScreen> {
                 // ─── RIGHT CONTENT PANE (HIỂN THỊ CHUẨN XÁC NỘI DUNG ỨNG DỤNG CÓ GÌ MỚI) ───
                 Expanded(
                   child: Container(
-                    color: const Color(0xFF065F46), // Dark green background from screenshot
+                    color: const Color(0xFF075985), // Dark green background from screenshot
                     child: _buildRightPaneContent(),
                   ),
                 ),
@@ -241,7 +241,7 @@ class _AccountScreenState extends State<AccountScreen> {
                 // Header Profile Card
                 Container(
                   padding: const EdgeInsets.fromLTRB(16, 40, 16, 16),
-                  color: const Color(0xFF065F46),
+                  color: const Color(0xFF075985),
                   child: Column(
                     children: [
                       // User Info Row
@@ -327,7 +327,7 @@ class _AccountScreenState extends State<AccountScreen> {
                             label: const Text('ĐĂNG NHẬP / ĐĂNG KÝ', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: const Color(0xFFFEF08A),
-                              foregroundColor: const Color(0xFF15803D),
+                              foregroundColor: const Color(0xFF0369A1),
                               padding: const EdgeInsets.symmetric(vertical: 9),
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                               elevation: 2,
@@ -399,7 +399,7 @@ class _AccountScreenState extends State<AccountScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 20, color: const Color(0xFF15803D)),
+            Icon(icon, size: 20, color: const Color(0xFF0369A1)),
             const SizedBox(height: 4),
             Text(label, style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: Color(0xFF334155))),
           ],
@@ -419,17 +419,17 @@ class _AccountScreenState extends State<AccountScreen> {
     final isSelected = _selectedMenu == key;
     return ListTile(
       dense: true,
-      leading: Icon(icon, size: 18, color: isSelected ? const Color(0xFF15803D) : const Color(0xFF64748B)),
+      leading: Icon(icon, size: 18, color: isSelected ? const Color(0xFF0369A1) : const Color(0xFF64748B)),
       title: Text(
         title,
         style: TextStyle(
           fontSize: 12.5,
           fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-          color: isSelected ? const Color(0xFF15803D) : const Color(0xFF1E293B),
+          color: isSelected ? const Color(0xFF0369A1) : const Color(0xFF1E293B),
         ),
       ),
       trailing: const Icon(Icons.chevron_right, size: 16, color: Color(0xFF94A3B8)),
-      tileColor: isSelected ? const Color(0xFFDCFCE7) : Colors.transparent,
+      tileColor: isSelected ? const Color(0xFFE0F2FE) : Colors.transparent,
       onTap: () {
         if (key == 'bookings') {
           Navigator.push(context, MaterialPageRoute(builder: (_) => BookedScreen(allVenues: widget.venues)));
@@ -452,7 +452,7 @@ class _AccountScreenState extends State<AccountScreen> {
           padding: const EdgeInsets.symmetric(vertical: 6),
           child: Row(
             children: [
-              Icon(icon, size: 18, color: const Color(0xFF15803D)),
+              Icon(icon, size: 18, color: const Color(0xFF0369A1)),
               const SizedBox(width: 10),
               SizedBox(width: 90, child: Text(label, style: const TextStyle(color: Color(0xFF64748B), fontSize: 13))),
               Expanded(
@@ -525,9 +525,9 @@ class _AccountScreenState extends State<AccountScreen> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 22, color: isActive ? const Color(0xFF15803D) : const Color(0xFF64748B)),
+          Icon(icon, size: 22, color: isActive ? const Color(0xFF0369A1) : const Color(0xFF64748B)),
           const SizedBox(height: 2),
-          Text(label, style: TextStyle(fontSize: 10, fontWeight: isActive ? FontWeight.bold : FontWeight.normal, color: isActive ? const Color(0xFF15803D) : const Color(0xFF64748B))),
+          Text(label, style: TextStyle(fontSize: 10, fontWeight: isActive ? FontWeight.bold : FontWeight.normal, color: isActive ? const Color(0xFF0369A1) : const Color(0xFF64748B))),
         ],
       ),
     );
@@ -547,14 +547,14 @@ class _AccountScreenState extends State<AccountScreen> {
               decoration: BoxDecoration(
                 color: Colors.white,
                 shape: BoxShape.circle,
-                border: Border.all(color: const Color(0xFF15803D), width: 2),
+                border: Border.all(color: const Color(0xFF0369A1), width: 2),
               ),
-              child: const Icon(Icons.article_outlined, color: Color(0xFF15803D), size: 22),
+              child: const Icon(Icons.article_outlined, color: Color(0xFF0369A1), size: 22),
             ),
           ),
           Transform.translate(
             offset: const Offset(0, -4),
-            child: const Text('Khám phá', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF15803D))),
+            child: const Text('Khám phá', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF0369A1))),
           ),
         ],
       ),

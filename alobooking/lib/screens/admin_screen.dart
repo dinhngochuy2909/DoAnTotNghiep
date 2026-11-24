@@ -1274,7 +1274,7 @@ class _AdminScreenState extends State<AdminScreen> {
       switch (l) {
         case 'RẤT CAO':
         case 'CAO':
-          return AdminUi.accent;
+          return AdminUi.success;
         case 'BÌNH THƯỜNG':
           return AdminUi.info;
         default:
@@ -1437,7 +1437,7 @@ class _AdminScreenState extends State<AdminScreen> {
               padding: EdgeInsets.only(bottom: 8),
               child: Row(
                 children: [
-                  Icon(Icons.check_circle_outline_rounded, color: AdminUi.accent, size: 18),
+                  Icon(Icons.check_circle_outline_rounded, color: AdminUi.success, size: 18),
                   SizedBox(width: 8),
                   Text('Không có việc tồn đọng', style: TextStyle(color: AdminUi.muted, fontSize: 13)),
                 ],
@@ -1659,8 +1659,9 @@ class _AdminScreenState extends State<AdminScreen> {
 
   Widget _approvalFilterChip(String key, String label) {
     final selected = _selectedApprovalFilter == key;
-    Color activeColor = AdminUi.accent;
-    Color activeColorDark = AdminUi.accent;
+    // "Tất cả" dùng màu chủ đạo (xanh biển); chỉ bộ lọc "Đã duyệt" mới mang nghĩa thành công (xanh lá)
+    Color activeColor = key == 'approved' ? AdminUi.success : AdminUi.accent;
+    Color activeColorDark = activeColor;
     if (key == 'pending') {
       activeColor = AdminUi.warn;
       activeColorDark = const Color(0xFFD97706);
@@ -1715,8 +1716,8 @@ class _AdminScreenState extends State<AdminScreen> {
   }
 
   Widget _buildVenueRowCard(Venue v) {
-    Color statusBg = AdminUi.accent.withOpacity(0.15);
-    Color statusColor = AdminUi.accent;
+    Color statusBg = AdminUi.success.withOpacity(0.15);
+    Color statusColor = AdminUi.success;
     String statusText = 'Đã duyệt';
 
     if (v.isPending) {
@@ -2033,7 +2034,7 @@ class _AdminScreenState extends State<AdminScreen> {
                   decoration: BoxDecoration(
                     color: AdminUi.surface,
                     borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: AdminUi.accent.withOpacity(0.25)),
+                    border: Border.all(color: AdminUi.success.withOpacity(0.25)),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -2042,13 +2043,13 @@ class _AdminScreenState extends State<AdminScreen> {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Flexible(child: Text('Đã Xác Nhận / Đang Đá', style: const TextStyle(color: AdminUi.muted, fontSize: 12), maxLines: 1, overflow: TextOverflow.ellipsis)),
-                          Icon(Icons.check_circle_outline, color: AdminUi.accent, size: 18),
+                          Icon(Icons.check_circle_outline, color: AdminUi.success, size: 18),
                         ],
                       ),
                       const SizedBox(height: 6),
                       Text('$confirmedCount', style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
                       const SizedBox(height: 2),
-                      const Text('Lịch thi đấu sẵn sàng', style: TextStyle(color: AdminUi.accent, fontSize: 11)),
+                      const Text('Lịch thi đấu sẵn sàng', style: TextStyle(color: AdminUi.success, fontSize: 11)),
                     ],
                   ),
                 ),
@@ -2198,7 +2199,7 @@ class _AdminScreenState extends State<AdminScreen> {
 
   Widget _buildBookingItemCard(BookingItem b) {
     Color statusColor = AdminUi.warn;
-    if (b.status == 'Đã xác nhận') statusColor = AdminUi.accent;
+    if (b.status == 'Đã xác nhận') statusColor = AdminUi.success;
     if (b.status == 'Hoàn thành') statusColor = AdminUi.violet;
     if (b.status == 'Đã hủy') statusColor = AdminUi.danger;
 
@@ -2314,7 +2315,7 @@ class _AdminScreenState extends State<AdminScreen> {
                     if (b.status == 'Chờ xác nhận') ...[
                       IconButton(
                         key: ValueKey('admin-booking-confirm-${b.id}'),
-                        icon: const Icon(Icons.check_circle_outline, color: AdminUi.accent, size: 22),
+                        icon: const Icon(Icons.check_circle_outline, color: AdminUi.success, size: 22),
                         tooltip: 'Xác nhận đơn',
                         onPressed: () async {
                           final ok = await FirestoreService.confirmBooking(b.id);
@@ -2463,7 +2464,7 @@ class _AdminScreenState extends State<AdminScreen> {
                   decoration: BoxDecoration(
                     color: AdminUi.surface,
                     borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: AdminUi.accent.withOpacity(0.25)),
+                    border: Border.all(color: AdminUi.success.withOpacity(0.25)),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -2472,13 +2473,13 @@ class _AdminScreenState extends State<AdminScreen> {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Flexible(child: Text('Đang Hoạt Động', style: const TextStyle(color: AdminUi.muted, fontSize: 12), maxLines: 1, overflow: TextOverflow.ellipsis)),
-                          Icon(Icons.check_circle_outline, color: AdminUi.accent, size: 18),
+                          Icon(Icons.check_circle_outline, color: AdminUi.success, size: 18),
                         ],
                       ),
                       const SizedBox(height: 6),
                       Text('$activeCount', style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
                       const SizedBox(height: 2),
-                      const Text('Tài khoản khả dụng', style: TextStyle(color: AdminUi.accent, fontSize: 11)),
+                      const Text('Tài khoản khả dụng', style: TextStyle(color: AdminUi.success, fontSize: 11)),
                     ],
                   ),
                 ),
@@ -2965,7 +2966,7 @@ class _AdminScreenState extends State<AdminScreen> {
               itemBuilder: (ctx, i) {
                 final p = filtered[i];
 
-                Color statusColor = AdminUi.accent; // Success
+                Color statusColor = AdminUi.success; // Success
                 if (p.status == 'Đang xử lý') statusColor = AdminUi.warn;
                 else if (p.status == 'Đã hoàn tiền') statusColor = AdminUi.danger;
 
@@ -3090,7 +3091,7 @@ class _AdminScreenState extends State<AdminScreen> {
                               value: 'success',
                               child: Row(
                                 children: [
-                                  Icon(Icons.check_circle, color: AdminUi.accent, size: 16),
+                                  Icon(Icons.check_circle, color: AdminUi.success, size: 16),
                                   SizedBox(width: 8),
                                   Text('Đánh dấu thành công', style: TextStyle(color: Colors.white, fontSize: 13)),
                                 ],
@@ -3475,7 +3476,7 @@ class _AdminScreenState extends State<AdminScreen> {
                     const SizedBox(height: 12),
                     Text(p.amount, style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 4),
-                    Text(p.status, style: const TextStyle(color: AdminUi.accent, fontSize: 12, fontWeight: FontWeight.bold)),
+                    Text(p.status, style: const TextStyle(color: AdminUi.success, fontSize: 12, fontWeight: FontWeight.bold)),
                     const Divider(color: AdminUi.border, height: 24),
                     _receiptRow('Mã GD:', p.id),
                     _receiptRow('Mã Đơn:', p.bookingId),
@@ -3821,7 +3822,7 @@ class _AdminScreenState extends State<AdminScreen> {
       case 'event':
         return AdminUi.violet;
       case 'update':
-        return AdminUi.accent;
+        return AdminUi.success;
       default:
         return AdminUi.info;
     }

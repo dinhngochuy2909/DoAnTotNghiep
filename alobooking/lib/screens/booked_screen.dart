@@ -206,7 +206,7 @@ class _BookedScreenState extends State<BookedScreen> with SingleTickerProviderSt
     return Scaffold(
       backgroundColor: const Color(0xFFF1F5F9),
       appBar: AppBar(
-        backgroundColor: const Color(0xFF15803D),
+        backgroundColor: const Color(0xFF0369A1),
         foregroundColor: Colors.white,
         elevation: 0,
         title: const Text('Lịch sử đặt sân', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18)),
@@ -233,7 +233,7 @@ class _BookedScreenState extends State<BookedScreen> with SingleTickerProviderSt
         ),
       ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator(color: Color(0xFF16A34A)))
+          ? const Center(child: CircularProgressIndicator(color: Color(0xFF0284C7)))
           : TabBarView(
               controller: _tabController,
               children: [for (var i = 0; i < 4; i++) _buildBookingList(_filteredList(i))],
@@ -284,7 +284,7 @@ class _BookedScreenState extends State<BookedScreen> with SingleTickerProviderSt
                   icon: const Icon(Icons.login_rounded, size: 16),
                   label: const Text('Đăng nhập', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF16A34A),
+                    backgroundColor: const Color(0xFF0284C7),
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
@@ -381,7 +381,7 @@ class _BookedScreenState extends State<BookedScreen> with SingleTickerProviderSt
                   children: [
                     const Text('Tổng tiền', style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
                     Text(b.amount,
-                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Color(0xFF16A34A))),
+                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Color(0xFF0284C7))),
                   ],
                 ),
                 if (canCancel)
@@ -400,7 +400,7 @@ class _BookedScreenState extends State<BookedScreen> with SingleTickerProviderSt
                     onPressed: () =>
                         Navigator.push(context, MaterialPageRoute(builder: (_) => VisualBookingScreen(venue: venue))),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF16A34A),
+                      backgroundColor: const Color(0xFF0284C7),
                       foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
