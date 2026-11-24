@@ -820,6 +820,14 @@ class _OwnerScreenState extends State<OwnerScreen> with SingleTickerProviderStat
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          const Padding(
+            padding: EdgeInsets.only(bottom: 10),
+            child: Text(
+              'Đơn của các sân bạn quản lý do chính bạn xác nhận hoặc hủy, không cần admin duyệt.',
+              key: ValueKey('owner-bookings-note'),
+              style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12, height: 1.4),
+            ),
+          ),
           // Search box
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -912,22 +920,86 @@ class _OwnerScreenState extends State<OwnerScreen> with SingleTickerProviderStat
                         ],
                       ),
                       const SizedBox(width: 8),
+                      // Chủ sân tự duyệt đơn của sân mình, không cần admin.
                       if (b.status == 'Chờ xác nhận') ...[
                         IconButton(
+                          key: ValueKey('owner-booking-confirm-${b.id}'),
                           icon: const Icon(Icons.check_circle, color: Color(0xFF10B981), size: 22),
                           tooltip: 'Xác nhận đơn',
                           onPressed: () async {
-                            await FirestoreService.confirmBooking(b.id);
+                            final ok = await FirestoreService.confirmBooking(b.id);
+                            if (!mounted) return;
+                            if (!ok) {
+                              _showToast('Không xác nhận được đơn ${b.id}. Kiểm tra kết nối rồi thử lại.', isError: true);
+                              return;
+                            }
                             setState(() => b.status = 'Đã xác nhận');
                             _showToast('Đã xác nhận đơn ${b.id} (đã nhận tiền chuyển khoản)!');
                           },
                         ),
+                        IconButton(
+                          key: ValueKey('owner-booking-cancel-${b.id}'),
+                          icon: const Icon(Icons.cancel_outlined, color: Color(0xFFEF4444), size: 22),
+                          tooltip: 'Hủy đơn',
+                          onPressed: () => _confirmCancelBooking(b),
+                        ),
                       ],
+                      if (b.status == 'Đã xác nhận')
+                        IconButton(
+                          key: ValueKey('owner-booking-complete-${b.id}'),
+                          icon: const Icon(Icons.done_all, color: Color(0xFFA78BFA), size: 22),
+                          tooltip: 'Đánh dấu hoàn thành',
+                          onPressed: () async {
+                            final ok = await FirestoreService.updateBookingStatus(b.id, 'Hoàn thành');
+                            if (!mounted) return;
+                            if (!ok) {
+                              _showToast('Không cập nhật được đơn ${b.id}. Kiểm tra kết nối rồi thử lại.', isError: true);
+                              return;
+                            }
+                            setState(() => b.status = 'Hoàn thành');
+                            _showToast('Đơn ${b.id} đã hoàn thành!');
+                          },
+                        ),
                     ],
                   ),
                 );
               },
             ),
+        ],
+      ),
+    );
+  }
+
+  /// Hủy đơn của khách: hỏi lại trước vì khách sẽ thấy đơn chuyển sang "Đã hủy".
+  void _confirmCancelBooking(BookingItem b) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1E293B),
+        title: const Text('Hủy đơn này?', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700)),
+        content: Text(
+          'Đơn ${b.id} của ${b.customer} (${b.time} - ${b.date}) sẽ chuyển sang "Đã hủy". '
+          'Nếu khách đã chuyển khoản, bạn cần tự hoàn tiền cho khách.',
+          style: const TextStyle(color: Color(0xFFCBD5E1), fontSize: 13.5, height: 1.45),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Giữ đơn')),
+          FilledButton(
+            key: const ValueKey('owner-booking-confirm-cancel'),
+            style: FilledButton.styleFrom(backgroundColor: const Color(0xFFEF4444)),
+            onPressed: () async {
+              Navigator.pop(ctx);
+              final ok = await FirestoreService.updateBookingStatus(b.id, 'Đã hủy');
+              if (!mounted) return;
+              if (!ok) {
+                _showToast('Không hủy được đơn ${b.id}. Kiểm tra kết nối rồi thử lại.', isError: true);
+                return;
+              }
+              setState(() => b.status = 'Đã hủy');
+              _showToast('Đã hủy đơn ${b.id}.');
+            },
+            child: const Text('Hủy đơn'),
+          ),
         ],
       ),
     );

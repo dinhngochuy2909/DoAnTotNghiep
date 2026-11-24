@@ -49,3 +49,6 @@ app.*.map.json
 
 # Khóa bí mật (không đưa lên git)
 dart_defines.json
+
+# Khóa API ảnh Pexels cho tool/fetch_stock_photos.py (bí mật, không đưa lên git)
+tool/pexels_key.txt

@@ -113,7 +113,7 @@ class InfoPages {
       FaqItem('Tôi có thể trả tiền mặt tại sân không?',
           'Với lượt đặt qua AloBooking, thanh toán chỉ bằng chuyển khoản ngân hàng qua mã VietQR, không nhận tiền mặt.'),
       FaqItem('Làm sao biết đơn của tôi đã được xác nhận?',
-          'Đơn ở trạng thái "Chờ xác nhận" cho tới khi ban quản lý nhận được tiền chuyển khoản đúng số tiền và nội dung. Bạn xem trạng thái trong mục "Sân đã đặt".'),
+          'Đơn ở trạng thái "Chờ xác nhận" cho tới khi chủ sân (hoặc ban quản lý AloBooking với sân do AloBooking quản lý) nhận được tiền chuyển khoản đúng số tiền và nội dung. Bạn xem trạng thái trong mục "Sân đã đặt".'),
       FaqItem('Tôi muốn hủy lượt đặt thì làm thế nào?',
           'Vào "Sân đã đặt", chọn đơn đang chờ xác nhận hoặc sắp diễn ra rồi bấm "Hủy đặt sân". '
               'Việc hoàn tiền (nếu có) do chủ sân xử lý theo chính sách của sân.'),
@@ -168,7 +168,7 @@ class InfoPages {
       ]),
       InfoSection('Đặt sân và thanh toán', bullets: [
         'Thanh toán bằng chuyển khoản ngân hàng, không nhận tiền mặt.',
-        'Đơn chỉ được xác nhận khi ban quản lý nhận được tiền đúng số tiền và nội dung chuyển khoản.',
+        'Đơn chỉ được xác nhận khi chủ sân (hoặc ban quản lý AloBooking với sân do AloBooking quản lý) nhận được tiền đúng số tiền và nội dung chuyển khoản.',
         'Mỗi khung giờ của một sân chỉ có một người đặt.',
         'Giá do chủ sân niêm yết. Với địa điểm lấy từ dữ liệu mở, giá chỉ là mức tham khảo.',
       ]),
@@ -231,7 +231,7 @@ class InfoPages {
       InfoSection('Thanh toán', bullets: [
         'AloBooking chỉ nhận chuyển khoản ngân hàng qua mã VietQR (chuẩn NAPAS 247), không nhận tiền mặt.',
         'Sau khi xác nhận đặt, bạn nhận mã QR kèm số tiền và nội dung chuyển khoản. Hãy chuyển đúng số tiền và nội dung để đơn được đối soát.',
-        'Đơn ở trạng thái "Chờ xác nhận" cho tới khi ban quản lý nhận được tiền.',
+        'Đơn ở trạng thái "Chờ xác nhận" cho tới khi chủ sân (hoặc ban quản lý AloBooking với sân do AloBooking quản lý) nhận được tiền.',
         'Nếu hệ thống chưa tạo được mã QR, hãy liên hệ ban quản lý để nhận thông tin chuyển khoản cho đơn của bạn.',
       ]),
       InfoSection('Giá', paragraphs: [

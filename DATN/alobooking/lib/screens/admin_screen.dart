@@ -14,6 +14,7 @@ import 'package:flutter/services.dart';
 import '../widgets/admin_ui.dart';
 import '../services/admin_stats.dart';
 import '../services/booking_slots.dart';
+import '../services/booking_approval.dart';
 import '../services/booking_count_service.dart';
 import '../services/demand_forecast_service.dart';
 import '../services/simulated_bookings.dart';
@@ -1389,19 +1390,35 @@ class _AdminScreenState extends State<AdminScreen> {
 
   Widget _buildAttentionCard(AdminStats s) {
     final pendingVenues = _venues.where((v) => v.isPending).length;
+    final today = DateTime.now();
+    final todayStart = DateTime(today.year, today.month, today.day);
+    final pendingBookings = _bookings.where((b) => b.status == 'Chờ xác nhận').toList();
+    final adminOwned = pendingBookings.where((b) => !BookingApproval.isOwnerManaged(b, _venues)).toList();
+    final adminPending = adminOwned.length;
+    final ownerPending = pendingBookings.length - adminPending;
+    final adminOverdue = adminOwned.where((b) {
+      final d = BookingSlots.parseDate(b.date);
+      return d != null && d.isBefore(todayStart);
+    }).length;
     final items = <(IconData, String, int, Color, VoidCallback)>[
       if (pendingVenues > 0)
         (Icons.stadium_outlined, 'Sân đang chờ duyệt', pendingVenues, AdminUi.warn, () => setState(() {
               _selectedApprovalFilter = 'pending';
               _selectedNavIndex = 1;
             })),
-      if (s.pending > 0)
-        (Icons.hourglass_top_rounded, 'Đơn chờ xác nhận', s.pending, AdminUi.info, () => setState(() {
+      // Đơn của sân đã có chủ riêng do chủ sân duyệt; admin chỉ phải duyệt đơn của sân do hệ thống quản lý.
+      if (adminPending > 0)
+        (Icons.hourglass_top_rounded, 'Đơn chờ admin xác nhận', adminPending, AdminUi.info, () => setState(() {
               _selectedBookingStatus = 'Chờ xác nhận';
               _selectedNavIndex = 2;
             })),
-      if (s.overduePending > 0)
-        (Icons.warning_amber_rounded, 'Đơn chờ xác nhận đã quá ngày chơi', s.overduePending, AdminUi.danger, () => setState(() {
+      if (adminOverdue > 0)
+        (Icons.warning_amber_rounded, 'Đơn chờ xác nhận đã quá ngày chơi', adminOverdue, AdminUi.danger, () => setState(() {
+              _selectedBookingStatus = 'Chờ xác nhận';
+              _selectedNavIndex = 2;
+            })),
+      if (ownerPending > 0)
+        (Icons.storefront_outlined, 'Đơn đang chờ chủ sân xác nhận', ownerPending, AdminUi.muted, () => setState(() {
               _selectedBookingStatus = 'Chờ xác nhận';
               _selectedNavIndex = 2;
             })),
@@ -2173,6 +2190,12 @@ class _AdminScreenState extends State<AdminScreen> {
     );
   }
 
+  /// Giao dịch của đơn thuộc sân đã có chủ riêng: chủ sân xác nhận tiền/hoàn tiền, admin chỉ xem biên lai.
+  bool _paymentOwnerManaged(PaymentItem p) {
+    final b = _bookings.where((x) => x.id == p.bookingId).firstOrNull;
+    return b != null && BookingApproval.isOwnerManaged(b, _venues);
+  }
+
   Widget _buildBookingItemCard(BookingItem b) {
     Color statusColor = AdminUi.warn;
     if (b.status == 'Đã xác nhận') statusColor = AdminUi.accent;
@@ -2259,47 +2282,90 @@ class _AdminScreenState extends State<AdminScreen> {
                       style: const TextStyle(color: AdminUi.muted, fontSize: 12)),
                 ],
               ),
-              // Action buttons (Approve, Complete, Cancel)
-              Row(
-                children: [
-                  if (b.status == 'Chờ xác nhận') ...[
-                    IconButton(
-                      icon: const Icon(Icons.check_circle_outline, color: AdminUi.accent, size: 22),
-                      tooltip: 'Xác nhận đơn',
-                      onPressed: () async {
-                        await FirestoreService.confirmBooking(b.id);
-                        setState(() {
-                          b.status = 'Đã xác nhận';
-                          for (final p in _payments) {
-                            if (p.bookingId == b.id && p.status.toLowerCase().contains('xử lý')) p.status = 'Thành công';
+              // Duyệt đơn: chủ sân của sân được đặt duyệt. Admin chỉ duyệt đơn của sân do hệ thống quản lý (chưa có chủ riêng).
+              if (BookingApproval.isOwnerManaged(b, _venues))
+                if (b.status == 'Chờ xác nhận' || b.status == 'Đã xác nhận')
+                  Flexible(
+                    child: Container(
+                      key: ValueKey('admin-booking-owner-note-${b.id}'),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: AdminUi.border.withValues(alpha: 0.4),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.storefront_outlined, size: 14, color: AdminUi.muted),
+                          const SizedBox(width: 6),
+                          Flexible(
+                            child: Text(BookingApproval.viewOnlyLabel(b, _venues),
+                                maxLines: 1, overflow: TextOverflow.ellipsis, style: AdminUi.caption),
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
+                else
+                  const SizedBox.shrink()
+              else
+                Row(
+                  children: [
+                    if (b.status == 'Chờ xác nhận') ...[
+                      IconButton(
+                        key: ValueKey('admin-booking-confirm-${b.id}'),
+                        icon: const Icon(Icons.check_circle_outline, color: AdminUi.accent, size: 22),
+                        tooltip: 'Xác nhận đơn',
+                        onPressed: () async {
+                          final ok = await FirestoreService.confirmBooking(b.id);
+                          if (!mounted) return;
+                          if (!ok) {
+                            _showToast('Không xác nhận được đơn ${b.id}. Kiểm tra kết nối rồi thử lại.', isError: true);
+                            return;
                           }
-                        });
-                        _showToast('Đã xác nhận đơn ${b.id} và đối soát tiền chuyển khoản!');
-                      },
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.cancel_outlined, color: AdminUi.danger, size: 22),
-                      tooltip: 'Hủy đơn',
-                      onPressed: () async {
-                        await FirestoreService.updateBookingStatus(b.id, 'Đã hủy');
-                        setState(() => b.status = 'Đã hủy');
-                        _showToast('Đã hủy đơn ${b.id}!', isError: true);
-                      },
-                    ),
+                          setState(() {
+                            b.status = 'Đã xác nhận';
+                            for (final p in _payments) {
+                              if (p.bookingId == b.id && p.status.toLowerCase().contains('xử lý')) p.status = 'Thành công';
+                            }
+                          });
+                          _showToast('Đã xác nhận đơn ${b.id} và đối soát tiền chuyển khoản!');
+                        },
+                      ),
+                      IconButton(
+                        key: ValueKey('admin-booking-cancel-${b.id}'),
+                        icon: const Icon(Icons.cancel_outlined, color: AdminUi.danger, size: 22),
+                        tooltip: 'Hủy đơn',
+                        onPressed: () async {
+                          final ok = await FirestoreService.updateBookingStatus(b.id, 'Đã hủy');
+                          if (!mounted) return;
+                          if (!ok) {
+                            _showToast('Không hủy được đơn ${b.id}. Kiểm tra kết nối rồi thử lại.', isError: true);
+                            return;
+                          }
+                          setState(() => b.status = 'Đã hủy');
+                          _showToast('Đã hủy đơn ${b.id}!', isError: true);
+                        },
+                      ),
+                    ],
+                    if (b.status == 'Đã xác nhận')
+                      IconButton(
+                        key: ValueKey('admin-booking-complete-${b.id}'),
+                        icon: const Icon(Icons.done_all, color: AdminUi.violet, size: 22),
+                        tooltip: 'Đánh dấu hoàn thành',
+                        onPressed: () async {
+                          final ok = await FirestoreService.updateBookingStatus(b.id, 'Hoàn thành');
+                          if (!mounted) return;
+                          if (!ok) {
+                            _showToast('Không cập nhật được đơn ${b.id}. Kiểm tra kết nối rồi thử lại.', isError: true);
+                            return;
+                          }
+                          setState(() => b.status = 'Hoàn thành');
+                          _showToast('Đơn ${b.id} đã hoàn thành!');
+                        },
+                      ),
                   ],
-                  if (b.status == 'Đã xác nhận') ...[
-                    IconButton(
-                      icon: const Icon(Icons.done_all, color: AdminUi.violet, size: 22),
-                      tooltip: 'Đánh dấu hoàn thành',
-                      onPressed: () async {
-                        await FirestoreService.updateBookingStatus(b.id, 'Hoàn thành');
-                        setState(() => b.status = 'Hoàn thành');
-                        _showToast('Đơn ${b.id} đã hoàn thành!');
-                      },
-                    ),
-                  ],
-                ],
-              ),
+                ),
             ],
           ),
         ],
@@ -3019,7 +3085,7 @@ class _AdminScreenState extends State<AdminScreen> {
                               ],
                             ),
                           ),
-                          if (p.status != 'Thành công')
+                          if (p.status != 'Thành công' && !_paymentOwnerManaged(p))
                             const PopupMenuItem(
                               value: 'success',
                               child: Row(
@@ -3030,7 +3096,7 @@ class _AdminScreenState extends State<AdminScreen> {
                                 ],
                               ),
                             ),
-                          if (p.status != 'Đã hoàn tiền')
+                          if (p.status != 'Đã hoàn tiền' && !_paymentOwnerManaged(p))
                             const PopupMenuItem(
                               value: 'refund',
                               child: Row(

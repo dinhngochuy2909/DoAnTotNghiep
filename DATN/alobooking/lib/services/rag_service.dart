@@ -299,7 +299,7 @@ Chủ sân: ${v.ownerName}''',
           title: 'Thanh toán',
           keywords: ['thanh toan', 'vietqr', 'chuyen khoan', 'tien mat', 'dat coc', 'qr'],
           content: '''- Chỉ thanh toán bằng chuyển khoản ngân hàng quét mã VietQR (không nhận tiền mặt).
-- Sau khi bấm xác nhận, ứng dụng hiện mã QR đúng số tiền kèm nội dung chuyển khoản là mã đơn; đơn chuyển sang "Đã xác nhận" khi ban quản lý nhận được tiền.
+- Sau khi bấm xác nhận, ứng dụng hiện mã QR đúng số tiền kèm nội dung chuyển khoản là mã đơn; đơn chuyển sang "Đã xác nhận" khi chủ sân nhận được tiền (chủ sân tự xác nhận đơn của sân mình; với sân do AloBooking quản lý thì ban quản lý AloBooking xác nhận).
 - Số tiền chuyển khoản là toàn bộ tiền các ca đã chọn (ứng dụng không có hình thức đặt cọc một phần).''',
         ),
         RagKnowledgeChunk(

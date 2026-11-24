@@ -517,7 +517,7 @@ class _VisualBookingScreenState extends State<VisualBookingScreen> {
                         child: Text(
                           'Chuyển khoản ngân hàng bằng mã VietQR, không nhận tiền mặt. '
                           'Sau khi xác nhận, bạn sẽ nhận mã QR kèm nội dung chuyển khoản; '
-                          'đơn được xác nhận khi ban quản lý nhận được tiền.',
+                          'đơn được xác nhận khi chủ sân nhận được tiền.',
                           style: TextStyle(fontSize: 12.5, height: 1.4, color: Color(0xFFBBF7D0)),
                         ),
                       ),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../data/venue_photos.dart';
 import '../models/venue.dart';
+import '../services/booking_approval.dart';
 import '../services/firestore_service.dart';
 import '../services/auth_service.dart';
 import '../services/admin_stats.dart';
@@ -3921,9 +3922,13 @@ class _HomeScreenState extends State<HomeScreen> {
   // BOOKINGS MANAGEMENT DIALOG (QUẢN LÝ ĐƠN ĐẶT SÂN)
   // ==========================================
   void _showBookingsDialog() async {
-    final bookings = await FirestoreService.getBookings();
+    final all = await FirestoreService.getBookings();
 
     if (!mounted) return;
+    // Chủ sân chỉ thấy và duyệt đơn của sân mình; admin thấy tất cả nhưng chỉ duyệt đơn của sân do hệ thống quản lý.
+    final role = AuthService.currentUser?.role ?? '';
+    final uid = AuthService.currentUser?.uid ?? '';
+    final bookings = role == 'owner' ? all.where((b) => BookingApproval.approverId(b, _allVenues) == uid).toList() : all;
 
     showDialog(
       context: context,
@@ -4050,13 +4055,14 @@ class _HomeScreenState extends State<HomeScreen> {
                                           ),
                                         ),
                                         const SizedBox(height: 6),
-                                        if (!isConfirmed && !isCancelled)
+                                        if (!isConfirmed && !isCancelled && BookingApproval.canApprove(role: role, uid: uid, b: item, venues: _allVenues))
                                           Row(
                                             mainAxisSize: MainAxisSize.min,
                                             children: [
                                               InkWell(
                                                 onTap: () async {
-                                                  await FirestoreService.confirmBooking(item.id);
+                                                  final ok = await FirestoreService.confirmBooking(item.id);
+                                                  if (!ok) return;
                                                   setDialogState(() {
                                                     item.status = 'Đã xác nhận';
                                                   });
@@ -4066,7 +4072,8 @@ class _HomeScreenState extends State<HomeScreen> {
                                               const SizedBox(width: 8),
                                               InkWell(
                                                 onTap: () async {
-                                                  await FirestoreService.updateBookingStatus(item.id, 'Đã hủy');
+                                                  final ok = await FirestoreService.updateBookingStatus(item.id, 'Đã hủy');
+                                                  if (!ok) return;
                                                   setDialogState(() {
                                                     item.status = 'Đã hủy';
                                                   });
@@ -4074,6 +4081,11 @@ class _HomeScreenState extends State<HomeScreen> {
                                                 child: const Text('Hủy', style: TextStyle(color: Color(0xFFEF4444), fontSize: 11)),
                                               ),
                                             ],
+                                          )
+                                        else if (!isConfirmed && !isCancelled)
+                                          Text(
+                                            BookingApproval.viewOnlyLabel(item, _allVenues),
+                                            style: const TextStyle(color: Color(0xFF64748B), fontSize: 10.5),
                                           ),
                                       ],
                                     ),
