@@ -24,7 +24,7 @@ extension _AdminBookingsTab on _AdminScreenState {
                   decoration: BoxDecoration(
                     color: AdminUi.surface,
                     borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: AdminUi.info.withOpacity(0.25)),
+                    border: Border.all(color: AdminUi.info.withValues(alpha: 0.25)),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -32,7 +32,7 @@ extension _AdminBookingsTab on _AdminScreenState {
                       const Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Flexible(child: Text('Tổng Đơn Đặt', style: const TextStyle(color: AdminUi.muted, fontSize: 12), maxLines: 1, overflow: TextOverflow.ellipsis)),
+                          Flexible(child: Text('Tổng Đơn Đặt', style: TextStyle(color: AdminUi.muted, fontSize: 12), maxLines: 1, overflow: TextOverflow.ellipsis)),
                           Icon(Icons.calendar_month_outlined, color: AdminUi.info, size: 18),
                         ],
                       ),
@@ -51,7 +51,7 @@ extension _AdminBookingsTab on _AdminScreenState {
                   decoration: BoxDecoration(
                     color: AdminUi.surface,
                     borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: AdminUi.warn.withOpacity(0.25)),
+                    border: Border.all(color: AdminUi.warn.withValues(alpha: 0.25)),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -59,7 +59,7 @@ extension _AdminBookingsTab on _AdminScreenState {
                       const Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Flexible(child: Text('Chờ Xác Nhận', style: const TextStyle(color: AdminUi.muted, fontSize: 12), maxLines: 1, overflow: TextOverflow.ellipsis)),
+                          Flexible(child: Text('Chờ Xác Nhận', style: TextStyle(color: AdminUi.muted, fontSize: 12), maxLines: 1, overflow: TextOverflow.ellipsis)),
                           Icon(Icons.hourglass_top_rounded, color: AdminUi.warn, size: 18),
                         ],
                       ),
@@ -78,7 +78,7 @@ extension _AdminBookingsTab on _AdminScreenState {
                   decoration: BoxDecoration(
                     color: AdminUi.surface,
                     borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: AdminUi.success.withOpacity(0.25)),
+                    border: Border.all(color: AdminUi.success.withValues(alpha: 0.25)),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -86,7 +86,7 @@ extension _AdminBookingsTab on _AdminScreenState {
                       const Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Flexible(child: Text('Đã Xác Nhận / Đang Đá', style: const TextStyle(color: AdminUi.muted, fontSize: 12), maxLines: 1, overflow: TextOverflow.ellipsis)),
+                          Flexible(child: Text('Đã Xác Nhận / Đang Đá', style: TextStyle(color: AdminUi.muted, fontSize: 12), maxLines: 1, overflow: TextOverflow.ellipsis)),
                           Icon(Icons.check_circle_outline, color: AdminUi.success, size: 18),
                         ],
                       ),
@@ -105,7 +105,7 @@ extension _AdminBookingsTab on _AdminScreenState {
                   decoration: BoxDecoration(
                     color: AdminUi.surface,
                     borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: AdminUi.violet.withOpacity(0.25)),
+                    border: Border.all(color: AdminUi.violet.withValues(alpha: 0.25)),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -113,7 +113,7 @@ extension _AdminBookingsTab on _AdminScreenState {
                       const Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Flexible(child: Text('Đã Hoàn Thành', style: const TextStyle(color: AdminUi.muted, fontSize: 12), maxLines: 1, overflow: TextOverflow.ellipsis)),
+                          Flexible(child: Text('Đã Hoàn Thành', style: TextStyle(color: AdminUi.muted, fontSize: 12), maxLines: 1, overflow: TextOverflow.ellipsis)),
                           Icon(Icons.task_alt, color: AdminUi.violet, size: 18),
                         ],
                       ),
@@ -135,7 +135,7 @@ extension _AdminBookingsTab on _AdminScreenState {
             decoration: BoxDecoration(
               color: AdminUi.surface,
               borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: AdminUi.border.withOpacity(0.5)),
+              border: Border.all(color: AdminUi.border.withValues(alpha: 0.5)),
             ),
             child: Column(
               children: [
@@ -147,7 +147,7 @@ extension _AdminBookingsTab on _AdminScreenState {
                         decoration: BoxDecoration(
                           color: AdminUi.bg,
                           borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: AdminUi.border.withOpacity(0.5)),
+                          border: Border.all(color: AdminUi.border.withValues(alpha: 0.5)),
                         ),
                         child: Row(
                           children: [
@@ -227,7 +227,7 @@ extension _AdminBookingsTab on _AdminScreenState {
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
               itemCount: _filteredBookings.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 10),
+              separatorBuilder: (_, _) => const SizedBox(height: 10),
               itemBuilder: (ctx, i) => _buildBookingItemCard(_filteredBookings[i]),
             ),
         ],
@@ -253,7 +253,7 @@ extension _AdminBookingsTab on _AdminScreenState {
       decoration: BoxDecoration(
         color: AdminUi.surface,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AdminUi.border.withOpacity(0.5)),
+        border: Border.all(color: AdminUi.border.withValues(alpha: 0.5)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -272,9 +272,9 @@ extension _AdminBookingsTab on _AdminScreenState {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                     decoration: BoxDecoration(
-                      color: statusColor.withOpacity(0.15),
+                      color: statusColor.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(6),
-                      border: Border.all(color: statusColor.withOpacity(0.4)),
+                      border: Border.all(color: statusColor.withValues(alpha: 0.4)),
                     ),
                     child: Text(
                       b.status,
@@ -499,6 +499,7 @@ extension _AdminBookingsTab on _AdminScreenState {
                 status: 'Đã xác nhận', // quản trị viên chỉ tạo đơn này sau khi đã nhận chuyển khoản
                 paid: true,
               );
+              if (!mounted || !ctx.mounted) return;
               setState(() => _bookings.insert(0, newBooking));
               Navigator.pop(ctx);
               _showToast('Đã tạo đơn đặt sân tại quầy $bookingId thành công!');

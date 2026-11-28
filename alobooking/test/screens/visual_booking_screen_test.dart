@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -158,10 +157,9 @@ void main() {
     expect(find.text('Cầu lông 12'), findsOneWidget);
   });
 
-  testWidgets('Ghi chú hủy lịch khớp chức năng: chỉ cách hủy, không còn nói là không hủy được', (tester) async {
+  testWidgets('Ghi chú hủy lịch khớp chức năng: ứng dụng không cho khách tự hủy', (tester) async {
     await _openBooking(tester, _venue());
-    expect(find.textContaining('Hủy lịch trước giờ chơi ít nhất 2 tiếng'), findsOneWidget);
-    expect(find.textContaining('KHÔNG hỗ trợ'), findsNothing);
+    expect(find.textContaining('không hỗ trợ hủy trên ứng dụng'), findsOneWidget);
   });
 
   testWidgets('Xác nhận đặt sân chỉ có chuyển khoản, không có tiền mặt', (tester) async {

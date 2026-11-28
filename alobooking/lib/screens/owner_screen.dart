@@ -293,12 +293,12 @@ class _OwnerScreenState extends State<OwnerScreen> with SingleTickerProviderStat
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 colors: [
-                  const Color(0xFF0284C7).withOpacity(0.2),
+                  const Color(0xFF0284C7).withValues(alpha: 0.2),
                   const Color(0xFF1E293B),
                 ],
               ),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFF0284C7).withOpacity(0.4)),
+              border: Border.all(color: const Color(0xFF0284C7).withValues(alpha: 0.4)),
             ),
             child: const Row(
               children: [
@@ -462,7 +462,7 @@ class _OwnerScreenState extends State<OwnerScreen> with SingleTickerProviderStat
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
               itemCount: filtered.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 12),
+              separatorBuilder: (_, _) => const SizedBox(height: 12),
               itemBuilder: (ctx, i) {
                 final v = filtered[i];
                 return _buildOwnerVenueCard(v);
@@ -474,18 +474,18 @@ class _OwnerScreenState extends State<OwnerScreen> with SingleTickerProviderStat
   }
 
   Widget _buildOwnerVenueCard(Venue v) {
-    Color statusBg = const Color(0xFF10B981).withOpacity(0.15);
+    Color statusBg = const Color(0xFF10B981).withValues(alpha: 0.15);
     Color statusColor = const Color(0xFF10B981);
     String statusText = '🟢 Đã duyệt • Công khai';
     IconData statusIcon = Icons.check_circle;
 
     if (v.isPending) {
-      statusBg = const Color(0xFFFBBF24).withOpacity(0.15);
+      statusBg = const Color(0xFFFBBF24).withValues(alpha: 0.15);
       statusColor = const Color(0xFFFBBF24);
       statusText = '🟡 Chờ Admin duyệt';
       statusIcon = Icons.hourglass_top;
     } else if (v.isRejected) {
-      statusBg = const Color(0xFFEF4444).withOpacity(0.15);
+      statusBg = const Color(0xFFEF4444).withValues(alpha: 0.15);
       statusColor = const Color(0xFFEF4444);
       statusText = '🔴 Bị từ chối duyệt';
       statusIcon = Icons.cancel;
@@ -497,7 +497,7 @@ class _OwnerScreenState extends State<OwnerScreen> with SingleTickerProviderStat
         color: const Color(0xFF1E293B),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: v.isPending ? const Color(0xFFFBBF24).withOpacity(0.5) : const Color(0xFF334155),
+          color: v.isPending ? const Color(0xFFFBBF24).withValues(alpha: 0.5) : const Color(0xFF334155),
         ),
       ),
       child: Column(
@@ -538,7 +538,7 @@ class _OwnerScreenState extends State<OwnerScreen> with SingleTickerProviderStat
                           decoration: BoxDecoration(
                             color: statusBg,
                             borderRadius: BorderRadius.circular(6),
-                            border: Border.all(color: statusColor.withOpacity(0.5)),
+                            border: Border.all(color: statusColor.withValues(alpha: 0.5)),
                           ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
@@ -577,9 +577,9 @@ class _OwnerScreenState extends State<OwnerScreen> with SingleTickerProviderStat
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: const Color(0xFFEF4444).withOpacity(0.1),
+                color: const Color(0xFFEF4444).withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(6),
-                border: Border.all(color: const Color(0xFFEF4444).withOpacity(0.3)),
+                border: Border.all(color: const Color(0xFFEF4444).withValues(alpha: 0.3)),
               ),
               child: Row(
                 children: [
@@ -870,7 +870,7 @@ class _OwnerScreenState extends State<OwnerScreen> with SingleTickerProviderStat
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
               itemCount: filtered.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 10),
+              separatorBuilder: (_, _) => const SizedBox(height: 10),
               itemBuilder: (ctx, i) {
                 final b = filtered[i];
                 Color statusColor = const Color(0xFF10B981);
@@ -1055,7 +1055,7 @@ class _OwnerScreenState extends State<OwnerScreen> with SingleTickerProviderStat
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             itemCount: filtered.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 10),
+            separatorBuilder: (_, _) => const SizedBox(height: 10),
             itemBuilder: (ctx, i) {
               final c = filtered[i];
               return Container(
@@ -1106,7 +1106,7 @@ class _OwnerScreenState extends State<OwnerScreen> with SingleTickerProviderStat
       decoration: BoxDecoration(
         color: const Color(0xFF1E293B),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.3)),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1194,9 +1194,9 @@ class _OwnerScreenState extends State<OwnerScreen> with SingleTickerProviderStat
                         padding: const EdgeInsets.all(10),
                         margin: const EdgeInsets.only(bottom: 12),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFFBBF24).withOpacity(0.12),
+                          color: const Color(0xFFFBBF24).withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: const Color(0xFFFBBF24).withOpacity(0.4)),
+                          border: Border.all(color: const Color(0xFFFBBF24).withValues(alpha: 0.4)),
                         ),
                         child: const Row(
                           children: [
@@ -1310,7 +1310,7 @@ class _OwnerScreenState extends State<OwnerScreen> with SingleTickerProviderStat
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                             decoration: BoxDecoration(
-                              color: const Color(0xFF0284C7).withOpacity(0.2),
+                              color: const Color(0xFF0284C7).withValues(alpha: 0.2),
                               borderRadius: BorderRadius.circular(10),
                             ),
                             child: const Text('✓ Đã tải từ máy', style: TextStyle(color: Color(0xFF38BDF8), fontSize: 10.5, fontWeight: FontWeight.bold)),
@@ -1335,7 +1335,7 @@ class _OwnerScreenState extends State<OwnerScreen> with SingleTickerProviderStat
                             Container(
                               height: 120,
                               width: double.infinity,
-                              color: Colors.black.withOpacity(0.55),
+                              color: Colors.black.withValues(alpha: 0.55),
                               alignment: Alignment.center,
                               child: const Column(
                                 mainAxisSize: MainAxisSize.min,
@@ -1438,7 +1438,7 @@ class _OwnerScreenState extends State<OwnerScreen> with SingleTickerProviderStat
                                 fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                               )),
                               onPressed: () => setDialogState(() => imageCtrl.text = url),
-                              backgroundColor: isSelected ? const Color(0xFF0284C7).withOpacity(0.3) : const Color(0xFF0F172A),
+                              backgroundColor: isSelected ? const Color(0xFF0284C7).withValues(alpha: 0.3) : const Color(0xFF0F172A),
                             ),
                           );
                         }),
@@ -1509,6 +1509,7 @@ class _OwnerScreenState extends State<OwnerScreen> with SingleTickerProviderStat
                     setState(() => _allVenues.insert(0, newVenue));
                     _showToast('Đăng ký sân thành công! Hồ sơ đang chờ Super Admin phê duyệt.');
                   }
+                  if (!ctx.mounted) return;
                   Navigator.pop(ctx);
                 },
                 style: ElevatedButton.styleFrom(
@@ -1540,6 +1541,7 @@ class _OwnerScreenState extends State<OwnerScreen> with SingleTickerProviderStat
           ElevatedButton(
             onPressed: () async {
               await FirestoreService.deleteVenue(v.id);
+              if (!mounted || !ctx.mounted) return;
               setState(() => _allVenues.removeWhere((item) => item.id == v.id));
               Navigator.pop(ctx);
               _showToast('Đã xóa sân ${v.name}!', isError: true);

@@ -246,8 +246,9 @@ class _ExploreScreenState extends State<ExploreScreen> {
 
   List<Widget> _items() {
     // Lần tải đầu chưa có tin: banner và khung xương thay cho vòng quay trống trơn.
-    if (_loading && _entries.isEmpty)
+    if (_loading && _entries.isEmpty) {
       return [_narrow(_hero()), _narrow(_skeleton())];
+    }
 
     final out = <Widget>[
       _narrow(_hero()),

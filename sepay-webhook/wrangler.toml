@@ -1,0 +1,7 @@
+name = "alobooking-sepay"
+main = "src/worker.js"
+compatibility_date = "2026-11-01"
+
+[vars]
+# Mã dự án Firebase (công khai). Số tài khoản và khóa SePay đặt bằng `wrangler secret put`, không ghi ở đây.
+FIRESTORE_PROJECT = "alobooking-b2484"

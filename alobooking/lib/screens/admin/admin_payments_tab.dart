@@ -89,7 +89,7 @@ extension _AdminPaymentsTab on _AdminScreenState {
             decoration: BoxDecoration(
               color: AdminUi.surface,
               borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: AdminUi.border.withOpacity(0.5)),
+              border: Border.all(color: AdminUi.border.withValues(alpha: 0.5)),
             ),
             child: Column(
               children: [
@@ -181,24 +181,30 @@ extension _AdminPaymentsTab on _AdminScreenState {
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
               itemCount: filtered.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 10),
+              separatorBuilder: (_, _) => const SizedBox(height: 10),
               itemBuilder: (ctx, i) {
                 final p = filtered[i];
 
                 Color statusColor = AdminUi.success; // Success
-                if (p.status == 'Đang xử lý') statusColor = AdminUi.warn;
-                else if (p.status == 'Đã hoàn tiền') statusColor = AdminUi.danger;
+                if (p.status == 'Đang xử lý') {
+                  statusColor = AdminUi.warn;
+                } else if (p.status == 'Đã hoàn tiền') {
+                  statusColor = AdminUi.danger;
+                }
 
                 IconData methodIcon = Icons.qr_code;
-                if (p.method.contains('MoMo')) methodIcon = Icons.account_balance_wallet_outlined;
-                else if (p.method.contains('Tiền mặt')) methodIcon = Icons.payments_outlined;
+                if (p.method.contains('MoMo')) {
+                  methodIcon = Icons.account_balance_wallet_outlined;
+                } else if (p.method.contains('Tiền mặt')) {
+                  methodIcon = Icons.payments_outlined;
+                }
 
                 return Container(
                   padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
                     color: AdminUi.surface,
                     borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: AdminUi.border.withOpacity(0.5)),
+                    border: Border.all(color: AdminUi.border.withValues(alpha: 0.5)),
                   ),
                   child: Row(
                     children: [
@@ -263,9 +269,9 @@ extension _AdminPaymentsTab on _AdminScreenState {
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                             decoration: BoxDecoration(
-                              color: statusColor.withOpacity(0.15),
+                              color: statusColor.withValues(alpha: 0.15),
                               borderRadius: BorderRadius.circular(6),
-                              border: Border.all(color: statusColor.withOpacity(0.5)),
+                              border: Border.all(color: statusColor.withValues(alpha: 0.5)),
                             ),
                             child: Text(
                               p.status,
@@ -363,12 +369,12 @@ extension _AdminPaymentsTab on _AdminScreenState {
             border: Border.all(
               color: selected
                   ? AdminUi.accent
-                  : AdminUi.border.withOpacity(0.6),
+                  : AdminUi.border.withValues(alpha: 0.6),
             ),
             boxShadow: selected
                 ? [
                     BoxShadow(
-                      color: AdminUi.accent.withOpacity(0.35),
+                      color: AdminUi.accent.withValues(alpha: 0.35),
                       blurRadius: 8,
                       offset: const Offset(0, 2),
                     ),

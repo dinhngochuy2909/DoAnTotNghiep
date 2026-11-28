@@ -154,7 +154,7 @@ extension _HomeAdminSidebar on _HomeScreenState {
               children: [
                 CircleAvatar(
                   radius: 17,
-                  backgroundColor: const Color(0xFF0EA5E9).withOpacity(0.2),
+                  backgroundColor: const Color(0xFF0EA5E9).withValues(alpha: 0.2),
                   child: const Text(
                     'AD',
                     style: TextStyle(color: Color(0xFF0EA5E9), fontWeight: FontWeight.bold, fontSize: 12),
@@ -217,7 +217,7 @@ extension _HomeAdminSidebar on _HomeScreenState {
                 borderRadius: BorderRadius.circular(10),
                 boxShadow: [
                   BoxShadow(
-                    color: const Color(0xFF0EA5E9).withOpacity(0.35),
+                    color: const Color(0xFF0EA5E9).withValues(alpha: 0.35),
                     blurRadius: 10,
                     offset: const Offset(0, 3),
                   ),
@@ -406,7 +406,7 @@ extension _HomeAdminSidebar on _HomeScreenState {
                     decoration: BoxDecoration(
                       color: const Color(0xFF1E293B),
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: const Color(0xFF0EA5E9).withOpacity(0.5)),
+                      border: Border.all(color: const Color(0xFF0EA5E9).withValues(alpha: 0.5)),
                     ),
                     alignment: Alignment.center,
                     child: const Row(
@@ -525,7 +525,7 @@ extension _HomeAdminSidebar on _HomeScreenState {
               : ListView.separated(
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
                   itemCount: filteredSidebarVenues.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 6),
+                  separatorBuilder: (_, _) => const SizedBox(height: 6),
                   itemBuilder: (ctx, idx) {
                     final venue = filteredSidebarVenues[idx];
                     return Container(
@@ -692,7 +692,7 @@ extension _HomeAdminSidebar on _HomeScreenState {
         decoration: BoxDecoration(
           color: const Color(0xFF1E293B),
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: color.withOpacity(0.3)),
+          border: Border.all(color: color.withValues(alpha: 0.3)),
         ),
         child: Column(
           children: [

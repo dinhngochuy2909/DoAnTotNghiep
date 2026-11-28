@@ -1,6 +1,7 @@
 // ignore: avoid_web_libraries_in_flutter
 import 'dart:async';
-// ignore: avoid_web_libraries_in_flutter
+// TODO: chuyển sang package:web + dart:js_interop (dart:html đã bị đánh dấu lỗi thời)
+// ignore: avoid_web_libraries_in_flutter, deprecated_member_use
 import 'dart:html' as html;
 
 /// Chọn ảnh từ máy tính / thiết bị trên Web và nén tối ưu (kích thước tối đa 800px, JPEG 82%)

@@ -48,10 +48,12 @@ class VenueCard extends StatelessWidget {
 
   /// Nguồn gốc của sân, nói thật cho người xem: sân do chủ sân/admin nhập và đã duyệt mới được ghi "Đã xác thực".
   static (IconData, String, Color) provenance(Venue v) {
-    if (v.isDemo)
+    if (v.isDemo) {
       return (Icons.science_outlined, 'Sân minh họa', const Color(0xFFB45309));
-    if (v.isImportedListing)
+    }
+    if (v.isImportedListing) {
       return (Icons.public_rounded, 'Dữ liệu mở', AppColors.muted);
+    }
     return (Icons.verified_rounded, 'Đã xác thực', AppColors.primary);
   }
 

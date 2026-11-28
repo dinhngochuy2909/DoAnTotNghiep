@@ -85,14 +85,14 @@ class FeaturedScreen extends StatelessWidget {
           boxShadow: [
             BoxShadow(
               color: rank <= 3
-                  ? rankColor.withOpacity(0.15)
-                  : Colors.black.withOpacity(0.04),
+                  ? rankColor.withValues(alpha: 0.15)
+                  : Colors.black.withValues(alpha: 0.04),
               blurRadius: 8,
               offset: const Offset(0, 2),
             ),
           ],
           border: rank <= 3
-              ? Border.all(color: rankColor.withOpacity(0.4), width: 1.5)
+              ? Border.all(color: rankColor.withValues(alpha: 0.4), width: 1.5)
               : null,
         ),
         child: Row(

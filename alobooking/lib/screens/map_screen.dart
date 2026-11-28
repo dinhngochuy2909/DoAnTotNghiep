@@ -159,7 +159,7 @@ class _MapScreenState extends State<MapScreen> {
                   : 'OpenStreetMap • ${widget.venues.length} điểm sân sẵn sàng',
               style: TextStyle(
                 fontSize: 11,
-                color: Colors.white.withOpacity(0.85),
+                color: Colors.white.withValues(alpha: 0.85),
                 fontWeight: FontWeight.w400,
               ),
             ),
@@ -172,7 +172,7 @@ class _MapScreenState extends State<MapScreen> {
             icon: Container(
               padding: const EdgeInsets.all(6),
               decoration: BoxDecoration(
-                color: _userLat != null ? const Color(0xFF22C55E) : Colors.white.withOpacity(0.2),
+                color: _userLat != null ? const Color(0xFF22C55E) : Colors.white.withValues(alpha: 0.2),
                 shape: BoxShape.circle,
               ),
               child: const Icon(Icons.my_location_rounded, size: 18, color: Colors.white),
@@ -338,7 +338,7 @@ class _MapScreenState extends State<MapScreen> {
               borderRadius: BorderRadius.circular(14),
               boxShadow: [
                 BoxShadow(
-                  color: const Color(0xFF0284C7).withOpacity(0.25),
+                  color: const Color(0xFF0284C7).withValues(alpha: 0.25),
                   blurRadius: 8,
                   offset: const Offset(0, 3),
                 ),
@@ -349,7 +349,7 @@ class _MapScreenState extends State<MapScreen> {
                 Container(
                   padding: const EdgeInsets.all(6),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
+                    color: Colors.white.withValues(alpha: 0.2),
                     shape: BoxShape.circle,
                   ),
                   child: const Icon(Icons.my_location_rounded, size: 16, color: Colors.white),
@@ -370,7 +370,7 @@ class _MapScreenState extends State<MapScreen> {
                       Text(
                         'Tọa độ: ${_userLat!.toStringAsFixed(4)}, ${_userLng!.toStringAsFixed(4)} • Sắp xếp gần nhất',
                         style: TextStyle(
-                          color: Colors.white.withOpacity(0.85),
+                          color: Colors.white.withValues(alpha: 0.85),
                           fontSize: 11,
                         ),
                       ),
@@ -445,7 +445,7 @@ class _MapScreenState extends State<MapScreen> {
         ),
         boxShadow: [
           BoxShadow(
-            color: isSelected ? const Color(0xFF0284C7).withOpacity(0.12) : Colors.black.withOpacity(0.04),
+            color: isSelected ? const Color(0xFF0284C7).withValues(alpha: 0.12) : Colors.black.withValues(alpha: 0.04),
             blurRadius: 10,
             offset: const Offset(0, 3),
           ),
@@ -484,7 +484,7 @@ class _MapScreenState extends State<MapScreen> {
                             borderRadius: BorderRadius.circular(5),
                             boxShadow: [
                               BoxShadow(
-                                color: Colors.black.withOpacity(0.2),
+                                color: Colors.black.withValues(alpha: 0.2),
                                 blurRadius: 4,
                                 offset: const Offset(0, 1),
                               ),

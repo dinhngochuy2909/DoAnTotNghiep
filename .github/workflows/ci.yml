@@ -28,7 +28,18 @@ jobs:
         run: flutter pub get
 
       - name: Phân tích mã
-        run: dart analyze
+        run: dart analyze --fatal-infos
 
       - name: Kiểm thử tự động
         run: flutter test
+
+      - name: Kiểm thử tích hợp Gemini (chỉ khi kho có secret GEMINI_API_KEY)
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          if (-not $env:GEMINI_API_KEY) { Write-Output "Chưa khai báo secret GEMINI_API_KEY: bỏ qua"; exit 0 }
+          flutter test test/integration/gemini_live_test.dart --dart-define=GEMINI_API_KEY=$env:GEMINI_API_KEY
+
+      - name: Kiểm thử máy nhận webhook SePay
+        working-directory: sepay-webhook
+        run: node --test test/worker.test.mjs

@@ -280,8 +280,7 @@ Chủ sân: ${v.ownerName}''',
           category: 'policy',
           title: 'Chính sách hủy sân, dời lịch, hoàn cọc',
           keywords: ['huy san', 'doi lich', 'hoan tien', 'hoan coc', 'bao luu', 'mua bao'],
-          content: '''- Khách tự hủy được trên ứng dụng khi còn cách giờ chơi từ 2 tiếng trở lên (đơn đang chờ xác nhận hoặc đã xác nhận): vào mục "Sân đã đặt" rồi bấm "Hủy đặt sân", đơn chuyển sang "Đã hủy".
-- Còn dưới 2 tiếng tới giờ chơi thì không hủy được nữa.
+          content: '''- Lịch đã đặt không tự hủy được trên ứng dụng. Nếu có sự cố, liên hệ chủ sân hoặc Hotline 0364059999.
 - Nếu đã chuyển khoản, việc hoàn tiền (nếu có) do chủ sân xử lý theo chính sách của sân.
 - Muốn dời lịch hoặc đổi khung giờ: liên hệ chủ sân hoặc Hotline 0364059999.''',
         ),
@@ -300,7 +299,7 @@ Chủ sân: ${v.ownerName}''',
           title: 'Thanh toán',
           keywords: ['thanh toan', 'vietqr', 'chuyen khoan', 'tien mat', 'dat coc', 'qr'],
           content: '''- Chỉ thanh toán bằng chuyển khoản ngân hàng quét mã VietQR (không nhận tiền mặt).
-- Sau khi bấm xác nhận, ứng dụng hiện mã QR đúng số tiền kèm nội dung chuyển khoản là mã đơn; đơn chuyển sang "Đã xác nhận" khi chủ sân nhận được tiền (chủ sân tự xác nhận đơn của sân mình; với sân do AloBooking quản lý thì ban quản lý AloBooking xác nhận).
+- Sau khi bấm xác nhận, ứng dụng hiện mã QR đúng số tiền kèm nội dung chuyển khoản là mã đơn; đơn tự chuyển sang "Đã xác nhận" khi tiền về đúng số tiền và nội dung; nếu chưa tự chuyển thì chủ sân (hoặc ban quản lý AloBooking) kiểm tra rồi xác nhận.
 - Số tiền chuyển khoản là toàn bộ tiền các ca đã chọn (ứng dụng không có hình thức đặt cọc một phần).''',
         ),
         RagKnowledgeChunk(

@@ -149,9 +149,9 @@ extension _HomeAdminDialogs on _HomeScreenState {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.08),
+        color: color.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withOpacity(0.2)),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
       ),
       child: Column(
         children: [
@@ -243,7 +243,7 @@ extension _HomeAdminDialogs on _HomeScreenState {
                           )
                         : ListView.separated(
                             itemCount: bookings.length,
-                            separatorBuilder: (_, __) => const SizedBox(height: 10),
+                            separatorBuilder: (_, _) => const SizedBox(height: 10),
                             itemBuilder: (bCtx, idx) {
                               final item = bookings[idx];
                               final isConfirmed = item.status == 'Đã xác nhận';
@@ -261,10 +261,10 @@ extension _HomeAdminDialogs on _HomeScreenState {
                                     CircleAvatar(
                                       radius: 20,
                                       backgroundColor: isConfirmed
-                                          ? const Color(0xFF10B981).withOpacity(0.15)
+                                          ? const Color(0xFF10B981).withValues(alpha: 0.15)
                                           : (isCancelled
-                                              ? const Color(0xFFEF4444).withOpacity(0.15)
-                                              : const Color(0xFFF59E0B).withOpacity(0.15)),
+                                              ? const Color(0xFFEF4444).withValues(alpha: 0.15)
+                                              : const Color(0xFFF59E0B).withValues(alpha: 0.15)),
                                       child: Icon(
                                         isConfirmed
                                             ? Icons.check
@@ -307,10 +307,10 @@ extension _HomeAdminDialogs on _HomeScreenState {
                                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                                           decoration: BoxDecoration(
                                             color: isConfirmed
-                                                ? const Color(0xFF10B981).withOpacity(0.15)
+                                                ? const Color(0xFF10B981).withValues(alpha: 0.15)
                                                 : (isCancelled
-                                                    ? const Color(0xFFEF4444).withOpacity(0.15)
-                                                    : const Color(0xFFF59E0B).withOpacity(0.15)),
+                                                    ? const Color(0xFFEF4444).withValues(alpha: 0.15)
+                                                    : const Color(0xFFF59E0B).withValues(alpha: 0.15)),
                                             borderRadius: BorderRadius.circular(6),
                                           ),
                                           child: Text(

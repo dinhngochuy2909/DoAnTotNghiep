@@ -5,8 +5,8 @@ import '../models/venue.dart';
 import '../services/auth_service.dart';
 import '../services/firestore_service.dart';
 import '../services/booking_slots.dart';
-import '../services/cancel_policy.dart';
 import '../services/payment_config.dart';
+import '../widgets/payment_status_panel.dart';
 import '../widgets/booking_bottom_sheet.dart';
 import 'booked_screen.dart';
 import 'home_screen.dart';
@@ -357,11 +357,6 @@ class _VisualBookingScreenState extends State<VisualBookingScreen> {
     final totalHours = parsedSlots.length;
     final totalPrice = _totalPrice(parsedSlots.map((s) => s['hour'] as int));
     final dateStr = _formatDateKey(_selectedDate);
-    // Ca sớm nhất cách hiện tại dưới 2 tiếng thì đặt xong sẽ không tự hủy được: phải báo trước khi khách trả tiền
-    final firstHour = parsedSlots.map((s) => s['hour'] as int).reduce((a, b) => a < b ? a : b);
-    final cancellable = CancelPolicy.canCustomerCancel(
-        DateTime(_selectedDate.year, _selectedDate.month, _selectedDate.day, firstHour), DateTime.now());
-
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -522,23 +517,11 @@ class _VisualBookingScreenState extends State<VisualBookingScreen> {
                         child: Text(
                           'Chuyển khoản ngân hàng bằng mã VietQR, không nhận tiền mặt. '
                           'Sau khi xác nhận, bạn sẽ nhận mã QR kèm nội dung chuyển khoản; '
-                          'đơn được xác nhận khi chủ sân nhận được tiền.',
+                          'đơn được xác nhận khi nhận được tiền.',
                           style: TextStyle(fontSize: 12.5, height: 1.4, color: Color(0xFFBAE6FD)),
                         ),
                       ),
                     ],
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  cancellable
-                      ? CancelPolicy.ruleText
-                      : 'Lưu ý: ca này bắt đầu trong chưa đầy ${CancelPolicy.minNoticeHours} tiếng nên đặt xong sẽ không hủy được.',
-                  key: const ValueKey('cancel-notice'),
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: cancellable ? _Vb.textDim : const Color(0xFFFB923C),
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -588,12 +571,15 @@ class _VisualBookingScreenState extends State<VisualBookingScreen> {
                             }
                             // Các đơn của cùng một lần thanh toán dùng chung một mã để khách chuyển khoản một lần
                             final baseCode = 'BK-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
+                            final bookingIds = [
+                              for (var i = 1; i <= byCourt.length; i++) byCourt.length == 1 ? baseCode : '$baseCode-$i',
+                            ];
                             var allSaved = true;
                             var seq = 0;
                             for (final e in byCourt.entries) {
                               seq++;
                               final ok = await FirestoreService.createBooking(
-                                id: byCourt.length == 1 ? baseCode : '$baseCode-$seq',
+                                id: bookingIds[seq - 1],
                                 customer: nameCtrl.text.trim(),
                                 phone: phoneCtrl.text.trim(),
                                 venueName: widget.venue.name,
@@ -628,6 +614,7 @@ class _VisualBookingScreenState extends State<VisualBookingScreen> {
                             if (mounted) {
                               _showPaymentDialog(
                                 code: baseCode,
+                                bookingIds: bookingIds,
                                 courtSummary: courtSummary,
                                 timeSummary: timeSummary,
                                 dateStr: dateStr,
@@ -687,6 +674,7 @@ class _VisualBookingScreenState extends State<VisualBookingScreen> {
   /// Sau khi giữ chỗ: hướng dẫn chuyển khoản (mã QR VietQR dựng sẵn đúng số tiền và nội dung).
   void _showPaymentDialog({
     required String code,
+    required List<String> bookingIds,
     required String courtSummary,
     required String timeSummary,
     required String dateStr,
@@ -694,12 +682,21 @@ class _VisualBookingScreenState extends State<VisualBookingScreen> {
   }) {
     final content = PaymentConfig.transferContent(code);
     final payload = PaymentConfig.qrPayload(amount: totalPrice, content: content);
+    var paid = false;
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (ctx) => Theme(
         data: _vbTheme(ctx),
-        child: AlertDialog(
+        child: StatefulBuilder(builder: (ctx, setDialog) {
+        if (paid) {
+          return AlertDialog(
+            backgroundColor: _Vb.surface2,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            content: SizedBox(width: 340, child: PaymentSuccessView(code: code, amount: _formatCurrency(totalPrice))),
+          );
+        }
+        return AlertDialog(
         backgroundColor: _Vb.surface2,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: const Column(
@@ -722,7 +719,7 @@ class _VisualBookingScreenState extends State<VisualBookingScreen> {
               children: [
                 Text(
                   'Đơn $code đã được ghi nhận ở trạng thái "Chờ xác nhận". '
-                  'Hãy chuyển khoản đúng số tiền và nội dung dưới đây; ban quản lý sẽ xác nhận khi nhận được tiền.',
+                  'Hãy chuyển khoản đúng số tiền và nội dung dưới đây; khi nhận được tiền, đơn được xác nhận.',
                   style: const TextStyle(fontSize: 12.5, height: 1.4),
                 ),
                 const SizedBox(height: 12),
@@ -754,6 +751,23 @@ class _VisualBookingScreenState extends State<VisualBookingScreen> {
                   ),
                 const SizedBox(height: 10),
                 if (payload != null) ...[
+                  PaymentStatusPanel(
+                    bookingIds: bookingIds,
+                    fetch: FirestoreService.getBookingStatuses,
+                    onPaid: () {
+                      setDialog(() => paid = true);
+                      // Giữ dấu tích một lát rồi tự chuyển sang lịch đã đặt
+                      Future.delayed(const Duration(seconds: 3), () {
+                        if (!mounted || !ctx.mounted) return;
+                        Navigator.pop(ctx);
+                        Navigator.pushReplacement(
+                          context,
+                          MaterialPageRoute(builder: (_) => BookedScreen(allVenues: [widget.venue])),
+                        );
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 10),
                   _copyRow(ctx, 'Ngân hàng', PaymentConfig.bankName.isEmpty ? 'BIN ${PaymentConfig.bankBin}' : PaymentConfig.bankName),
                   _copyRow(ctx, 'Số tài khoản', PaymentConfig.accountNo, copyValue: PaymentConfig.accountNo),
                   if (PaymentConfig.accountName.isNotEmpty) _copyRow(ctx, 'Chủ tài khoản', PaymentConfig.accountName),
@@ -788,10 +802,11 @@ class _VisualBookingScreenState extends State<VisualBookingScreen> {
               _loadExistingBookings();
             },
             style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0369A1)),
-            child: const Text('Tôi đã chuyển khoản', style: TextStyle(color: Colors.white)),
+            child: const Text('Đóng', style: TextStyle(color: Colors.white)),
           ),
         ],
-      ),
+      );
+      }),
       ),
     );
   }
@@ -915,7 +930,7 @@ class _VisualBookingScreenState extends State<VisualBookingScreen> {
                   border: Border.all(color: const Color(0xFFFDE047), width: 1.2),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.15),
+                      color: Colors.black.withValues(alpha: 0.15),
                       blurRadius: 4,
                       offset: const Offset(0, 1),
                     ),
@@ -1037,14 +1052,14 @@ class _VisualBookingScreenState extends State<VisualBookingScreen> {
                     width: 58,
                     margin: const EdgeInsets.only(right: 6),
                     decoration: BoxDecoration(
-                      color: isSelected ? _Vb.accent : Colors.white.withOpacity(0.07),
+                      color: isSelected ? _Vb.accent : Colors.white.withValues(alpha: 0.07),
                       borderRadius: BorderRadius.circular(8),
                       border: Border.all(
                         color: isSelected ? _Vb.accent : _Vb.border,
                         width: 1,
                       ),
                       boxShadow: isSelected
-                          ? [BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 4, offset: const Offset(0, 2))]
+                          ? [BoxShadow(color: Colors.black.withValues(alpha: 0.2), blurRadius: 4, offset: const Offset(0, 2))]
                           : null,
                     ),
                     child: FittedBox(
@@ -1120,7 +1135,7 @@ class _VisualBookingScreenState extends State<VisualBookingScreen> {
         width: 26,
         height: 26,
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.18),
+          color: Colors.white.withValues(alpha: 0.18),
           borderRadius: BorderRadius.circular(6),
         ),
         child: Icon(icon, color: Colors.white, size: 18),
@@ -1222,7 +1237,7 @@ class _VisualBookingScreenState extends State<VisualBookingScreen> {
             ),
             const SizedBox(height: 2),
             const Text(
-              'Hủy lịch trước giờ chơi ít nhất 2 tiếng, tại mục "Sân đã đặt"',
+              'Lịch đã đặt không hỗ trợ hủy trên ứng dụng',
               style: TextStyle(fontSize: 12, color: _Vb.textDim, fontWeight: FontWeight.w500),
               textAlign: TextAlign.center,
             ),

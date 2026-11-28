@@ -127,7 +127,7 @@ class _ChatbotScreenState extends State<ChatbotScreen> with TickerProviderStateM
     final cancelledCount = bookings.where((b) => b.status.contains('Hủy')).length;
 
     for (final b in bookings) {
-      final type = _detectVenueType(b.venueName + ' ' + b.field);
+      final type = _detectVenueType('${b.venueName} ${b.field}');
       venueTypeCount[type] = (venueTypeCount[type] ?? 0) + 1;
     }
     final sortedTypes = venueTypeCount.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
@@ -369,9 +369,9 @@ Bạn cần tìm sân nào?''';
               width: 36,
               height: 36,
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.2),
+                color: Colors.white.withValues(alpha: 0.2),
                 shape: BoxShape.circle,
-                border: Border.all(color: Colors.white.withOpacity(0.4), width: 1.5),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.4), width: 1.5),
               ),
               child: const Center(
                 child: Icon(Icons.smart_toy_rounded, color: Colors.white, size: 20),
@@ -459,9 +459,9 @@ Bạn cần tìm sân nào?''';
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
                   decoration: BoxDecoration(
-                    color: _primaryGreen.withOpacity(0.08),
+                    color: _primaryGreen.withValues(alpha: 0.08),
                     borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: _primaryGreen.withOpacity(0.35), width: 1),
+                    border: Border.all(color: _primaryGreen.withValues(alpha: 0.35), width: 1),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
@@ -530,7 +530,7 @@ Bạn cần tìm sân nào?''';
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.07),
+                        color: Colors.black.withValues(alpha: 0.07),
                         blurRadius: 4,
                         offset: const Offset(0, 2),
                       ),
@@ -594,7 +594,7 @@ Bạn cần tìm sân nào?''';
           scrollDirection: Axis.horizontal,
           physics: const BouncingScrollPhysics(),
           itemCount: venues.length,
-          separatorBuilder: (_, __) => const SizedBox(width: 10),
+          separatorBuilder: (_, _) => const SizedBox(width: 10),
           itemBuilder: (context, index) => _buildVenueCard(venues[index]),
         ),
       ),
@@ -636,7 +636,7 @@ Bạn cần tìm sân nào?''';
         border: Border.all(color: const Color(0xFFE2E8F0)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.06),
+            color: Colors.black.withValues(alpha: 0.06),
             blurRadius: 8,
             offset: const Offset(0, 3),
           ),
@@ -667,9 +667,9 @@ Bạn cần tìm sân nào?''';
                         begin: Alignment.topCenter,
                         end: Alignment.bottomCenter,
                         colors: [
-                          Colors.black.withOpacity(0.35),
+                          Colors.black.withValues(alpha: 0.35),
                           Colors.transparent,
-                          Colors.black.withOpacity(0.4),
+                          Colors.black.withValues(alpha: 0.4),
                         ],
                       ),
                     ),
@@ -681,7 +681,7 @@ Bạn cần tìm sân nào?''';
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
                     decoration: BoxDecoration(
-                      color: sportColor.withOpacity(0.92),
+                      color: sportColor.withValues(alpha: 0.92),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Row(
@@ -707,7 +707,7 @@ Bạn cần tìm sân nào?''';
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                     decoration: BoxDecoration(
-                      color: Colors.black.withOpacity(0.72),
+                      color: Colors.black.withValues(alpha: 0.72),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Row(
@@ -924,7 +924,7 @@ Bạn cần tìm sân nào?''';
               ),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.07),
+                  color: Colors.black.withValues(alpha: 0.07),
                   blurRadius: 4,
                   offset: const Offset(0, 2),
                 ),
@@ -966,7 +966,7 @@ Bạn cần tìm sân nào?''';
           width: 8,
           height: 8,
           decoration: BoxDecoration(
-            color: _primaryGreen.withOpacity(0.4 + value * 0.6),
+            color: _primaryGreen.withValues(alpha: 0.4 + value * 0.6),
             shape: BoxShape.circle,
           ),
         );
@@ -981,7 +981,7 @@ Bạn cần tìm sân nào?''';
         color: Colors.white,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.08),
+            color: Colors.black.withValues(alpha: 0.08),
             blurRadius: 8,
             offset: const Offset(0, -2),
           ),
@@ -1033,7 +1033,7 @@ Bạn cần tìm sân nào?''';
                     ? []
                     : [
                         BoxShadow(
-                          color: _primaryGreen.withOpacity(0.4),
+                          color: _primaryGreen.withValues(alpha: 0.4),
                           blurRadius: 8,
                           offset: const Offset(0, 2),
                         ),

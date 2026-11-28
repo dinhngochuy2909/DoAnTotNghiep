@@ -46,7 +46,7 @@ extension _HomeVenueDialogs on _HomeScreenState {
                       Container(
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
-                          color: isEdit ? const Color(0xFF0284C7).withOpacity(0.12) : const Color(0xFF0EA5E9).withOpacity(0.12),
+                          color: isEdit ? const Color(0xFF0284C7).withValues(alpha: 0.12) : const Color(0xFF0EA5E9).withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Icon(
@@ -138,7 +138,7 @@ extension _HomeVenueDialogs on _HomeScreenState {
                                     const Text('Môn thể thao *', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12)),
                                     const SizedBox(height: 6),
                                     DropdownButtonFormField<String>(
-                                      value: selectedType,
+                                      initialValue: selectedType,
                                       decoration: InputDecoration(
                                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                                         contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
@@ -175,7 +175,7 @@ extension _HomeVenueDialogs on _HomeScreenState {
                                     const Text('Quận / Huyện *', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12)),
                                     const SizedBox(height: 6),
                                     DropdownButtonFormField<String>(
-                                      value: selectedDistrict,
+                                      initialValue: selectedDistrict,
                                       decoration: InputDecoration(
                                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                                         contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
@@ -264,7 +264,7 @@ extension _HomeVenueDialogs on _HomeScreenState {
                                   decoration: BoxDecoration(
                                     color: const Color(0xFFE0F2FE),
                                     borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(color: const Color(0xFF0284C7).withOpacity(0.4)),
+                                    border: Border.all(color: const Color(0xFF0284C7).withValues(alpha: 0.4)),
                                   ),
                                   child: const Row(
                                     mainAxisSize: MainAxisSize.min,
@@ -302,7 +302,7 @@ extension _HomeVenueDialogs on _HomeScreenState {
                                   child: Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                     decoration: BoxDecoration(
-                                      color: Colors.black.withOpacity(0.65),
+                                      color: Colors.black.withValues(alpha: 0.65),
                                       borderRadius: BorderRadius.circular(6),
                                     ),
                                     child: const Text(
@@ -315,7 +315,7 @@ extension _HomeVenueDialogs on _HomeScreenState {
                                   Container(
                                     height: 135,
                                     width: double.infinity,
-                                    color: Colors.black.withOpacity(0.5),
+                                    color: Colors.black.withValues(alpha: 0.5),
                                     alignment: Alignment.center,
                                     child: const Column(
                                       mainAxisSize: MainAxisSize.min,

@@ -178,12 +178,12 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
           width: 80,
           height: 80,
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.15),
+            color: Colors.white.withValues(alpha: 0.15),
             shape: BoxShape.circle,
-            border: Border.all(color: Colors.white.withOpacity(0.3), width: 2),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.3), width: 2),
             boxShadow: [
               BoxShadow(
-                color: const Color(0xFF0EA5E9).withOpacity(0.4),
+                color: const Color(0xFF0EA5E9).withValues(alpha: 0.4),
                 blurRadius: 30,
                 spreadRadius: 5,
               ),
@@ -211,7 +211,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
           style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w400,
-            color: Colors.white.withOpacity(0.75),
+            color: Colors.white.withValues(alpha: 0.75),
           ),
         ),
       ],
@@ -226,7 +226,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.15),
+            color: Colors.black.withValues(alpha: 0.15),
             blurRadius: 30,
             offset: const Offset(0, 10),
           ),
@@ -343,7 +343,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF0284C7),
                   foregroundColor: Colors.white,
-                  disabledBackgroundColor: const Color(0xFF0284C7).withOpacity(0.6),
+                  disabledBackgroundColor: const Color(0xFF0284C7).withValues(alpha: 0.6),
                   elevation: 0,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
@@ -511,15 +511,15 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
           'Chưa có tài khoản? ',
           style: TextStyle(
             fontSize: 14,
-            color: Colors.white.withOpacity(0.8),
+            color: Colors.white.withValues(alpha: 0.8),
           ),
         ),
         GestureDetector(
           onTap: () {
             Navigator.of(context).push(
               PageRouteBuilder(
-                pageBuilder: (_, __, ___) => const RegisterScreen(),
-                transitionsBuilder: (_, animation, __, child) {
+                pageBuilder: (_, _, _) => const RegisterScreen(),
+                transitionsBuilder: (_, animation, _, child) {
                   return SlideTransition(
                     position: Tween<Offset>(
                       begin: const Offset(1.0, 0.0),

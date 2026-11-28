@@ -7,7 +7,7 @@ Future<void> _pump(WidgetTester tester, {Widget? under}) async {
     home: Scaffold(
       body: Stack(
         children: [
-          if (under != null) under,
+          ?under,
           const Positioned.fill(child: FloatingChatButton()),
         ],
       ),

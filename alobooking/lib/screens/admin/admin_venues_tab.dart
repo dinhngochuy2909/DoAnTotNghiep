@@ -21,7 +21,7 @@ extension _AdminVenuesTab on _AdminScreenState {
                       decoration: BoxDecoration(
                         color: AdminUi.bg,
                         borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: AdminUi.border.withOpacity(0.5)),
+                        border: Border.all(color: AdminUi.border.withValues(alpha: 0.5)),
                       ),
                       child: TextField(
                         onChanged: (val) => setState(() => _searchVenueQuery = val),
@@ -149,12 +149,12 @@ extension _AdminVenuesTab on _AdminScreenState {
             border: Border.all(
               color: selected
                   ? AdminUi.accent
-                  : AdminUi.border.withOpacity(0.6),
+                  : AdminUi.border.withValues(alpha: 0.6),
             ),
             boxShadow: selected
                 ? [
                     BoxShadow(
-                      color: AdminUi.accent.withOpacity(0.35),
+                      color: AdminUi.accent.withValues(alpha: 0.35),
                       blurRadius: 8,
                       offset: const Offset(0, 2),
                     ),
@@ -207,12 +207,12 @@ extension _AdminVenuesTab on _AdminScreenState {
                   ),
             borderRadius: BorderRadius.circular(10),
             border: Border.all(
-              color: selected ? activeColor : AdminUi.border.withOpacity(0.6),
+              color: selected ? activeColor : AdminUi.border.withValues(alpha: 0.6),
             ),
             boxShadow: selected
                 ? [
                     BoxShadow(
-                      color: activeColor.withOpacity(0.35),
+                      color: activeColor.withValues(alpha: 0.35),
                       blurRadius: 8,
                       offset: const Offset(0, 2),
                     ),
@@ -233,16 +233,16 @@ extension _AdminVenuesTab on _AdminScreenState {
   }
 
   Widget _buildVenueRowCard(Venue v) {
-    Color statusBg = AdminUi.success.withOpacity(0.15);
+    Color statusBg = AdminUi.success.withValues(alpha: 0.15);
     Color statusColor = AdminUi.success;
     String statusText = 'Đã duyệt';
 
     if (v.isPending) {
-      statusBg = AdminUi.warn.withOpacity(0.15);
+      statusBg = AdminUi.warn.withValues(alpha: 0.15);
       statusColor = AdminUi.warn;
       statusText = 'Chờ duyệt';
     } else if (v.isRejected) {
-      statusBg = AdminUi.danger.withOpacity(0.15);
+      statusBg = AdminUi.danger.withValues(alpha: 0.15);
       statusColor = AdminUi.danger;
       statusText = 'Từ chối';
     }
@@ -254,7 +254,7 @@ extension _AdminVenuesTab on _AdminScreenState {
         color: AdminUi.surface,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
-          color: v.isPending ? AdminUi.warn.withOpacity(0.6) : AdminUi.border.withOpacity(0.5),
+          color: v.isPending ? AdminUi.warn.withValues(alpha: 0.6) : AdminUi.border.withValues(alpha: 0.5),
           width: v.isPending ? 1.5 : 1.0,
         ),
       ),
@@ -286,7 +286,7 @@ extension _AdminVenuesTab on _AdminScreenState {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                           decoration: BoxDecoration(
-                            color: AdminUi.accent.withOpacity(0.15),
+                            color: AdminUi.accent.withValues(alpha: 0.15),
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: Text(
@@ -301,7 +301,7 @@ extension _AdminVenuesTab on _AdminScreenState {
                           decoration: BoxDecoration(
                             color: statusBg,
                             borderRadius: BorderRadius.circular(6),
-                            border: Border.all(color: statusColor.withOpacity(0.5)),
+                            border: Border.all(color: statusColor.withValues(alpha: 0.5)),
                           ),
                           child: Text(
                             statusText,
@@ -378,7 +378,7 @@ extension _AdminVenuesTab on _AdminScreenState {
               decoration: BoxDecoration(
                 color: AdminUi.bg,
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: AdminUi.warn.withOpacity(0.3)),
+                border: Border.all(color: AdminUi.warn.withValues(alpha: 0.3)),
               ),
               child: Row(
                 children: [
@@ -461,6 +461,7 @@ extension _AdminVenuesTab on _AdminScreenState {
             onPressed: () async {
               final reason = reasonCtrl.text.trim().isEmpty ? 'Chưa đáp ứng tiêu chuẩn kiểm duyệt' : reasonCtrl.text.trim();
               await FirestoreService.updateVenueApproval(v.id, 'rejected', reason);
+              if (!mounted || !ctx.mounted) return;
               final updated = v.copyWith(approvalStatus: 'rejected', rejectReason: reason);
               final idx = _venues.indexWhere((item) => item.id == v.id);
               if (idx != -1) setState(() => _venues[idx] = updated);
@@ -713,6 +714,7 @@ extension _AdminVenuesTab on _AdminScreenState {
                     _showToast('Đã thêm sân "${created.name}" thành công!');
                   }
 
+                  if (!ctx.mounted) return;
                   Navigator.pop(ctx);
                 },
                 style: ElevatedButton.styleFrom(
@@ -754,6 +756,7 @@ extension _AdminVenuesTab on _AdminScreenState {
           ElevatedButton(
             onPressed: () async {
               await FirestoreService.deleteVenue(v.id);
+              if (!mounted || !ctx.mounted) return;
               setState(() => _venues.removeWhere((x) => x.id == v.id));
               Navigator.pop(ctx);
               _showToast('Đã xóa sân "${v.name}" thành công!', isError: true);
@@ -841,7 +844,7 @@ extension _AdminVenuesTab on _AdminScreenState {
                             borderRadius: BorderRadius.circular(6),
                             border: Border.all(color: AdminUi.border),
                           ),
-                          child: Text('$t', style: const TextStyle(color: AdminUi.muted, fontSize: 11)),
+                          child: Text(t, style: const TextStyle(color: AdminUi.muted, fontSize: 11)),
                         );
                       }).toList(),
                     ),

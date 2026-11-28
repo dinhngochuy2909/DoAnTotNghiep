@@ -58,7 +58,7 @@ class _AccountScreenState extends State<AccountScreen> {
                 const Text('📍 Khu vực thường chơi', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                 const SizedBox(height: 6),
                 DropdownButtonFormField<String>(
-                  value: tempDist,
+                  initialValue: tempDist,
                   items: _districts.map((d) => DropdownMenuItem(value: d, child: Text(d))).toList(),
                   onChanged: (val) => setDialogState(() => tempDist = val!),
                   decoration: InputDecoration(
@@ -72,7 +72,7 @@ class _AccountScreenState extends State<AccountScreen> {
                 const Text('🏸 Môn thể thao yêu thích', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                 const SizedBox(height: 6),
                 DropdownButtonFormField<String>(
-                  value: tempSport,
+                  initialValue: tempSport,
                   items: _sports.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
                   onChanged: (val) => setDialogState(() => tempSport = val!),
                   decoration: InputDecoration(
@@ -86,7 +86,7 @@ class _AccountScreenState extends State<AccountScreen> {
                 const Text('🏆 Trình độ chơi', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                 const SizedBox(height: 6),
                 DropdownButtonFormField<String>(
-                  value: tempLevel,
+                  initialValue: tempLevel,
                   items: _levels.map((l) => DropdownMenuItem(value: l, child: Text(l))).toList(),
                   onChanged: (val) => setDialogState(() => tempLevel = val!),
                   decoration: InputDecoration(
@@ -153,12 +153,12 @@ class _AccountScreenState extends State<AccountScreen> {
               ? const Center(child: Text('Không có thông báo mới.'))
               : ListView.separated(
                   itemCount: notifs.length,
-                  separatorBuilder: (_, __) => const Divider(height: 1),
+                  separatorBuilder: (_, _) => const Divider(height: 1),
                   itemBuilder: (_, idx) {
                     final n = notifs[idx];
                     return ListTile(
                       leading: CircleAvatar(
-                        backgroundColor: const Color(0xFF0369A1).withOpacity(0.12),
+                        backgroundColor: const Color(0xFF0369A1).withValues(alpha: 0.12),
                         child: const Icon(Icons.sports, color: Color(0xFF0369A1), size: 18),
                       ),
                       title: Text(n.title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
@@ -250,7 +250,7 @@ class _AccountScreenState extends State<AccountScreen> {
                         child: Container(
                           padding: const EdgeInsets.all(10),
                           decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.12),
+                            color: Colors.white.withValues(alpha: 0.12),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Row(
@@ -289,9 +289,9 @@ class _AccountScreenState extends State<AccountScreen> {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                         decoration: BoxDecoration(
-                          color: AuthService.isGuest ? const Color(0xFFB45309).withOpacity(0.3) : Colors.white.withOpacity(0.1),
+                          color: AuthService.isGuest ? const Color(0xFFB45309).withValues(alpha: 0.3) : Colors.white.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: AuthService.isGuest ? const Color(0xFFFDE68A) : Colors.white.withOpacity(0.2)),
+                          border: Border.all(color: AuthService.isGuest ? const Color(0xFFFDE68A) : Colors.white.withValues(alpha: 0.2)),
                         ),
                         child: Row(
                           children: [

@@ -1,6 +1,5 @@
 import 'dart:math' as math;
 
-import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:flutter/material.dart';
 import '../screens/chatbot_screen.dart';
 import '../services/navigator_key.dart';
@@ -192,7 +191,7 @@ class _FloatingChatButtonState extends State<FloatingChatButton> with SingleTick
                           shape: BoxShape.circle,
                           boxShadow: [
                             BoxShadow(
-                              color: _primaryGreen.withOpacity(0.3 + _pulseController.value * 0.25),
+                              color: _primaryGreen.withValues(alpha: 0.3 + _pulseController.value * 0.25),
                               blurRadius: 16 + _pulseController.value * 8,
                               spreadRadius: 2,
                             ),

@@ -1,4 +1,5 @@
-// ignore: avoid_web_libraries_in_flutter
+// TODO: chuyển sang package:web + dart:js_interop (dart:html đã bị đánh dấu lỗi thời)
+// ignore: avoid_web_libraries_in_flutter, deprecated_member_use
 import 'dart:html' as html;
 
 /// Xin vị trí hiện tại qua trình duyệt. Trả về null nếu người dùng từ chối hoặc trình duyệt không lấy được vị trí.

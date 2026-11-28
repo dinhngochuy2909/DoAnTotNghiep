@@ -1,3 +1,5 @@
+// Công cụ chạy tay ở dòng lệnh nên in ra màn hình là chủ ý.
+// ignore_for_file: avoid_print
 import 'package:alobooking/services/auth_service.dart';
 
 void main() async {

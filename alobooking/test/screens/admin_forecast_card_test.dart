@@ -109,8 +109,8 @@ void main() {
     BookingCountService.clearCache();
   });
 
-  for (final size in const [Size(1440, 2600), Size(390, 4200)])
-  testWidgets('Thẻ dự báo Admin ${size.width.toInt()}px: hiện số đơn theo mô hình đếm, bấm ngày thấy lý do, chú thích trung thực', (tester) async {
+  for (final size in const [Size(1440, 2600), Size(390, 4200)]) {
+    testWidgets('Thẻ dự báo Admin ${size.width.toInt()}px: hiện số đơn theo mô hình đếm, bấm ngày thấy lý do, chú thích trung thực', (tester) async {
     tester.view.physicalSize = size;
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
@@ -149,8 +149,9 @@ void main() {
       expect(tester.takeException(), isNull);
     }, _client);
   });
+  }
 
-  for (final size in const [Size(1440, 3200), Size(390, 5200)])
+  for (final size in const [Size(1440, 3200), Size(390, 5200)]) {
     testWidgets('Chế độ mô phỏng ${size.width.toInt()}px: công tắc bật có biển cảnh báo và bảng đối chiếu đáp án, tắt thì trở lại như cũ', (tester) async {
       tester.view.physicalSize = size;
       tester.view.devicePixelRatio = 1;
@@ -207,4 +208,5 @@ void main() {
         expect(tester.takeException(), isNull);
       }, _client);
     });
+  }
 }

@@ -325,9 +325,9 @@ class _VenueDetailScreenState extends State<VenueDetailScreen> with SingleTicker
                           begin: Alignment.topCenter,
                           end: Alignment.bottomCenter,
                           colors: [
-                            Colors.black.withOpacity(0.35),
+                            Colors.black.withValues(alpha: 0.35),
                             Colors.transparent,
-                            Colors.black.withOpacity(0.4),
+                            Colors.black.withValues(alpha: 0.4),
                           ],
                         ),
                       ),
@@ -342,7 +342,7 @@ class _VenueDetailScreenState extends State<VenueDetailScreen> with SingleTicker
                           key: const ValueKey('stock-image-badge'),
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                           decoration: BoxDecoration(
-                            color: Colors.black.withOpacity(0.55),
+                            color: Colors.black.withValues(alpha: 0.55),
                             borderRadius: BorderRadius.circular(10),
                           ),
                           child: const Row(
@@ -440,7 +440,7 @@ class _VenueDetailScreenState extends State<VenueDetailScreen> with SingleTicker
                   border: Border.all(color: const Color(0xFFE2E8F0)),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.04),
+                      color: Colors.black.withValues(alpha: 0.04),
                       blurRadius: 8,
                       offset: const Offset(0, 2),
                     ),
@@ -467,7 +467,7 @@ class _VenueDetailScreenState extends State<VenueDetailScreen> with SingleTicker
                             child: Image.network(
                               v.logo,
                               fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => const Center(
+                              errorBuilder: (_, _, _) => const Center(
                                 child: Icon(Icons.sports_tennis, color: Color(0xFFD97706), size: 30),
                               ),
                             ),
@@ -623,7 +623,7 @@ class _VenueDetailScreenState extends State<VenueDetailScreen> with SingleTicker
           color: Colors.white,
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.06),
+              color: Colors.black.withValues(alpha: 0.06),
               blurRadius: 10,
               offset: const Offset(0, -3),
             ),
@@ -786,8 +786,8 @@ class _VenueDetailScreenState extends State<VenueDetailScreen> with SingleTicker
               ),
               SizedBox(height: 6),
               Text(
-                'Bạn tự hủy được khi còn cách giờ chơi từ 2 tiếng trở lên, trong mục "Lịch sử đặt sân"; dưới 2 tiếng thì không hủy được. Việc hoàn tiền (nếu đã thanh toán trước) '
-                'do chủ sân xử lý theo chính sách riêng của từng sân. Nếu cần hỗ trợ, hãy liên hệ chủ sân hoặc Hotline/Zalo 0364059999.',
+                'Lịch đã đặt không tự hủy được trên ứng dụng. Nếu có sự cố, hãy liên hệ chủ sân hoặc Hotline/Zalo 0364059999; '
+                'việc hoàn tiền (nếu có) do chủ sân xử lý theo chính sách riêng của từng sân.',
                 style: TextStyle(fontSize: 12, color: Color(0xFF64748B), height: 1.45),
               ),
             ],

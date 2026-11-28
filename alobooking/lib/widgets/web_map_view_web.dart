@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
-// ignore: avoid_web_libraries_in_flutter
+// TODO: chuyển sang package:web + dart:js_interop (dart:html đã bị đánh dấu lỗi thời)
+// ignore: avoid_web_libraries_in_flutter, deprecated_member_use
 import 'dart:html' as html;
 // ignore: avoid_web_libraries_in_flutter
 import 'dart:ui_web' as ui_web;

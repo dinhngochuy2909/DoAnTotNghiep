@@ -508,6 +508,22 @@ class FirestoreService {
     }
   }
 
+  /// Trạng thái hiện tại của từng đơn (chỉ đọc trường `status`); null nếu có đơn chưa đọc được.
+  static Future<List<String>?> getBookingStatuses(List<String> bookingIds) async {
+    try {
+      final out = <String>[];
+      for (final id in bookingIds) {
+        final response = await http.get(Uri.parse('$baseUrl/bookings/$id?mask.fieldPaths=status'));
+        if (response.statusCode != 200) return null;
+        final fields = (json.decode(response.body) as Map<String, dynamic>)['fields'] as Map<String, dynamic>?;
+        out.add(fields?['status']?['stringValue'] as String? ?? '');
+      }
+      return out;
+    } catch (_) {
+      return null;
+    }
+  }
+
   /// Tạo đơn đặt sân lưu trực tiếp lên Firestore alobooking-b2484
   static Future<bool> createBooking({
     required String customer,
@@ -634,7 +650,7 @@ class FirestoreService {
       if (i > 0 && (s.length - i) % 3 == 0) b.write('.');
       b.write(s[i]);
     }
-    return '${b}đ';
+    return '$bđ';
   }
 
   /// Gán số lượt đặt và tổng chi tiêu thật cho từng khách (khớp theo số điện thoại, nếu thiếu thì theo tên).

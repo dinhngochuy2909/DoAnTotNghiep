@@ -86,7 +86,7 @@ class _DeviceSimulatorWrapperState extends State<DeviceSimulatorWrapper> {
                     border: Border.all(color: const Color(0xFF0EA5E9), width: 1.5),
                     boxShadow: [
                       BoxShadow(
-                        color: const Color(0xFF0EA5E9).withOpacity(0.35),
+                        color: const Color(0xFF0EA5E9).withValues(alpha: 0.35),
                         blurRadius: 14,
                         offset: const Offset(0, 4),
                       ),
@@ -153,7 +153,7 @@ class _DeviceSimulatorWrapperState extends State<DeviceSimulatorWrapper> {
                             decoration: BoxDecoration(
                               color: const Color(0xFF475569),
                               borderRadius: const BorderRadius.horizontal(left: Radius.circular(2)),
-                              boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.5), blurRadius: 2)],
+                              boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.5), blurRadius: 2)],
                             ),
                           ),
                         ),
@@ -167,7 +167,7 @@ class _DeviceSimulatorWrapperState extends State<DeviceSimulatorWrapper> {
                             decoration: BoxDecoration(
                               color: const Color(0xFF475569),
                               borderRadius: const BorderRadius.horizontal(left: Radius.circular(2)),
-                              boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.5), blurRadius: 2)],
+                              boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.5), blurRadius: 2)],
                             ),
                           ),
                         ),
@@ -181,7 +181,7 @@ class _DeviceSimulatorWrapperState extends State<DeviceSimulatorWrapper> {
                             decoration: BoxDecoration(
                               color: const Color(0xFF475569),
                               borderRadius: const BorderRadius.horizontal(left: Radius.circular(2)),
-                              boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.5), blurRadius: 2)],
+                              boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.5), blurRadius: 2)],
                             ),
                           ),
                         ),
@@ -195,7 +195,7 @@ class _DeviceSimulatorWrapperState extends State<DeviceSimulatorWrapper> {
                             decoration: BoxDecoration(
                               color: const Color(0xFF475569),
                               borderRadius: const BorderRadius.horizontal(right: Radius.circular(2)),
-                              boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.5), blurRadius: 2)],
+                              boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.5), blurRadius: 2)],
                             ),
                           ),
                         ),
@@ -209,7 +209,7 @@ class _DeviceSimulatorWrapperState extends State<DeviceSimulatorWrapper> {
                             decoration: BoxDecoration(
                               color: const Color(0xFF64748B),
                               borderRadius: const BorderRadius.horizontal(right: Radius.circular(2)),
-                              boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.5), blurRadius: 2)],
+                              boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.5), blurRadius: 2)],
                             ),
                           ),
                         ),
@@ -229,13 +229,13 @@ class _DeviceSimulatorWrapperState extends State<DeviceSimulatorWrapper> {
                           border: Border.all(color: const Color(0xFF475569), width: 2),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(0.75),
+                              color: Colors.black.withValues(alpha: 0.75),
                               blurRadius: 42,
                               spreadRadius: 10,
                               offset: const Offset(0, 16),
                             ),
                             BoxShadow(
-                              color: const Color(0xFF0EA5E9).withOpacity(0.2),
+                              color: const Color(0xFF0EA5E9).withValues(alpha: 0.2),
                               blurRadius: 35,
                               spreadRadius: 2,
                             ),
@@ -332,7 +332,7 @@ class _DeviceSimulatorWrapperState extends State<DeviceSimulatorWrapper> {
                                           borderRadius: BorderRadius.circular(16),
                                           boxShadow: [
                                             BoxShadow(
-                                              color: Colors.black.withOpacity(0.5),
+                                              color: Colors.black.withValues(alpha: 0.5),
                                               blurRadius: 4,
                                             ),
                                           ],
@@ -366,7 +366,7 @@ class _DeviceSimulatorWrapperState extends State<DeviceSimulatorWrapper> {
                                               height: 6,
                                               margin: const EdgeInsets.only(right: 12),
                                               decoration: BoxDecoration(
-                                                color: const Color(0xFF0369A1).withOpacity(0.8),
+                                                color: const Color(0xFF0369A1).withValues(alpha: 0.8),
                                                 shape: BoxShape.circle,
                                               ),
                                             ),
@@ -405,7 +405,7 @@ class _DeviceSimulatorWrapperState extends State<DeviceSimulatorWrapper> {
                                         width: 130,
                                         height: 4.5,
                                         decoration: BoxDecoration(
-                                          color: Colors.black.withOpacity(0.6),
+                                          color: Colors.black.withValues(alpha: 0.6),
                                           borderRadius: BorderRadius.circular(3),
                                         ),
                                       ),

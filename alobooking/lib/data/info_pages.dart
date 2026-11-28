@@ -62,7 +62,7 @@ class InfoPages {
         'Tìm sân cầu lông, pickleball, bóng đá, tennis, bóng rổ theo môn, theo tên hoặc theo quận.',
         'Xem sân trên bản đồ, đọc giá, giờ mở cửa, tiện ích và đánh giá của khách.',
         'Chọn sân con và khung giờ còn trống trên sơ đồ đặt sân, thanh toán bằng chuyển khoản VietQR.',
-        'Theo dõi và hủy lượt đặt trong mục "Sân đã đặt".',
+        'Theo dõi lượt đặt trong mục "Sân đã đặt".',
         'Hỏi trợ lý AI để tra cứu sân theo nhu cầu của bạn.',
         'Xem bảng tin Khám phá: tin mới của AloBooking, sân mới được duyệt và đánh giá mới của khách.',
       ]),
@@ -92,7 +92,7 @@ class InfoPages {
         'Mở sân bạn chọn để xem giá, giờ mở cửa, tiện ích, hình ảnh và đánh giá, rồi bấm "ĐẶT LỊCH NGAY".',
         'Chọn ngày, sau đó chạm vào các ô trắng trên bảng để chọn sân con và khung giờ. Ô đã có người đặt, đang khóa hoặc bảo trì, hay đang có sự kiện thì không chọn được.',
         'Kiểm tra tổng số giờ và tổng tiền rồi xác nhận. Đơn được ghi nhận ở trạng thái "Chờ xác nhận".',
-        'Chuyển khoản theo mã VietQR với đúng số tiền và nội dung chuyển khoản của đơn. Ban quản lý xác nhận đơn khi nhận được tiền.',
+        'Chuyển khoản theo mã VietQR với đúng số tiền và nội dung chuyển khoản của đơn. Khi tiền về, đơn được xác nhận.',
         'Theo dõi đơn trong mục "Sân đã đặt" (Tất cả, Sắp diễn ra, Đã hoàn tất, Đã hủy).',
       ]),
       InfoSection('Lưu ý', bullets: [
@@ -113,11 +113,10 @@ class InfoPages {
       FaqItem('Tôi có thể trả tiền mặt tại sân không?',
           'Với lượt đặt qua AloBooking, thanh toán chỉ bằng chuyển khoản ngân hàng qua mã VietQR, không nhận tiền mặt.'),
       FaqItem('Làm sao biết đơn của tôi đã được xác nhận?',
-          'Đơn ở trạng thái "Chờ xác nhận" cho tới khi chủ sân (hoặc ban quản lý AloBooking với sân do AloBooking quản lý) nhận được tiền chuyển khoản đúng số tiền và nội dung. Bạn xem trạng thái trong mục "Sân đã đặt".'),
+          'Khi tiền về đúng số tiền và nội dung, hệ thống tự xác nhận đơn và màn hình thanh toán báo thành công. Nếu chưa tự xác nhận, đơn ở trạng thái "Chờ xác nhận" cho tới khi chủ sân (hoặc ban quản lý) kiểm tra. Bạn xem trạng thái trong mục "Sân đã đặt".'),
       FaqItem('Tôi muốn hủy lượt đặt thì làm thế nào?',
-          'Vào "Sân đã đặt", chọn đơn đang chờ xác nhận hoặc sắp diễn ra rồi bấm "Hủy đặt sân". '
-              'Chỉ hủy được khi còn cách giờ chơi từ 2 tiếng trở lên. '
-              'Việc hoàn tiền (nếu có) do chủ sân xử lý theo chính sách của sân.'),
+          'Ứng dụng không hỗ trợ khách tự hủy lượt đã đặt. Nếu có sự cố, hãy liên hệ chủ sân hoặc ban quản lý; '
+              'việc hoàn tiền (nếu có) do chủ sân xử lý theo chính sách của sân.'),
       FaqItem('Vì sao tôi không đặt được một số sân?',
           'Có ba lý do thường gặp: bạn chưa đăng nhập (chế độ khách chỉ xem), sân chưa niêm yết giá nên chưa nhận đặt online, '
               'hoặc đó là sân minh họa (Demo) chỉ để trình diễn.'),
@@ -150,7 +149,7 @@ class InfoPages {
         'Xem lịch đặt và doanh thu của sân mình trong mục "Quản Lý Sân" và "Doanh Thu".',
         'Thay ảnh minh họa bằng ảnh thật của sân; khi đó nhãn "Ảnh minh họa" biến mất.',
         'Nhập giá dạng "100k - 200k/h" để sân nhận đặt online. Nếu để "Liên hệ" thì khách chưa đặt online được.',
-        'Khi khách hủy đơn, việc hoàn tiền (nếu có) do chủ sân xử lý theo chính sách của sân.',
+        'Khách không tự hủy được đơn. Chủ sân chỉ hủy được đơn còn chờ xác nhận (ví dụ khách không thanh toán); việc hoàn tiền (nếu có) theo chính sách của sân.',
       ]),
     ],
   );
@@ -169,7 +168,7 @@ class InfoPages {
       ]),
       InfoSection('Đặt sân và thanh toán', bullets: [
         'Thanh toán bằng chuyển khoản ngân hàng, không nhận tiền mặt.',
-        'Đơn chỉ được xác nhận khi chủ sân (hoặc ban quản lý AloBooking với sân do AloBooking quản lý) nhận được tiền đúng số tiền và nội dung chuyển khoản.',
+        'Đơn chỉ được xác nhận khi tiền về đúng số tiền và nội dung chuyển khoản: hệ thống tự đối soát, hoặc chủ sân (hoặc ban quản lý) kiểm tra và xác nhận.',
         'Mỗi khung giờ của một sân chỉ có một người đặt.',
         'Giá do chủ sân niêm yết. Với địa điểm lấy từ dữ liệu mở, giá chỉ là mức tham khảo.',
       ]),
@@ -203,6 +202,7 @@ class InfoPages {
         'Lịch sử đặt sân và trạng thái thanh toán của từng đơn.',
         'Đánh giá bạn gửi, kèm họ tên của bạn và hiển thị công khai.',
         'Thông báo gửi tới tài khoản của bạn.',
+        'Khi bạn chuyển khoản: số tiền, nội dung và thông tin giao dịch được dịch vụ SePay gửi tới máy chủ trung gian (Cloudflare) để đối soát đơn.',
       ]),
       InfoSection('Lưu ở đâu', paragraphs: [
         'Dữ liệu được lưu trên Google Cloud Firestore.',
@@ -226,21 +226,21 @@ class InfoPages {
     id: InfoPageId.payments,
     title: 'Thanh toán & hủy sân',
     icon: Icons.qr_code_2_rounded,
-    intro: 'Cách thanh toán một lượt đặt sân, và việc cần làm khi bạn muốn hủy.',
+    intro: 'Cách thanh toán một lượt đặt sân, và quy định về hủy sân.',
     note: updated,
     sections: [
       InfoSection('Thanh toán', bullets: [
         'AloBooking chỉ nhận chuyển khoản ngân hàng qua mã VietQR (chuẩn NAPAS 247), không nhận tiền mặt.',
         'Sau khi xác nhận đặt, bạn nhận mã QR kèm số tiền và nội dung chuyển khoản. Hãy chuyển đúng số tiền và nội dung để đơn được đối soát.',
-        'Đơn ở trạng thái "Chờ xác nhận" cho tới khi chủ sân (hoặc ban quản lý AloBooking với sân do AloBooking quản lý) nhận được tiền.',
+        'Đơn ở trạng thái "Chờ xác nhận" cho tới khi tiền về đúng số tiền và nội dung, lúc đó đơn tự chuyển sang "Đã xác nhận". Nếu chưa tự chuyển (chuyển thiếu, sai nội dung...), chủ sân hoặc ban quản lý kiểm tra rồi xác nhận.',
         'Nếu hệ thống chưa tạo được mã QR, hãy liên hệ ban quản lý để nhận thông tin chuyển khoản cho đơn của bạn.',
       ]),
       InfoSection('Giá', paragraphs: [
         'Giá giờ thường và giá giờ vàng (16:00 – 22:00) được ghi ở màn đặt sân. Tổng tiền hiển thị trước khi bạn xác nhận.',
       ]),
       InfoSection('Hủy đặt sân', bullets: [
-        'Vào "Sân đã đặt", chọn đơn đang chờ xác nhận hoặc sắp diễn ra và bấm "Hủy đặt sân". Đơn chuyển sang "Đã hủy".',
-        'Chỉ hủy được khi còn cách giờ chơi từ 2 tiếng trở lên; còn dưới 2 tiếng thì không hủy được.',
+        'Ứng dụng không hỗ trợ khách tự hủy lượt đã đặt.',
+        'Nếu có sự cố, hãy liên hệ chủ sân hoặc ban quản lý, kèm mã đơn.',
         'Việc hoàn tiền (nếu có) do chủ sân xử lý theo chính sách của sân. AloBooking chưa hoàn tiền tự động.',
       ]),
       InfoSection('Chuyển khoản sai', paragraphs: [

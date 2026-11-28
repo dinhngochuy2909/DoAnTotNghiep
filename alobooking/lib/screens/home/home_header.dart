@@ -29,7 +29,7 @@ extension _HomeHeader on _HomeScreenState {
                   decoration: BoxDecoration(
                     color: const Color(0xFF075985),
                     shape: BoxShape.circle,
-                    border: Border.all(color: Colors.white.withOpacity(0.35), width: 1.5),
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.35), width: 1.5),
                   ),
                   child: const Center(
                     child: Icon(Icons.sports_tennis, color: Colors.white, size: 20),
@@ -55,7 +55,7 @@ extension _HomeHeader on _HomeScreenState {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
                           decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.2),
+                            color: Colors.white.withValues(alpha: 0.2),
                             borderRadius: BorderRadius.circular(10),
                           ),
                           child: Text(
@@ -181,7 +181,7 @@ extension _HomeHeader on _HomeScreenState {
                     width: 34,
                     height: 34,
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.18),
+                      color: Colors.white.withValues(alpha: 0.18),
                       shape: BoxShape.circle,
                     ),
                     child: const Icon(Icons.notifications_none, color: Colors.white, size: 19),
@@ -213,7 +213,7 @@ extension _HomeHeader on _HomeScreenState {
                 decoration: BoxDecoration(
                   color: const Color(0xFF075985),
                   shape: BoxShape.circle,
-                  border: Border.all(color: Colors.white.withOpacity(0.3), width: 1.5),
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.3), width: 1.5),
                 ),
                 child: const Center(
                   child: Icon(Icons.sports_tennis, color: Colors.white, size: 24),
@@ -272,7 +272,7 @@ extension _HomeHeader on _HomeScreenState {
                       borderRadius: BorderRadius.circular(20),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.2),
+                          color: Colors.black.withValues(alpha: 0.2),
                           blurRadius: 4,
                           offset: const Offset(0, 2),
                         ),
@@ -399,7 +399,7 @@ extension _HomeHeader on _HomeScreenState {
                       borderRadius: BorderRadius.circular(20),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.2),
+                          color: Colors.black.withValues(alpha: 0.2),
                           blurRadius: 4,
                           offset: const Offset(0, 2),
                         ),
@@ -440,7 +440,7 @@ extension _HomeHeader on _HomeScreenState {
                       borderRadius: BorderRadius.circular(20),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.2),
+                          color: Colors.black.withValues(alpha: 0.2),
                           blurRadius: 4,
                           offset: const Offset(0, 2),
                         ),
@@ -500,7 +500,7 @@ extension _HomeHeader on _HomeScreenState {
       width: 36,
       height: 36,
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.18),
+        color: Colors.white.withValues(alpha: 0.18),
         shape: BoxShape.circle,
       ),
       child: Icon(icon, color: Colors.white, size: 20),
@@ -524,7 +524,7 @@ extension _HomeHeader on _HomeScreenState {
           borderRadius: BorderRadius.circular(12),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.06),
+              color: Colors.black.withValues(alpha: 0.06),
               blurRadius: 8,
               offset: const Offset(0, 2),
             ),
@@ -592,7 +592,7 @@ extension _HomeHeader on _HomeScreenState {
         borderRadius: BorderRadius.circular(10),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.06),
+            color: Colors.black.withValues(alpha: 0.06),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -720,10 +720,10 @@ extension _HomeHeader on _HomeScreenState {
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFF0284C7).withOpacity(0.6), width: 1.5),
+        border: Border.all(color: const Color(0xFF0284C7).withValues(alpha: 0.6), width: 1.5),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF0284C7).withOpacity(0.2),
+            color: const Color(0xFF0284C7).withValues(alpha: 0.2),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -737,7 +737,7 @@ extension _HomeHeader on _HomeScreenState {
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF0284C7).withOpacity(0.2),
+                  color: const Color(0xFF0284C7).withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(10),
                   border: Border.all(color: const Color(0xFF38BDF8), width: 1),
                 ),
@@ -899,7 +899,7 @@ extension _HomeHeader on _HomeScreenState {
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.04),
+                      color: Colors.black.withValues(alpha: 0.04),
                       blurRadius: 4,
                       offset: const Offset(0, 2),
                     ),
@@ -978,7 +978,7 @@ extension _HomeHeader on _HomeScreenState {
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.03),
+                      color: Colors.black.withValues(alpha: 0.03),
                       blurRadius: 4,
                       offset: const Offset(0, 2),
                     ),

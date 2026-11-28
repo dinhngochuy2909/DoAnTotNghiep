@@ -38,7 +38,7 @@ extension _AdminCustomersTab on _AdminScreenState {
                   decoration: BoxDecoration(
                     color: AdminUi.surface,
                     borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: AdminUi.info.withOpacity(0.25)),
+                    border: Border.all(color: AdminUi.info.withValues(alpha: 0.25)),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -46,7 +46,7 @@ extension _AdminCustomersTab on _AdminScreenState {
                       const Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Flexible(child: Text('Tổng Khách Hàng', style: const TextStyle(color: AdminUi.muted, fontSize: 12), maxLines: 1, overflow: TextOverflow.ellipsis)),
+                          Flexible(child: Text('Tổng Khách Hàng', style: TextStyle(color: AdminUi.muted, fontSize: 12), maxLines: 1, overflow: TextOverflow.ellipsis)),
                           Icon(Icons.people_outline, color: AdminUi.info, size: 18),
                         ],
                       ),
@@ -65,7 +65,7 @@ extension _AdminCustomersTab on _AdminScreenState {
                   decoration: BoxDecoration(
                     color: AdminUi.surface,
                     borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: AdminUi.warn.withOpacity(0.25)),
+                    border: Border.all(color: AdminUi.warn.withValues(alpha: 0.25)),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -73,7 +73,7 @@ extension _AdminCustomersTab on _AdminScreenState {
                       const Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Flexible(child: Text('Hội Viên VIP', style: const TextStyle(color: AdminUi.muted, fontSize: 12), maxLines: 1, overflow: TextOverflow.ellipsis)),
+                          Flexible(child: Text('Hội Viên VIP', style: TextStyle(color: AdminUi.muted, fontSize: 12), maxLines: 1, overflow: TextOverflow.ellipsis)),
                           Icon(Icons.workspace_premium, color: AdminUi.warn, size: 18),
                         ],
                       ),
@@ -92,7 +92,7 @@ extension _AdminCustomersTab on _AdminScreenState {
                   decoration: BoxDecoration(
                     color: AdminUi.surface,
                     borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: AdminUi.success.withOpacity(0.25)),
+                    border: Border.all(color: AdminUi.success.withValues(alpha: 0.25)),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -100,7 +100,7 @@ extension _AdminCustomersTab on _AdminScreenState {
                       const Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Flexible(child: Text('Đang Hoạt Động', style: const TextStyle(color: AdminUi.muted, fontSize: 12), maxLines: 1, overflow: TextOverflow.ellipsis)),
+                          Flexible(child: Text('Đang Hoạt Động', style: TextStyle(color: AdminUi.muted, fontSize: 12), maxLines: 1, overflow: TextOverflow.ellipsis)),
                           Icon(Icons.check_circle_outline, color: AdminUi.success, size: 18),
                         ],
                       ),
@@ -122,7 +122,7 @@ extension _AdminCustomersTab on _AdminScreenState {
             decoration: BoxDecoration(
               color: AdminUi.surface,
               borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: AdminUi.border.withOpacity(0.5)),
+              border: Border.all(color: AdminUi.border.withValues(alpha: 0.5)),
             ),
             child: Column(
               children: [
@@ -215,13 +215,17 @@ extension _AdminCustomersTab on _AdminScreenState {
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
               itemCount: filtered.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 10),
+              separatorBuilder: (_, _) => const SizedBox(height: 10),
               itemBuilder: (ctx, i) {
                 final c = filtered[i];
                 Color rankColor = const Color(0xFFCD7F32); // Bronze
-                if (c.rank.contains('Kim Cương')) rankColor = AdminUi.info;
-                else if (c.rank.contains('Vàng')) rankColor = AdminUi.warn;
-                else if (c.rank.contains('Bạc')) rankColor = AdminUi.muted;
+                if (c.rank.contains('Kim Cương')) {
+                  rankColor = AdminUi.info;
+                } else if (c.rank.contains('Vàng')) {
+                  rankColor = AdminUi.warn;
+                } else if (c.rank.contains('Bạc')) {
+                  rankColor = AdminUi.muted;
+                }
 
                 final isLocked = c.status == 'Tạm khóa';
 
@@ -230,7 +234,7 @@ extension _AdminCustomersTab on _AdminScreenState {
                   decoration: BoxDecoration(
                     color: AdminUi.surface,
                     borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: isLocked ? AdminUi.danger.withOpacity(0.3) : AdminUi.border.withOpacity(0.5)),
+                    border: Border.all(color: isLocked ? AdminUi.danger.withValues(alpha: 0.3) : AdminUi.border.withValues(alpha: 0.5)),
                   ),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.center,
@@ -242,7 +246,7 @@ extension _AdminCustomersTab on _AdminScreenState {
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           gradient: LinearGradient(
-                            colors: [rankColor.withOpacity(0.8), rankColor],
+                            colors: [rankColor.withValues(alpha: 0.8), rankColor],
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
                           ),
@@ -270,9 +274,9 @@ extension _AdminCustomersTab on _AdminScreenState {
                                 Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                                   decoration: BoxDecoration(
-                                    color: rankColor.withOpacity(0.15),
+                                    color: rankColor.withValues(alpha: 0.15),
                                     borderRadius: BorderRadius.circular(6),
-                                    border: Border.all(color: rankColor.withOpacity(0.5)),
+                                    border: Border.all(color: rankColor.withValues(alpha: 0.5)),
                                   ),
                                   child: Text(
                                     c.rank,
@@ -284,7 +288,7 @@ extension _AdminCustomersTab on _AdminScreenState {
                                   Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                     decoration: BoxDecoration(
-                                      color: AdminUi.danger.withOpacity(0.15),
+                                      color: AdminUi.danger.withValues(alpha: 0.15),
                                       borderRadius: BorderRadius.circular(4),
                                     ),
                                     child: const Text('Tạm khóa', style: TextStyle(color: AdminUi.danger, fontSize: 10, fontWeight: FontWeight.bold)),

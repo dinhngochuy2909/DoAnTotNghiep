@@ -151,7 +151,7 @@ class AdminStats {
       if (i > 0 && (s.length - i) % 3 == 0) buf.write('.');
       buf.write(s[i]);
     }
-    return '${n < 0 ? '-' : ''}${buf}đ';
+    return '${n < 0 ? '-' : ''}$bufđ';
   }
 
   /// 1.250.000 -> "1,25 tr"; 85.000 -> "85k"

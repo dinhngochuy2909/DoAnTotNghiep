@@ -3,7 +3,6 @@ import '../models/user.dart';
 import '../models/venue.dart';
 import '../services/auth_service.dart';
 import '../services/booking_slots.dart';
-import '../services/cancel_policy.dart';
 import '../services/firestore_service.dart';
 import 'login_screen.dart';
 import 'visual_booking_screen.dart';
@@ -11,11 +10,7 @@ import 'visual_booking_screen.dart';
 /// Màn hình SÂN ĐÃ ĐẶT: lịch đặt thật của tài khoản đang đăng nhập (đọc từ Firestore).
 class BookedScreen extends StatefulWidget {
   final List<Venue> allVenues;
-
-  /// Đồng hồ để biết đã quá hạn hủy chưa; kiểm thử truyền giờ cố định.
-  final DateTime Function() clock;
-
-  const BookedScreen({super.key, this.allVenues = const [], this.clock = DateTime.now});
+  const BookedScreen({super.key, this.allVenues = const []});
 
   @override
   State<BookedScreen> createState() => _BookedScreenState();
@@ -103,7 +98,7 @@ class _BookedScreenState extends State<BookedScreen> with SingleTickerProviderSt
     if (BookingSlots.isCancelled(b.status)) return _BookingState.cancelled;
     final st = b.status.toLowerCase();
     final end = _end(b);
-    if (st.contains('hoàn thành') || (end != null && end.isBefore(widget.clock()))) return _BookingState.completed;
+    if (st.contains('hoàn thành') || (end != null && end.isBefore(DateTime.now()))) return _BookingState.completed;
     if (st.contains('chờ')) return _BookingState.pending;
     return _BookingState.upcoming;
   }
@@ -322,8 +317,6 @@ class _BookedScreenState extends State<BookedScreen> with SingleTickerProviderSt
     final type = venue?.type ?? 'badminton';
     final color = _typeColor(type);
     final state = _stateOf(b);
-    final active = state == _BookingState.upcoming || state == _BookingState.pending;
-    final canCancel = active && CancelPolicy.canCustomerCancel(_start(b), widget.clock());
 
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
@@ -377,22 +370,6 @@ class _BookedScreenState extends State<BookedScreen> with SingleTickerProviderSt
             ],
             const SizedBox(height: 8),
             _buildInfoItem(Icons.payments_outlined, 'Thanh toán', b.paymentMethod),
-            if (active && !canCancel) ...[
-              const SizedBox(height: 8),
-              Row(
-                key: ValueKey('cancel-closed-${b.id}'),
-                children: const [
-                  Icon(Icons.lock_clock_outlined, size: 14, color: Color(0xFFB45309)),
-                  SizedBox(width: 5),
-                  Expanded(
-                    child: Text(
-                      'Không hủy được: còn dưới ${CancelPolicy.minNoticeHours} tiếng tới giờ chơi.',
-                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFFB45309)),
-                    ),
-                  ),
-                ],
-              ),
-            ],
             const Padding(padding: EdgeInsets.symmetric(vertical: 12), child: Divider(height: 1, color: Color(0xFFF1F5F9))),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -405,18 +382,7 @@ class _BookedScreenState extends State<BookedScreen> with SingleTickerProviderSt
                         style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Color(0xFF0284C7))),
                   ],
                 ),
-                if (canCancel)
-                  OutlinedButton(
-                    onPressed: () => _showCancelDialog(b),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: const Color(0xFFEF4444),
-                      side: const BorderSide(color: Color(0xFFFCA5A5)),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                    ),
-                    child: const Text('Hủy đặt sân', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
-                  )
-                else if (venue != null && (state == _BookingState.completed || state == _BookingState.cancelled))
+                if (venue != null && (state == _BookingState.completed || state == _BookingState.cancelled))
                   ElevatedButton(
                     onPressed: () =>
                         Navigator.push(context, MaterialPageRoute(builder: (_) => VisualBookingScreen(venue: venue))),
@@ -455,52 +421,4 @@ class _BookedScreenState extends State<BookedScreen> with SingleTickerProviderSt
     );
   }
 
-  void _showCancelDialog(BookingItem b) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Xác nhận hủy đặt sân', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 17)),
-        content: Text(
-          'Hủy lượt đặt tại "${b.venueName}" lúc ${b.time} ngày ${b.date}? '
-          'Đơn sẽ chuyển sang "Đã hủy". Việc hoàn tiền (nếu có) do chủ sân xử lý theo chính sách của sân. ${CancelPolicy.ruleText}',
-          style: const TextStyle(fontSize: 13, color: Color(0xFF475569), height: 1.4),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Giữ lại', style: TextStyle(color: Color(0xFF64748B))),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              Navigator.pop(ctx);
-              // Kiểm tra lại: hộp thoại có thể đã mở lâu đến quá hạn hủy
-              if (!CancelPolicy.canCustomerCancel(_start(b), widget.clock())) {
-                setState(() {});
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Đã quá hạn hủy. ${CancelPolicy.ruleText}'), backgroundColor: Color(0xFFEF4444)),
-                );
-                return;
-              }
-              final ok = await FirestoreService.updateBookingStatus(b.id, 'Đã hủy');
-              if (!mounted) return;
-              if (ok) setState(() => b.status = 'Đã hủy');
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(ok ? 'Đã hủy lịch đặt sân' : 'Chưa hủy được, vui lòng thử lại'),
-                  backgroundColor: ok ? const Color(0xFF16A34A) : const Color(0xFFEF4444),
-                ),
-              );
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFEF4444),
-              foregroundColor: Colors.white,
-              elevation: 0,
-            ),
-            child: const Text('Xác nhận hủy'),
-          ),
-        ],
-      ),
-    );
-  }
 }

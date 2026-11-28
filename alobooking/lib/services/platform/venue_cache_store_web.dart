@@ -1,4 +1,5 @@
-// ignore: avoid_web_libraries_in_flutter
+// TODO: chuyển sang package:web + dart:js_interop (dart:html đã bị đánh dấu lỗi thời)
+// ignore: avoid_web_libraries_in_flutter, deprecated_member_use
 import 'dart:html' as html;
 
 /// Lưu bộ nhớ đệm vào localStorage của trình duyệt để mở lại app (hoặc tải lại trang) không phải đọc lại từ Firestore.
