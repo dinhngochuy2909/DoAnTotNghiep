@@ -589,6 +589,7 @@ class _VisualBookingScreenState extends State<VisualBookingScreen> {
                                 amount: _formatCurrency(_totalPrice(e.value)),
                                 paymentMethod: paymentMethod,
                                 ownerId: widget.venue.ownerId,
+                                venueId: widget.venue.id,
                                 userId: AuthService.currentUser?.uid ?? '',
                               );
                               if (!ok) allSaved = false;

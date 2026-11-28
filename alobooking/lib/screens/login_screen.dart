@@ -89,6 +89,16 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
     );
   }
 
+  /// Mật khẩu không nằm trong mã nguồn: khai DEMO_ADMIN_EMAIL, DEMO_ADMIN_PASSWORD, DEMO_OWNER_PASSWORD trong
+  /// `dart_defines.json`. Bản phát hành luôn nhận chuỗi rỗng nên không chứa các giá trị này.
+  static const _adminEmail = kDebugMode ? String.fromEnvironment('DEMO_ADMIN_EMAIL') : '';
+  static const _adminPassword = kDebugMode ? String.fromEnvironment('DEMO_ADMIN_PASSWORD') : '';
+  static const _ownerPassword = kDebugMode ? String.fromEnvironment('DEMO_OWNER_PASSWORD') : '';
+  static const _demoAccounts = [
+    if (_adminEmail != '' && _adminPassword != '') ('👑 Admin', _adminEmail, _adminPassword),
+    if (_ownerPassword != '') ('🏟️ Chủ Sân', 'chusan@alobooking.com', _ownerPassword),
+  ];
+
   @override
   Widget build(BuildContext context) {
     final screenSize = MediaQuery.of(context).size;
@@ -369,8 +379,8 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
 
             const SizedBox(height: 16),
 
-            // Gợi ý tài khoản demo: chỉ hiện khi chạy debug, bản phát hành không có
-            if (kDebugMode)
+            // Điền nhanh tài khoản demo: chỉ khi chạy debug và đã khai mật khẩu trong dart_defines.json
+            if (kDebugMode && _demoAccounts.isNotEmpty)
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
               decoration: BoxDecoration(
@@ -386,7 +396,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                       Icon(Icons.verified_user_outlined, size: 15, color: Color(0xFF0284C7)),
                       SizedBox(width: 6),
                       Text(
-                        'Tài khoản Demo (4 Phân Quyền):',
+                        'Tài khoản demo:',
                         style: TextStyle(
                           fontSize: 11.5,
                           fontWeight: FontWeight.bold,
@@ -400,56 +410,17 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                     spacing: 6,
                     runSpacing: 6,
                     children: [
-                      ActionChip(
-                        avatar: const Text('👑', style: TextStyle(fontSize: 12)),
-                        label: const Text('Admin', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                        backgroundColor: const Color(0xFFE0F2FE),
-                        labelStyle: const TextStyle(color: Color(0xFF0369A1)),
-                        onPressed: () {
-                          _emailController.text = 'admin@alobooking.com';
-                          _passwordController.text = 'admin123';
-                        },
-                      ),
-                      ActionChip(
-                        avatar: const Text('🏟️', style: TextStyle(fontSize: 12)),
-                        label: const Text('Chủ Sân', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                        backgroundColor: const Color(0xFFE0F2FE),
-                        labelStyle: const TextStyle(color: Color(0xFF0369A1)),
-                        onPressed: () {
-                          _emailController.text = 'chusan@alobooking.com';
-                          _passwordController.text = 'chusan123';
-                        },
-                      ),
-                      ActionChip(
-                        avatar: const Text('👤', style: TextStyle(fontSize: 12)),
-                        label: const Text('Khách Hàng', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                        backgroundColor: const Color(0xFFF1F5F9),
-                        labelStyle: const TextStyle(color: Color(0xFF475569)),
-                        onPressed: () {
-                          _emailController.text = 'user@alobooking.com';
-                          _passwordController.text = '123456';
-                        },
-                      ),
-                      ActionChip(
-                        avatar: const Text('👀', style: TextStyle(fontSize: 12)),
-                        label: const Text('Khách Xem (Chỉ xem)', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                        backgroundColor: const Color(0xFFFEF3C7),
-                        labelStyle: const TextStyle(color: Color(0xFFB45309)),
-                        onPressed: () {
-                          _emailController.text = 'guest@alobooking.com';
-                          _passwordController.text = '123456';
-                        },
-                      ),
+                      for (final (label, email, password) in _demoAccounts)
+                        ActionChip(
+                          label: Text(label, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                          backgroundColor: const Color(0xFFE0F2FE),
+                          labelStyle: const TextStyle(color: Color(0xFF0369A1)),
+                          onPressed: () {
+                            _emailController.text = email;
+                            _passwordController.text = password;
+                          },
+                        ),
                     ],
-                  ),
-                  const SizedBox(height: 6),
-                  const Text(
-                    '• Admin duyệt bài đăng sân, quản trị toàn hệ thống\n• Chủ sân quản lý cụm sân, xem đơn đặt & doanh thu\n• Khách Hàng đặt sân & thanh toán trực tuyến\n• Khách Xem: Chỉ xem sân, bản đồ & giá, KHÔNG ĐẶT ĐƯỢC SÂN',
-                    style: TextStyle(
-                      fontSize: 10,
-                      color: Color(0xFF64748B),
-                      height: 1.4,
-                    ),
                   ),
                 ],
               ),

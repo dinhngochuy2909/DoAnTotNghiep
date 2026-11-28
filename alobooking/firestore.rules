@@ -1,8 +1,129 @@
 rules_version = '2';
+
+// Luật bảo mật của AloBooking. Người gọi được nhận ra bằng token Firebase Authentication;
+// vai trò đọc từ users/{uid}.role. Mọi thứ không được liệt kê đều bị từ chối.
+// Kiểm thử: xem firestore-tests/rules.test.mjs.
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /{document=**} {
-      allow read, write: if true;
+
+    function signedIn() { return request.auth != null; }
+    function uid() { return request.auth.uid; }
+    function userPath(id) { return /databases/$(database)/documents/users/$(id); }
+    function role() {
+      return signedIn() && exists(userPath(uid())) ? get(userPath(uid())).data.get('role', 'customer') : '';
+    }
+    function isAdmin() { return role() == 'admin'; }
+    // Tài khoản riêng của máy nhận webhook SePay: chỉ xác nhận đơn đã nhận được tiền.
+    function isWebhook() { return role() == 'webhook'; }
+    function changed() { return request.resource.data.diff(resource.data).affectedKeys(); }
+    // Đơn hoặc phiếu thu thuộc về người gọi: người đặt, hoặc chủ sân được đặt.
+    function mine() {
+      return signedIn() && (resource.data.get('userId', '') == uid() || resource.data.get('ownerId', '') == uid());
+    }
+    function bookingPath(id) { return /databases/$(database)/documents/bookings/$(id); }
+    function venueOwner(venueId) {
+      return get(/databases/$(database)/documents/venues/$(string(venueId))).data.get('ownerId', 'admin_super_01');
+    }
+
+    match /users/{id} {
+      allow get: if signedIn() && (uid() == id || isAdmin());
+      allow list: if isAdmin();
+      // Tự đăng ký chỉ được làm khách hàng; mật khẩu do Firebase Authentication giữ, không lưu ở đây.
+      allow create: if isAdmin() || (signedIn() && uid() == id && request.resource.data.role == 'customer'
+                      && !('password' in request.resource.data));
+      allow update: if isAdmin() || (signedIn() && uid() == id && !changed().hasAny(['role', 'password']));
+      allow delete: if isAdmin();
+    }
+
+    match /venues/{id} {
+      allow read: if true;
+      allow create: if isAdmin() || (role() in ['owner', 'court_owner', 'manager']
+                      && request.resource.data.ownerId == uid()
+                      && request.resource.data.approvalStatus == 'pending');
+      // Chủ sân sửa sân của mình: giữ nguyên chủ sở hữu, không tự duyệt.
+      allow update: if isAdmin() || (signedIn() && resource.data.get('ownerId', '') == uid()
+                      && request.resource.data.ownerId == uid()
+                      && request.resource.data.approvalStatus in [resource.data.get('approvalStatus', 'approved'), 'pending']);
+      allow delete: if isAdmin() || (signedIn() && resource.data.get('ownerId', '') == uid());
+    }
+
+    match /bookings/{id} {
+      allow read: if isAdmin() || isWebhook() || mine();
+
+      // Trường `id` phải đúng mã tài liệu (máy nhận tìm đơn theo trường này). Mã "BK-123456-2" chỉ hợp lệ
+      // khi cùng người đặt sở hữu "BK-123456-1", để không ai ghép đơn của mình vào mã của người khác.
+      function validCode() {
+        return request.resource.data.id == id
+          && id.matches('BK-[0-9]{6}(-[0-9]{1,2})?')
+          && (id.size() == 9
+              || (!existsAfter(bookingPath(id[0:9]))
+                  && getAfter(bookingPath(id[0:9] + '-1')).data.userId == uid()));
+      }
+      allow create: if isAdmin() || (signedIn() && validCode()
+                      && request.resource.data.userId == uid()
+                      && request.resource.data.status == 'Chờ xác nhận'
+                      && request.resource.data.ownerId == venueOwner(request.resource.data.venueId));
+
+      allow update: if isAdmin()
+        // Chủ sân xử lý đơn sân mình, chỉ đổi trạng thái.
+        || (signedIn() && resource.data.get('ownerId', '') == uid() && changed().hasOnly(['status'])
+            && request.resource.data.status in ['Đã xác nhận', 'Đã hủy', 'Hoàn thành'])
+        // Máy nhận webhook chỉ được chuyển đơn đang chờ sang đã xác nhận.
+        || (isWebhook() && changed().hasOnly(['status'])
+            && resource.data.status == 'Chờ xác nhận' && request.resource.data.status == 'Đã xác nhận');
+      allow delete: if isAdmin();
+    }
+
+    // Lịch bận công khai: chỉ sân, ngày, giờ và trạng thái, không có tên hay số điện thoại khách.
+    // Mã tài liệu trùng mã đơn.
+    match /slots/{id} {
+      allow read: if true;
+      allow create: if isAdmin() || (signedIn()
+                      && request.resource.data.keys().hasOnly(['venueId', 'venueName', 'field', 'date', 'time', 'status', 'paymentMethod', 'createdAt'])
+                      && request.resource.data.status == 'Đã đặt'
+                      && getAfter(bookingPath(id)).data.userId == uid()
+                      && getAfter(bookingPath(id)).data.venueId == request.resource.data.venueId
+                      && getAfter(bookingPath(id)).data.date == request.resource.data.date
+                      && getAfter(bookingPath(id)).data.time == request.resource.data.time
+                      && getAfter(bookingPath(id)).data.field == request.resource.data.field);
+      allow update: if isAdmin() || (signedIn() && get(bookingPath(id)).data.ownerId == uid()
+                      && changed().hasOnly(['status']));
+      allow delete: if isAdmin();
+    }
+
+    match /payments/{id} {
+      allow read: if isAdmin() || isWebhook() || mine();
+      allow create: if isAdmin() || (signedIn()
+                      && request.resource.data.userId == uid()
+                      && request.resource.data.status == 'Đang xử lý'
+                      && getAfter(bookingPath(request.resource.data.bookingId)).data.userId == uid()
+                      && getAfter(bookingPath(request.resource.data.bookingId)).data.ownerId == request.resource.data.ownerId);
+      allow update: if isAdmin()
+        || (signedIn() && resource.data.get('ownerId', '') == uid() && changed().hasOnly(['status']))
+        || (isWebhook() && changed().hasOnly(['status', 'bankRef']) && request.resource.data.status == 'Thành công');
+      allow delete: if isAdmin();
+    }
+
+    match /reviews/{id} {
+      allow read: if true;
+      allow create: if signedIn() && request.resource.data.userId == uid()
+                      && request.resource.data.stars >= 1 && request.resource.data.stars <= 5
+                      && request.resource.data.comment.size() <= 1000;
+      allow update, delete: if isAdmin();
+    }
+
+    match /news/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /notifications/{id} {
+      // Quản trị viên còn đọc được hộp thư chung của hệ thống.
+      allow read: if signedIn() && (resource.data.userId == uid() || (isAdmin() && resource.data.userId == 'admin_super_01'));
+      allow create: if signedIn() && request.resource.data.isRead == false
+                      && request.resource.data.title.size() <= 200 && request.resource.data.message.size() <= 500;
+      allow update: if signedIn() && (resource.data.userId == uid() || isAdmin()) && changed().hasOnly(['isRead']);
+      allow delete: if isAdmin();
     }
   }
 }

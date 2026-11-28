@@ -7,6 +7,9 @@
 //   SEPAY_HMAC_SECRET   khóa ký HMAC-SHA256 của webhook (nên dùng)
 //   SEPAY_API_KEY       hoặc khóa kiểu "Authorization: Apikey ..."
 //   FIRESTORE_PROJECT   mã dự án Firebase (khai trong wrangler.toml)
+//   FIREBASE_API_KEY    khóa web của Firebase, và
+//   BOT_EMAIL, BOT_PASSWORD  tài khoản riêng của máy nhận (vai trò "webhook"): luật Firestore chỉ cho
+//                       tài khoản này chuyển đơn đang chờ sang đã xác nhận.
 
 const PENDING = 'Chờ xác nhận';
 const CONFIRMED = 'Đã xác nhận';
@@ -50,7 +53,7 @@ export async function handle(request, env, http, now) {
   }
 
   try {
-    const store = firestore(env.FIRESTORE_PROJECT, http);
+    const store = firestore(env.FIRESTORE_PROJECT, http, await botToken(env, http, now));
     const bookings = await store.bookingsOfCode(code);
     const pending = bookings.filter((b) => b.status === PENDING);
     if (pending.length === 0) {
@@ -63,6 +66,16 @@ export async function handle(request, env, http, now) {
     if (total <= 0 || paid < total) {
       console.log('Chuyển thiếu tiền cho mã', code, '- cần', total, 'nhận', paid);
       return ok();
+    }
+
+    // Số tiền trên đơn do trình duyệt gửi lên: đối chiếu với bảng giá của sân trước khi tự xác nhận.
+    for (const b of pending) {
+      const venue = b.venueId ? await store.venue(b.venueId) : null;
+      const expected = venue ? expectedPrice(venue.price, b.time) : null;
+      if (expected === null || money(b.amount) < expected) {
+        console.log('Đơn', b.id, 'không khớp giá sân: cần', expected, 'đơn ghi', money(b.amount), '- để chủ sân kiểm tra');
+        return ok();
+      }
     }
 
     const reference = String(data.referenceCode || `SePay-${data.id}`);
@@ -92,6 +105,40 @@ export function money(text) {
   return Number(String(text ?? '').replace(/[^0-9]/g, '')) || 0;
 }
 
+/**
+ * Số tiền của các ca "18:00 - 20:00, 21:00 - 22:00" theo giá sân "80k - 100k/h": giờ vàng 16:00 – 22:00 lấy giá
+ * cao, còn lại giá thấp (giống BookingSlots.priceForHour trong ứng dụng). null nếu không đọc được giờ.
+ */
+export function expectedPrice(priceText, timeText) {
+  const m = /(\d+)\s*k\s*-\s*(\d+)\s*k/.exec(String(priceText ?? '').toLowerCase());
+  const low = m ? Math.min(Number(m[1]), Number(m[2])) * 1000 : 150000;
+  const high = m ? Math.max(Number(m[1]), Number(m[2])) * 1000 : 150000;
+  let total = 0;
+  for (const part of String(timeText ?? '').split(',')) {
+    const t = /^\s*(\d{1,2}):00\s*-\s*(\d{1,2}):00\s*$/.exec(part);
+    if (!t || Number(t[2]) <= Number(t[1]) || Number(t[2]) > 24) return null;
+    for (let h = Number(t[1]); h < Number(t[2]); h++) total += h >= 16 && h < 22 ? high : low;
+  }
+  return total;
+}
+
+let session; // token của tài khoản máy nhận, dùng lại cho tới gần hết hạn
+
+/** Đăng nhập tài khoản riêng của máy nhận; chưa khai BOT_EMAIL thì gọi Firestore không kèm token. */
+async function botToken(env, http, now) {
+  if (!env.BOT_EMAIL) return null;
+  if (session && session.email === env.BOT_EMAIL && now() < session.expires) return session.token;
+  const res = await http(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${env.FIREBASE_API_KEY}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: env.BOT_EMAIL, password: env.BOT_PASSWORD, returnSecureToken: true }),
+  });
+  if (!res.ok) throw new Error(`đăng nhập máy nhận ${res.status}`);
+  const data = await res.json();
+  session = { email: env.BOT_EMAIL, token: data.idToken, expires: now() + (Number(data.expiresIn) - 60) * 1000 };
+  return session.token;
+}
+
 async function authentic(request, raw, env, now) {
   if (env.SEPAY_HMAC_SECRET) {
     const signature = request.headers.get('X-SePay-Signature') || '';
@@ -116,13 +163,14 @@ function same(a, b) {
   return diff === 0;
 }
 
-function firestore(project, http) {
+function firestore(project, http, token) {
   const base = `https://firestore.googleapis.com/v1/projects/${project}/databases/(default)/documents`;
+  const headers = { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) };
 
   async function query(structuredQuery) {
     const res = await http(`${base}:runQuery`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({ structuredQuery }),
     });
     if (!res.ok) throw new Error(`runQuery ${res.status}`);
@@ -130,7 +178,7 @@ function firestore(project, http) {
       .filter((row) => row.document)
       .map((row) => {
         const out = { docId: row.document.name.split('/').pop() };
-        for (const [k, v] of Object.entries(row.document.fields || {})) out[k] = v.stringValue;
+        for (const [k, v] of Object.entries(row.document.fields || {})) out[k] = v.stringValue ?? v.integerValue;
         return out;
       });
   }
@@ -151,6 +199,13 @@ function firestore(project, http) {
       });
       return rows.filter((b) => b.id === code || String(b.id).startsWith(`${code}-`));
     },
+    /** Bảng giá của sân; null nếu không có sân này. */
+    async venue(venueId) {
+      const res = await http(`${base}/venues/${encodeURIComponent(venueId)}?mask.fieldPaths=price`, { method: 'GET', headers });
+      if (res.status === 404) return null;
+      if (!res.ok) throw new Error(`venue ${res.status}`);
+      return { price: (await res.json()).fields?.price?.stringValue };
+    },
     paymentsOfBooking(bookingId) {
       return query({ from: [{ collectionId: 'payments' }], where: where('bookingId', 'EQUAL', bookingId) });
     },
@@ -159,7 +214,7 @@ function firestore(project, http) {
       const fields = Object.fromEntries(Object.entries(values).map(([k, v]) => [k, { stringValue: v }]));
       const res = await http(`${base}/${collection}/${encodeURIComponent(docId)}?${mask}&currentDocument.exists=true`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({ fields }),
       });
       if (!res.ok) throw new Error(`update ${collection} ${res.status}`);

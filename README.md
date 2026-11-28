@@ -21,13 +21,14 @@
 │   │       ├── weather/        Thời tiết Open-Meteo (hiện tại, dự báo, lịch sử)
 │   │       └── platform/       Mã riêng cho web (chọn ảnh, vị trí, bộ nhớ đệm)
 │   ├── test/                   Test tự động, cấu trúc phản chiếu lib/
-│   ├── tool/                   Script Python lấy dữ liệu (tin RSS, thời tiết, đơn mô phỏng)
+│   ├── tool/                   Script Python lấy dữ liệu (tin RSS, thời tiết, đơn mô phỏng), chuyển dữ liệu
 │   │   └── data/               Dữ liệu các script ghi ra (CSV, JSON)
 │   ├── assets/demo/            Dữ liệu mô phỏng được đóng gói vào ứng dụng
 │   ├── web/ android/ ios/ windows/   Thư mục nền tảng do Flutter sinh ra
 │   ├── pubspec.yaml            Khai báo thư viện
-│   ├── firestore.rules         Luật truy cập Firestore (đang mở, xem docs/dac-ta-yeu-cau.md mục 5)
-│   ├── firebase.json           Cấu hình Firebase Hosting
+│   ├── firestore.rules         Luật bảo mật Firestore theo vai trò
+│   ├── firestore-tests/        Kiểm thử luật và máy nhận trên bộ mô phỏng Firebase
+│   ├── firebase.json           Cấu hình Hosting, luật, đăng nhập và bộ mô phỏng
 │   └── dart_defines.example.json   Mẫu file khóa bí mật (xem bên dưới)
 └── docs/
     ├── report/                 Báo cáo đồ án (.docx và bản .md), slide, checklist
@@ -46,7 +47,7 @@
 
 Chạy trong thư mục `alobooking/`.
 
-1. Sao chép `dart_defines.example.json` thành `dart_defines.json` và điền khóa thật (Gemini, thông tin nhận tiền). File này đã được `.gitignore`, không đưa lên git.
+1. Sao chép `dart_defines.example.json` thành `dart_defines.json` và điền khóa thật (Gemini, thông tin nhận tiền, khóa web Firebase). File này đã được `.gitignore`, không đưa lên git.
 2. Cài thư viện và chạy:
 
 ```
@@ -61,11 +62,19 @@ Mở http://localhost:8801/.
 Đang chạy tại https://alobooking-b2484.web.app. Trong thư mục `alobooking/`:
 
 ```
-flutter build web --release --no-tree-shake-icons --dart-define-from-file=dart_defines.json --dart-define=GEMINI_API_KEY= --dart-define=DEMO_ACCOUNTS=false
+flutter build web --release --no-tree-shake-icons --dart-define-from-file=dart_defines.json --dart-define=GEMINI_API_KEY=
 firebase deploy --only hosting
 ```
 
-Hai tham số cuối của lệnh build giữ cho khóa Gemini và tài khoản demo không lọt vào bản web công khai.
+Tham số cuối giữ cho khóa Gemini không lọt vào bản web công khai. Mật khẩu demo chỉ được nạp ở bản debug.
+
+## Đăng nhập và bảo mật
+
+- Đăng ký, đăng nhập bằng Firebase Authentication; Firestore chỉ lưu hồ sơ và vai trò (`users/{uid}.role`).
+- Mọi yêu cầu tới Firestore gắn token; quyền do [alobooking/firestore.rules](alobooking/firestore.rules) quyết định.
+- Đơn đặt (có tên, số điện thoại) chỉ người đặt, chủ sân và quản trị viên đọc được. Ô giờ đã đặt công khai ở collection `slots`, không có thông tin cá nhân.
+- Khóa web Firebase không phải bí mật, nhưng nên giới hạn trong Google Cloud Console chỉ cho Identity Toolkit API và Token Service API.
+- Áp dụng luật: `firebase deploy --only firestore:rules`. Chuyển dữ liệu cũ trước bằng `python tool/migrate_to_auth.py` (xem đầu tệp).
 
 ## Kiểm thử
 
@@ -74,6 +83,14 @@ flutter test
 dart analyze --fatal-infos
 flutter test test/integration/gemini_live_test.dart --dart-define-from-file=dart_defines.json   # gọi Gemini thật
 ```
+
+Luật bảo mật, máy nhận webhook và luồng đặt sân chạy trên bộ mô phỏng Firebase (cần Java 21, không đụng dữ liệu thật):
+
+```
+firebase emulators:exec --only firestore,auth --project demo-alobooking "node --test firestore-tests/rules.test.mjs && node --test firestore-tests/worker.emulator.test.mjs && flutter test test/integration/emulator_flow_test.dart --dart-define=FIREBASE_EMULATOR=127.0.0.1 --dart-define=FIREBASE_PROJECT=demo-alobooking"
+```
+
+Trên Windows, bộ mô phỏng không mở được thư mục có dấu tiếng Việt: chép dự án sang đường dẫn không dấu để chạy lệnh trên.
 
 Test gọi Gemini tự bỏ qua khi không truyền khóa. Trên GitHub Actions, thêm secret `GEMINI_API_KEY` thì bước này mới chạy.
 
@@ -88,5 +105,5 @@ Máy nhận webhook ở [sepay-webhook/](sepay-webhook/README.md) (Cloudflare Wo
 | `crawl_news.py` | Lấy tin thể thao từ RSS, đăng lên mục Khám phá (có ghi nguồn) |
 | `crawl_weather.py` | Tải thời tiết nhiều năm của Hà Nội về `tool/data/` |
 | `simulate_bookings.py` | Sinh đơn đặt sân mô phỏng vào `assets/demo/` (luôn gắn nhãn mô phỏng) |
-| `check_auth_roles.dart` | Chạy tay kiểm tra đăng nhập theo vai trò (cần mạng) |
+| `migrate_to_auth.py` | Sao lưu và chuyển tài khoản, đơn cũ sang Firebase Authentication |
 | `build_training_dataset.py` | Dựng bảng dữ liệu huấn luyện theo ngày và theo giờ |

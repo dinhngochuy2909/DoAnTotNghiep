@@ -152,7 +152,7 @@ class _VenueFinderScreenState extends State<VenueFinderScreen> {
     var list = <BookingItem>[];
     var failed = false;
     try {
-      list = await (widget.bookingsLoader ?? FirestoreService.getBookings)();
+      list = await (widget.bookingsLoader ?? FirestoreService.getSlots)();
       failed = widget.bookingsLoader == null && FirestoreService.lastLoadFailed && list.isEmpty;
     } catch (_) {
       failed = true;

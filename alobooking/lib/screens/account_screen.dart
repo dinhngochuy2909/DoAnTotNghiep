@@ -129,10 +129,9 @@ class _AccountScreenState extends State<AccountScreen> {
 
   void _showNotificationsDialog() async {
     final me = AuthService.currentUser;
-    final ids = <String>{if (me != null) me.uid, if (me != null && me.isAdmin) 'admin_super_01'};
     final notifs = me == null || AuthService.isGuest
         ? <NotificationItem>[]
-        : (await FirestoreService.getNotifications()).where((n) => ids.contains(n.userId)).toList();
+        : await FirestoreService.getNotifications();
     if (!mounted) return;
 
     showDialog(

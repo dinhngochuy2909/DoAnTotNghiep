@@ -495,7 +495,8 @@ extension _AdminBookingsTab on _AdminScreenState {
                 date: newBooking.date,
                 amount: newBooking.amount,
                 paymentMethod: newBooking.paymentMethod,
-                ownerId: _venues.where((v) => v.name == newBooking.venueName).map((v) => v.ownerId).firstOrNull ?? 'admin_super_01',
+                ownerId: venue.ownerId,
+                venueId: venue.id,
                 status: 'Đã xác nhận', // quản trị viên chỉ tạo đơn này sau khi đã nhận chuyển khoản
                 paid: true,
               );

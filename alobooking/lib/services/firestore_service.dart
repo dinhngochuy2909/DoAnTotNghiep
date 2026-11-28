@@ -5,6 +5,9 @@ import '../models/customer.dart';
 import '../models/payment.dart';
 import '../models/notification_item.dart';
 import '../models/news_post.dart';
+import 'auth_service.dart';
+import 'firebase_config.dart';
+import 'session.dart';
 import 'venue_cache.dart';
 
 class BookingItem {
@@ -23,6 +26,10 @@ class BookingItem {
   /// uid tài khoản đã đặt (rỗng với đơn cũ hoặc đơn tại quầy)
   final String userId;
 
+  /// uid chủ sân được đặt và mã sân; luật bảo mật dựa vào hai trường này.
+  final String ownerId;
+  final int venueId;
+
   BookingItem({
     required this.id,
     required this.customer,
@@ -36,7 +43,28 @@ class BookingItem {
     required this.paymentMethod,
     DateTime? createdAt,
     this.userId = '',
+    this.ownerId = '',
+    this.venueId = 0,
   }) : createdAt = createdAt ?? DateTime.now();
+
+  /// Một dòng lịch bận công khai (collection `slots`): không có tên, số điện thoại hay số tiền.
+  factory BookingItem.fromSlot(String docId, Map<String, dynamic> fields) {
+    String v(String k) => (fields[k]?['stringValue'] ?? '').toString();
+    return BookingItem(
+      id: docId,
+      customer: '',
+      phone: '',
+      amount: '',
+      venueName: v('venueName'),
+      field: v('field'),
+      time: v('time'),
+      date: v('date'),
+      status: v('status'),
+      paymentMethod: v('paymentMethod'),
+      createdAt: DateTime.tryParse(v('createdAt')),
+      venueId: int.tryParse((fields['venueId']?['integerValue'] ?? '0').toString()) ?? 0,
+    );
+  }
 
   /// Đơn này có phải của tài khoản (uid, số điện thoại, tên) không.
   /// Ưu tiên uid; đơn cũ chưa có uid thì khớp theo số điện thoại, thiếu số thì khớp theo tên.
@@ -62,6 +90,8 @@ class BookingItem {
       paymentMethod: fields['paymentMethod']?['stringValue'] ?? 'Chuyển khoản QR',
       createdAt: DateTime.tryParse(fields['createdAt']?['stringValue'] ?? '') ?? DateTime.now(),
       userId: fields['userId']?['stringValue'] ?? '',
+      ownerId: fields['ownerId']?['stringValue'] ?? '',
+      venueId: int.tryParse((fields['venueId']?['integerValue'] ?? '0').toString()) ?? 0,
     );
   }
 }
@@ -126,7 +156,7 @@ enum LoadFailure {
 }
 
 class FirestoreService {
-  static const String projectId = 'alobooking-b2484';
+  static const String projectId = FirebaseConfig.projectId;
 
   /// Lý do thất bại của các lần tải gần nhất (từ lần đặt lại cuối). [LoadFailure.none] nếu không lỗi.
   static LoadFailure lastFailure = LoadFailure.none;
@@ -172,7 +202,7 @@ class FirestoreService {
       final q = pageToken != null && pageToken.isNotEmpty ? '&pageToken=$pageToken' : '';
       http.Response res;
       try {
-        res = await http.get(Uri.parse('$baseUrl/$collection?pageSize=$pageSize$q'));
+        res = await http.get(Uri.parse('$baseUrl/$collection?pageSize=$pageSize$q'), headers: await Session.headers());
       } catch (_) {
         _raise(LoadFailure.network);
         return (ok: false, docs: docs);
@@ -196,8 +226,7 @@ class FirestoreService {
     return (ok: true, docs: docs);
   }
 
-  static const String baseUrl =
-      'https://firestore.googleapis.com/v1/projects/$projectId/databases/(default)/documents';
+  static const String baseUrl = FirebaseConfig.firestoreUrl;
 
   /// Lấy danh sách sân thể thao.
   ///
@@ -232,7 +261,7 @@ class FirestoreService {
         final queryParam = pageToken != null ? '&pageToken=$pageToken' : '';
         http.Response response;
         try {
-          response = await http.get(Uri.parse('$baseUrl/venues?pageSize=300$queryParam'));
+          response = await http.get(Uri.parse('$baseUrl/venues?pageSize=300$queryParam'), headers: await Session.headers());
         } catch (_) {
           failure = LoadFailure.network;
           break;
@@ -339,7 +368,7 @@ class FirestoreService {
 
       final response = await http.post(
         Uri.parse('$baseUrl/venues?documentId=$docId'),
-        headers: {'Content-Type': 'application/json'},
+        headers: await Session.headers(json: true),
         body: json.encode(payload),
       );
       final ok = response.statusCode == 200 || response.statusCode == 201;
@@ -386,7 +415,7 @@ class FirestoreService {
 
       final response = await http.patch(
         Uri.parse('$baseUrl/venues/$docId'),
-        headers: {'Content-Type': 'application/json'},
+        headers: await Session.headers(json: true),
         body: json.encode(payload),
       );
       final ok = response.statusCode == 200;
@@ -400,7 +429,7 @@ class FirestoreService {
   /// Xóa sân thể thao khỏi Firestore
   static Future<bool> deleteVenue(int venueId) async {
     try {
-      final response = await http.delete(Uri.parse('$baseUrl/venues/$venueId'));
+      final response = await http.delete(Uri.parse('$baseUrl/venues/$venueId'), headers: await Session.headers());
       final ok = response.statusCode == 200;
       if (ok) VenueCache.removeId(venueId);
       return ok;
@@ -426,7 +455,7 @@ class FirestoreService {
       final response = await http.patch(
         Uri.parse('$baseUrl/venues/$venueId?updateMask.fieldPaths=approvalStatus&updateMask.fieldPaths=rejectReason'
             '${stamp != null ? '&updateMask.fieldPaths=approvedAt' : ''}'),
-        headers: {'Content-Type': 'application/json'},
+        headers: await Session.headers(json: true),
         body: json.encode(payload),
       );
       final ok = response.statusCode == 200;
@@ -452,41 +481,83 @@ class FirestoreService {
     return count;
   }
 
-  /// Lấy danh sách đơn đặt sân từ Firestore (hỗ trợ phân trang)
+  /// Tài liệu có `field` đúng bằng `value`. Luật bảo mật chỉ cho người thường đọc qua truy vấn lọc kiểu này.
+  static Future<({bool ok, List<Map<String, dynamic>> docs})> _queryDocs(String collection, String field, String value) async {
+    final docs = <Map<String, dynamic>>[];
+    http.Response res;
+    try {
+      res = await http.post(
+        Uri.parse('$baseUrl:runQuery'),
+        headers: await Session.headers(json: true),
+        body: json.encode({
+          'structuredQuery': {
+            'from': [
+              {'collectionId': collection}
+            ],
+            'where': {
+              'fieldFilter': {
+                'field': {'fieldPath': field},
+                'op': 'EQUAL',
+                'value': {'stringValue': value},
+              }
+            },
+          }
+        }),
+      );
+    } catch (_) {
+      _raise(LoadFailure.network);
+      return (ok: false, docs: docs);
+    }
+    if (res.statusCode != 200) {
+      _raise(_classify(res.statusCode));
+      return (ok: false, docs: docs);
+    }
+    try {
+      for (final row in json.decode(res.body) as List<dynamic>) {
+        final doc = (row as Map<String, dynamic>)['document'];
+        if (doc != null) docs.add(doc as Map<String, dynamic>);
+      }
+    } catch (_) {
+      _raise(LoadFailure.server);
+      return (ok: false, docs: docs);
+    }
+    return (ok: true, docs: docs);
+  }
+
+  /// Tài liệu (đơn, phiếu thu) tài khoản hiện tại được xem: quản trị viên thấy tất cả; chủ sân thấy của sân mình
+  /// và của chính mình; khách thấy của mình; chưa đăng nhập thì không có gì (và không hỏi máy chủ).
+  static Future<List<Map<String, dynamic>>> _visibleDocs(String collection) async {
+    final user = AuthService.currentUser;
+    if (user == null || user.isGuest) return [];
+    if (user.isAdmin) return (await _listDocs(collection, pageSize: 100)).docs;
+    final own = (await _queryDocs(collection, 'userId', user.uid)).docs;
+    if (!user.isOwner) return own;
+    final venue = (await _queryDocs(collection, 'ownerId', user.uid)).docs;
+    return {for (final doc in [...own, ...venue]) doc['name'] as String: doc}.values.toList();
+  }
+
+  /// Đơn đặt sân mà tài khoản hiện tại được xem, mới nhất trước.
   static Future<List<BookingItem>> getBookings() async {
     try {
-      final List<BookingItem> allBookings = [];
-      String? pageToken;
-
-      do {
-        final queryParam = pageToken != null ? '&pageToken=$pageToken' : '';
-        final response = await http.get(Uri.parse('$baseUrl/bookings?pageSize=100$queryParam'));
-
-        if (response.statusCode == 200) {
-          final data = json.decode(response.body);
-          final documents = data['documents'] as List<dynamic>?;
-          if (documents != null && documents.isNotEmpty) {
-            for (final doc in documents) {
-              final name = (doc['name'] as String).split('/').last;
-              final fields = doc['fields'] as Map<String, dynamic>;
-              allBookings.add(BookingItem.fromFirestoreFields(name, fields));
-            }
-          }
-          pageToken = data['nextPageToken'] as String?;
-        } else {
-          if (response.statusCode != 404) _raise(_classify(response.statusCode));
-          break;
-        }
-      } while (pageToken != null && pageToken.isNotEmpty);
-
-      if (allBookings.isNotEmpty) {
-        allBookings.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-        return allBookings;
-      }
-    } catch (e) {
-      _raise(LoadFailure.network);
+      final bookings = [
+        for (final doc in await _visibleDocs('bookings'))
+          BookingItem.fromFirestoreFields((doc['name'] as String).split('/').last, doc['fields'] as Map<String, dynamic>)
+      ];
+      bookings.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      return bookings;
+    } catch (_) {
+      _raise(LoadFailure.server);
+      return <BookingItem>[];
     }
-    return <BookingItem>[];
+  }
+
+  /// Lịch bận công khai của mọi sân: dùng cho sơ đồ giờ trống, tìm sân, chatbot và dự báo nhu cầu.
+  static Future<List<BookingItem>> getSlots() async {
+    final r = await _listDocs('slots');
+    return [
+      for (final doc in r.docs)
+        BookingItem.fromSlot((doc['name'] as String).split('/').last, (doc['fields'] as Map<String, dynamic>?) ?? {})
+    ];
   }
 
   /// Cập nhật trạng thái đơn đặt sân
@@ -499,10 +570,19 @@ class FirestoreService {
       };
       final response = await http.patch(
         Uri.parse('$baseUrl/bookings/$bookingId?updateMask.fieldPaths=status'),
-        headers: {'Content-Type': 'application/json'},
+        headers: await Session.headers(json: true),
         body: json.encode(payload),
       );
-      return response.statusCode == 200;
+      if (response.statusCode != 200) return false;
+      // Đơn bị hủy: đánh dấu cả dòng lịch công khai để ô giờ trống lại.
+      if (newStatus == 'Đã hủy') {
+        await http.patch(
+          Uri.parse('$baseUrl/slots/$bookingId?updateMask.fieldPaths=status&currentDocument.exists=true'),
+          headers: await Session.headers(json: true),
+          body: json.encode(payload),
+        );
+      }
+      return true;
     } catch (e) {
       return false;
     }
@@ -513,7 +593,7 @@ class FirestoreService {
     try {
       final out = <String>[];
       for (final id in bookingIds) {
-        final response = await http.get(Uri.parse('$baseUrl/bookings/$id?mask.fieldPaths=status'));
+        final response = await http.get(Uri.parse('$baseUrl/bookings/$id?mask.fieldPaths=status'), headers: await Session.headers());
         if (response.statusCode != 200) return null;
         final fields = (json.decode(response.body) as Map<String, dynamic>)['fields'] as Map<String, dynamic>?;
         out.add(fields?['status']?['stringValue'] as String? ?? '');
@@ -524,7 +604,7 @@ class FirestoreService {
     }
   }
 
-  /// Tạo đơn đặt sân lưu trực tiếp lên Firestore alobooking-b2484
+  /// Tạo đơn đặt sân. Đơn, dòng lịch bận công khai và phiếu thu được ghi trong một lần (được cả hoặc không).
   static Future<bool> createBooking({
     required String customer,
     required String phone,
@@ -533,6 +613,7 @@ class FirestoreService {
     required String time,
     required String date,
     required String amount,
+    required int venueId,
     String paymentMethod = 'Chuyển khoản VietQR',
     String ownerId = 'admin_super_01',
     String status = 'Chờ xác nhận',
@@ -542,58 +623,75 @@ class FirestoreService {
   }) async {
     try {
       final bookingId = id ?? 'BK-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
-      final payload = {
-        'fields': {
-          'id': {'stringValue': bookingId},
-          'customer': {'stringValue': customer},
-          'phone': {'stringValue': phone},
-          'venueName': {'stringValue': venueName},
-          'field': {'stringValue': field},
-          'time': {'stringValue': time},
-          'date': {'stringValue': date},
-          'amount': {'stringValue': amount},
-          'status': {'stringValue': status},
-          'paymentMethod': {'stringValue': paymentMethod},
-          'createdAt': {'stringValue': DateTime.now().toIso8601String()},
-          if (userId.isNotEmpty) 'userId': {'stringValue': userId},
-        }
+      final createdAt = DateTime.now().toIso8601String();
+      Map<String, dynamic> text(String v) => {'stringValue': v};
+      final venue = {'integerValue': '$venueId'};
+      final booking = {
+        'id': text(bookingId),
+        'customer': text(customer),
+        'phone': text(phone),
+        'venueId': venue,
+        'venueName': text(venueName),
+        'ownerId': text(ownerId),
+        'field': text(field),
+        'time': text(time),
+        'date': text(date),
+        'amount': text(amount),
+        'status': text(status),
+        'paymentMethod': text(paymentMethod),
+        'createdAt': text(createdAt),
+        if (userId.isNotEmpty) 'userId': text(userId),
       };
-
-      final response = await http.post(
-        Uri.parse('$baseUrl/bookings?documentId=$bookingId'),
-        headers: {'Content-Type': 'application/json'},
-        body: json.encode(payload),
+      final slot = {
+        'venueId': venue,
+        'venueName': text(venueName),
+        'field': text(field),
+        'date': text(date),
+        'time': text(time),
+        'status': text('Đã đặt'),
+        'paymentMethod': text(paymentMethod),
+        'createdAt': text(createdAt),
+      };
+      // Phiếu thu ở trạng thái "Đang xử lý": chỉ chuyển "Thành công" khi nhận được tiền (webhook hoặc người duyệt).
+      final payId = 'PAY-${bookingId.replaceFirst('BK-', '')}';
+      final payment = PaymentItem(
+        id: payId,
+        bookingId: bookingId,
+        customer: customer,
+        amount: amount,
+        method: paymentMethod,
+        time: '$date $time',
+        status: paid ? 'Thành công' : 'Đang xử lý',
+        bankRef: '',
+        userId: userId,
+        ownerId: ownerId,
       );
+      Map<String, dynamic> create(String path, Map<String, dynamic> fields) => {
+            'update': {'name': '${FirebaseConfig.documentsPath}/$path', 'fields': fields},
+            'currentDocument': {'exists': false},
+          };
+      final response = await http.post(
+        Uri.parse('$baseUrl:commit'),
+        headers: await Session.headers(json: true),
+        body: json.encode({
+          'writes': [
+            create('bookings/$bookingId', booking),
+            create('slots/$bookingId', slot),
+            create('payments/$payId', payment.toFirestoreFields()),
+          ]
+        }),
+      );
+      if (response.statusCode != 200) return false;
 
-      final isSuccess = response.statusCode == 200 || response.statusCode == 201;
-      if (isSuccess) {
-        // Phiếu thu ở trạng thái "Đang xử lý": chỉ chuyển "Thành công" khi chủ sân/admin xác nhận đã nhận tiền.
-        // (Không có cổng thanh toán nên không được tự khẳng định đã thanh toán.)
-        final payId = 'PAY-${DateTime.now().millisecondsSinceEpoch.toString().substring(6)}';
-        final newPayment = PaymentItem(
-          id: payId,
-          bookingId: bookingId,
-          customer: customer,
-          amount: amount,
-          method: paymentMethod,
-          time: '$date $time',
-          status: paid ? 'Thành công' : 'Đang xử lý',
-          bankRef: '',
-        );
-        await addPayment(newPayment);
-
-        // Thông báo cho chủ sân của cụm sân được đặt
-        final notif = NotificationItem(
-          id: 'NOTIF-${DateTime.now().millisecondsSinceEpoch.toString().substring(6)}',
-          userId: ownerId,
-          title: 'Đơn đặt sân mới: $bookingId',
-          message: 'Khách hàng $customer vừa đặt sân $venueName ($field - $time ngày $date).',
-          type: 'booking',
-        );
-        await addNotification(notif);
-      }
-
-      return isSuccess;
+      // Thông báo cho chủ sân của cụm sân được đặt
+      await addNotification(NotificationItem(
+        id: 'NOTIF-${bookingId.replaceFirst('BK-', '')}',
+        userId: ownerId,
+        title: 'Đơn đặt sân mới: $bookingId',
+        message: 'Khách hàng $customer vừa đặt sân $venueName ($field - $time ngày $date).',
+        type: 'booking',
+      ));
+      return true;
     } catch (e) {
       return false;
     }
@@ -677,6 +775,27 @@ class FirestoreService {
     return customers;
   }
 
+  /// Danh sách khách đã đặt, dựng từ chính các đơn (gộp theo số điện thoại, thiếu số thì theo tên).
+  static List<CustomerItem> customersFromBookings(List<BookingItem> bookings) {
+    final byKey = <String, CustomerItem>{};
+    for (final b in bookings) {
+      final digits = b.phone.replaceAll(RegExp(r'[^0-9]'), '');
+      final key = digits.isNotEmpty ? digits : b.customer.trim().toLowerCase();
+      if (key.isEmpty || b.status.toLowerCase().contains('hủy')) continue;
+      byKey.putIfAbsent(
+          key,
+          () => CustomerItem(
+                id: key,
+                name: b.customer.isEmpty ? 'Chưa cập nhật tên' : b.customer,
+                phone: b.phone,
+                email: '',
+                favoriteSport: b.field.replaceAll(RegExp(r'\s*\d+$'), ''),
+                joinDate: _fmtDate(b.createdAt.toIso8601String()),
+              ));
+    }
+    return enrichCustomers(byKey.values.toList(), bookings);
+  }
+
   static Map<String, dynamic> _customerFields(CustomerItem c) => {
         'displayName': {'stringValue': c.name},
         'phone': {'stringValue': c.phone},
@@ -696,7 +815,7 @@ class FirestoreService {
         ..['createdBy'] = {'stringValue': 'admin'};
       final res = await http.post(
         Uri.parse('$baseUrl/users?documentId=${Uri.encodeComponent(customer.id)}'),
-        headers: {'Content-Type': 'application/json'},
+        headers: await Session.headers(json: true),
         body: json.encode({'fields': fields}),
       );
       return res.statusCode == 200 || res.statusCode == 201;
@@ -711,7 +830,7 @@ class FirestoreService {
       final mask = fields.keys.map((k) => 'updateMask.fieldPaths=$k').join('&');
       final res = await http.patch(
         Uri.parse('$baseUrl/users/${Uri.encodeComponent(customer.id)}?$mask'),
-        headers: {'Content-Type': 'application/json'},
+        headers: await Session.headers(json: true),
         body: json.encode({'fields': fields}),
       );
       return res.statusCode == 200;
@@ -722,7 +841,7 @@ class FirestoreService {
 
   static Future<bool> deleteCustomer(String id) async {
     try {
-      final res = await http.delete(Uri.parse('$baseUrl/users/${Uri.encodeComponent(id)}'));
+      final res = await http.delete(Uri.parse('$baseUrl/users/${Uri.encodeComponent(id)}'), headers: await Session.headers());
       return res.statusCode == 200;
     } catch (_) {
       return false;
@@ -735,14 +854,10 @@ class FirestoreService {
 
   /// Lấy danh sách giao dịch thanh toán từ Firestore
   static Future<List<PaymentItem>> getPayments() async {
-    final r = await _listDocs('payments', pageSize: 100);
-    final list = <PaymentItem>[];
-    for (final doc in r.docs) {
-      final name = (doc['name'] as String).split('/').last;
-      final fields = doc['fields'] as Map<String, dynamic>;
-      list.add(PaymentItem.fromFirestoreFields(name, fields));
-    }
-    return list;
+    return [
+      for (final doc in await _visibleDocs('payments'))
+        PaymentItem.fromFirestoreFields((doc['name'] as String).split('/').last, doc['fields'] as Map<String, dynamic>)
+    ];
   }
 
   /// Thêm giao dịch thanh toán mới lên Firestore
@@ -752,7 +867,7 @@ class FirestoreService {
       final payload = {'fields': payment.toFirestoreFields()};
       final response = await http.post(
         Uri.parse('$baseUrl/payments?documentId=$docId'),
-        headers: {'Content-Type': 'application/json'},
+        headers: await Session.headers(json: true),
         body: json.encode(payload),
       );
       return response.statusCode == 200 || response.statusCode == 201;
@@ -785,7 +900,7 @@ class FirestoreService {
       };
       final response = await http.patch(
         Uri.parse('$baseUrl/payments/$id?updateMask.fieldPaths=status'),
-        headers: {'Content-Type': 'application/json'},
+        headers: await Session.headers(json: true),
         body: json.encode(payload),
       );
       return response.statusCode == 200;
@@ -825,7 +940,7 @@ class FirestoreService {
     try {
       final res = await http.post(
         Uri.parse('$baseUrl/reviews?documentId=${Uri.encodeComponent(review.id)}'),
-        headers: {'Content-Type': 'application/json'},
+        headers: await Session.headers(json: true),
         body: json.encode({'fields': review.toFirestoreFields()}),
       );
       return res.statusCode == 200 || res.statusCode == 201;
@@ -856,7 +971,7 @@ class FirestoreService {
     try {
       final res = await http.post(
         Uri.parse('$baseUrl/news?documentId=${Uri.encodeComponent(post.id)}'),
-        headers: {'Content-Type': 'application/json'},
+        headers: await Session.headers(json: true),
         body: json.encode({'fields': post.toFirestoreFields()}),
       );
       return res.statusCode == 200 || res.statusCode == 201;
@@ -872,7 +987,7 @@ class FirestoreService {
       final mask = fields.keys.map((k) => 'updateMask.fieldPaths=$k').join('&');
       final res = await http.patch(
         Uri.parse('$baseUrl/news/${Uri.encodeComponent(post.id)}?$mask'),
-        headers: {'Content-Type': 'application/json'},
+        headers: await Session.headers(json: true),
         body: json.encode({'fields': fields}),
       );
       return res.statusCode == 200;
@@ -883,7 +998,7 @@ class FirestoreService {
 
   static Future<bool> deleteNews(String id) async {
     try {
-      final res = await http.delete(Uri.parse('$baseUrl/news/${Uri.encodeComponent(id)}'));
+      final res = await http.delete(Uri.parse('$baseUrl/news/${Uri.encodeComponent(id)}'), headers: await Session.headers());
       return res.statusCode == 200;
     } catch (_) {
       return false;
@@ -894,14 +1009,15 @@ class FirestoreService {
   // THÔNG BÁO HỆ THỐNG (NOTIFICATIONS)
   // ==========================================
 
-  /// Lấy danh sách thông báo từ Firestore
-  static Future<List<NotificationItem>> getNotifications([String? userId]) async {
-    final r = await _listDocs('notifications', pageSize: 50);
+  /// Thông báo gửi cho tài khoản hiện tại (quản trị viên thêm hộp thư chung `admin_super_01`).
+  static Future<List<NotificationItem>> getNotifications() async {
+    final user = AuthService.currentUser;
+    if (user == null || user.isGuest) return [];
     final list = <NotificationItem>[];
-    for (final doc in r.docs) {
-      final name = (doc['name'] as String).split('/').last;
-      final fields = doc['fields'] as Map<String, dynamic>;
-      list.add(NotificationItem.fromFirestoreFields(name, fields));
+    for (final id in {user.uid, if (user.isAdmin) 'admin_super_01'}) {
+      for (final doc in (await _queryDocs('notifications', 'userId', id)).docs) {
+        list.add(NotificationItem.fromFirestoreFields((doc['name'] as String).split('/').last, doc['fields'] as Map<String, dynamic>));
+      }
     }
     list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
     return list;
@@ -914,7 +1030,7 @@ class FirestoreService {
       final payload = {'fields': item.toFirestoreFields()};
       final response = await http.post(
         Uri.parse('$baseUrl/notifications?documentId=$docId'),
-        headers: {'Content-Type': 'application/json'},
+        headers: await Session.headers(json: true),
         body: json.encode(payload),
       );
       return response.statusCode == 200 || response.statusCode == 201;
@@ -933,7 +1049,7 @@ class FirestoreService {
       };
       final response = await http.patch(
         Uri.parse('$baseUrl/notifications/$notifId?updateMask.fieldPaths=isRead'),
-        headers: {'Content-Type': 'application/json'},
+        headers: await Session.headers(json: true),
         body: json.encode(payload),
       );
       return response.statusCode == 200;

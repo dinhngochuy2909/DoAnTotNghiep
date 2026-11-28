@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:alobooking/services/auth_service.dart';
 import 'package:alobooking/data/venues_data.dart';
 import 'package:alobooking/screens/admin_screen.dart';
 import 'package:alobooking/services/admin_stats.dart' show VnWeekday;
@@ -107,7 +108,9 @@ void main() {
   setUp(() {
     WeatherHistoryService.clearCache();
     BookingCountService.clearCache();
+    AuthService.loginAsAdminDemo(); // chỉ quản trị viên đọc được toàn bộ đơn
   });
+  tearDown(AuthService.logout);
 
   for (final size in const [Size(1440, 2600), Size(390, 4200)]) {
     testWidgets('Thẻ dự báo Admin ${size.width.toInt()}px: hiện số đơn theo mô hình đếm, bấm ngày thấy lý do, chú thích trung thực', (tester) async {

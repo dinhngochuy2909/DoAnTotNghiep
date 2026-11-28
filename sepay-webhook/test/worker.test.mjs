@@ -1,7 +1,7 @@
 // Chạy: node --test test/   (không cần mạng, không đụng cơ sở dữ liệu thật)
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { handle, bookingCode, money, hmacHex } from '../src/worker.js';
+import { handle, bookingCode, money, hmacHex, expectedPrice } from '../src/worker.js';
 
 const ACCOUNT = '0000000000';
 const NOW = 1_800_000_000_000;
@@ -15,9 +15,15 @@ const doc = (collection, docId, values) => ({
 });
 
 /** Firestore giả giữ dữ liệu trong bộ nhớ và ghi lại mọi lần sửa. */
-function fakeStore({ bookings = [], payments = [], failPatch = false } = {}) {
+function fakeStore({ bookings = [], payments = [], failPatch = false, price = '100k - 200k/h' } = {}) {
   const writes = [];
+  const calls = [];
   const http = async (url, init) => {
+    calls.push({ url, headers: init.headers });
+    if (url.includes('accounts:signInWithPassword')) {
+      return new Response(JSON.stringify({ idToken: 'token-may', expiresIn: '3600' }), { status: 200 });
+    }
+    if (init.method === 'GET') return new Response(JSON.stringify({ fields: { price: { stringValue: price } } }), { status: 200 });
     if (url.endsWith(':runQuery')) {
       const q = JSON.parse(init.body).structuredQuery;
       const name = q.from[0].collectionId;
@@ -31,8 +37,11 @@ function fakeStore({ bookings = [], payments = [], failPatch = false } = {}) {
     writes.push({ doc: path.split('/documents/')[1], ...fields });
     return new Response('{}', { status: 200 });
   };
-  return { http, writes };
+  return { http, writes, calls };
 }
+
+/** Đơn đang chờ của sân số 7, một giờ ngoài giờ vàng. */
+const waiting = (id, amount) => ({ id, status: 'Chờ xác nhận', amount, venueId: '7', time: '10:00 - 11:00' });
 
 const transfer = (over = {}) => ({
   id: 1, gateway: 'MBBank', accountNumber: ACCOUNT, code: null, content: 'BK123456', transferType: 'in',
@@ -49,7 +58,7 @@ async function post(body, { headers, store, settings = env } = {}) {
 }
 
 const pendingOne = () => ({
-  bookings: [{ id: 'BK-123456', status: 'Chờ xác nhận', amount: '200.000 đ' }],
+  bookings: [waiting('BK-123456', '200.000 đ')],
   payments: [{ docId: 'PAY-1', bookingId: 'BK-123456', status: 'Đang xử lý' }],
 });
 
@@ -66,9 +75,9 @@ test('tiền đủ, đúng mã: xác nhận đơn và phiếu thu, trả đúng 
 test('đặt nhiều sân cùng một mã: phải đủ tổng tiền mới xác nhận tất cả', async () => {
   const data = {
     bookings: [
-      { id: 'BK-123456-1', status: 'Chờ xác nhận', amount: '200.000 đ' },
-      { id: 'BK-123456-2', status: 'Chờ xác nhận', amount: '100.000 đ' },
-      { id: 'BK-1234567', status: 'Chờ xác nhận', amount: '100.000 đ' }, // mã khác, không được đụng
+      waiting('BK-123456-1', '200.000 đ'),
+      waiting('BK-123456-2', '100.000 đ'),
+      waiting('BK-1234567', '100.000 đ'), // mã khác, không được đụng
     ],
   };
   const short = fakeStore(data);
@@ -134,6 +143,35 @@ test('xác thực kiểu API Key; chưa cấu hình khóa thì từ chối tất
 test('ghi cơ sở dữ liệu lỗi thì trả 500 để SePay gửi lại', async () => {
   const store = fakeStore({ ...pendingOne(), failPatch: true });
   assert.equal((await post(transfer(), { store })).status, 500);
+});
+
+test('đơn ghi giá thấp hơn bảng giá của sân thì không tự xác nhận', async () => {
+  const cheat = fakeStore({ bookings: [waiting('BK-123456', '1.000 đ')], price: '100k - 200k/h' });
+  const r = await post(transfer({ transferAmount: 1000 }), { store: cheat });
+  assert.equal(r.status, 200);
+  assert.equal(cheat.writes.length, 0);
+  const unknownVenue = fakeStore({ bookings: [{ id: 'BK-123456', status: 'Chờ xác nhận', amount: '200.000 đ' }] });
+  await post(transfer(), { store: unknownVenue });
+  assert.equal(unknownVenue.writes.length, 0);
+});
+
+test('có tài khoản máy nhận thì đăng nhập một lần rồi gắn token vào mọi yêu cầu', async () => {
+  const settings = { ...env, BOT_EMAIL: 'may@thu.vn', BOT_PASSWORD: 'p', FIREBASE_API_KEY: 'k' };
+  const store = fakeStore(pendingOne());
+  await post(transfer(), { store, settings });
+  await post(transfer(), { store, settings });
+  assert.equal(store.calls.filter((c) => c.url.includes('accounts:signInWithPassword')).length, 1);
+  const data = store.calls.filter((c) => !c.url.includes('accounts:'));
+  assert.ok(data.length > 0);
+  assert.ok(data.every((c) => c.headers.Authorization === 'Bearer token-may'));
+});
+
+test('giá theo giờ giống ứng dụng', () => {
+  assert.equal(expectedPrice('80k - 100k/h', '15:00 - 17:00'), 180000); // một giờ thường, một giờ vàng
+  assert.equal(expectedPrice('100k - 80k/h', '18:00 - 19:00, 22:00 - 23:00'), 180000);
+  assert.equal(expectedPrice('Liên hệ', '05:00 - 06:00'), 150000);
+  assert.equal(expectedPrice('80k - 100k/h', '18:30 - 19:00'), null);
+  assert.equal(expectedPrice('80k - 100k/h', ''), null);
 });
 
 test('đọc mã đơn và số tiền', () => {

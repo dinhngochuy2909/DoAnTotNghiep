@@ -212,7 +212,7 @@ class RagService {
   static Future<void> _load() async {
     final results = await Future.wait([
       FirestoreService.getVenues(),
-      FirestoreService.getBookings(),
+      FirestoreService.getSlots(),
     ]);
     // Chỉ sân đã được duyệt mới được tư vấn cho khách
     // Sân demo (dữ liệu minh họa) không có thật và không đặt được nên trợ lý AI không giới thiệu/thống kê chúng

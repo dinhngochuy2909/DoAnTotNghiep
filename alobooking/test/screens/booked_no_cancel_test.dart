@@ -25,8 +25,11 @@ void main() {
           e.key: {'stringValue': e.value},
       },
     };
+    // Khách đọc đơn của mình bằng truy vấn lọc (runQuery).
     final fake = MockClient((request) async => http.Response.bytes(
-        utf8.encode(jsonEncode({'documents': [booking]})), 200, headers: {'content-type': 'application/json; charset=utf-8'}));
+        utf8.encode(jsonEncode(request.url.path.endsWith(':runQuery') ? [{'document': booking}] : {'documents': []})),
+        200,
+        headers: {'content-type': 'application/json; charset=utf-8'}));
 
     await http.runWithClient(() async {
       await tester.pumpWidget(const MaterialApp(home: BookedScreen()));

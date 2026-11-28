@@ -30,7 +30,6 @@ class _OwnerScreenState extends State<OwnerScreen> with SingleTickerProviderStat
   late TabController _tabController;
   List<Venue> _allVenues = [];
   List<BookingItem> _allBookings = [];
-  List<CustomerItem> _allCustomers = [];
   List<PaymentItem> _allPayments = [];
   bool _isLoading = false;
 
@@ -60,19 +59,8 @@ class _OwnerScreenState extends State<OwnerScreen> with SingleTickerProviderStat
     return _allBookings.where((b) => names.contains(b.venueName.trim().toLowerCase())).toList();
   }
 
-  // Khách hàng đã từng đặt tại sân của tôi (khớp số điện thoại, nếu thiếu thì theo tên)
-  List<CustomerItem> get _myCustomers {
-    String digits(String s) => s.replaceAll(RegExp(r'[^0-9]'), '');
-    final bookings = _myBookings;
-    return _allCustomers.where((c) {
-      final cp = digits(c.phone);
-      return bookings.any((b) {
-        final bp = digits(b.phone);
-        return (cp.isNotEmpty && bp == cp) ||
-            ((cp.isEmpty || bp.isEmpty) && b.customer.trim().toLowerCase() == c.name.trim().toLowerCase());
-      });
-    }).toList();
-  }
+  // Khách đã đặt tại sân của tôi, dựng từ chính các đơn (chủ sân không được đọc hồ sơ người dùng)
+  List<CustomerItem> get _myCustomers => FirestoreService.customersFromBookings(_myBookings);
 
   // Giao dịch thanh toán thuộc đơn đặt của sân tôi
   List<PaymentItem> get _myPayments {
@@ -113,14 +101,12 @@ class _OwnerScreenState extends State<OwnerScreen> with SingleTickerProviderStat
     setState(() => _isLoading = true);
     final fetchedVenues = await FirestoreService.getVenues();
     final fetchedBookings = await FirestoreService.getBookings();
-    final fetchedCustomers = await FirestoreService.getCustomers();
     final fetchedPayments = await FirestoreService.getPayments();
     setState(() {
       if (fetchedVenues.isNotEmpty) {
         _allVenues = fetchedVenues;
       }
       _allBookings = fetchedBookings;
-      _allCustomers = fetchedCustomers;
       _allPayments = fetchedPayments;
       _isLoading = false;
     });

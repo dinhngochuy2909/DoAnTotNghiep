@@ -9,12 +9,16 @@ Nguyên tắc:
  - Ứng dụng hiển thị "Nguồn: <báo>" và nút "Đọc bài gốc" dẫn về báo.
  - Bỏ tin cá cược/soi kèo. Ưu tiên môn app có: cầu lông, pickleball, tennis, bóng rổ, bóng đá.
  - Mã tin = rss_ + băm của đường dẫn, chạy lại nhiều lần không bị trùng.
+
+Chỉ quản trị viên được ghi tin: đặt biến môi trường ALOBOOKING_ADMIN_EMAIL và ALOBOOKING_ADMIN_PASSWORD
+(khóa Firebase đọc từ FIREBASE_API_KEY hoặc dart_defines.json). Chạy thử --dry thì không cần.
 """
 import datetime as dt
 import email.utils
 import hashlib
 import html
 import json
+import os
 import re
 import sys
 import urllib.error
@@ -109,9 +113,36 @@ def doc_id(url):
     return 'rss_' + hashlib.sha1(url.encode()).hexdigest()[:12]
 
 
-def fs(method, path, body=None):
-    req = urllib.request.Request(BASE + path, data=json.dumps(body).encode() if body is not None else None, method=method,
+_token = None
+
+
+def admin_token():
+    """Đăng nhập quản trị viên một lần để được ghi vào collection `news`."""
+    global _token
+    if _token:
+        return _token
+    key = os.environ.get('FIREBASE_API_KEY', '')
+    defines = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'dart_defines.json')
+    if not key and os.path.exists(defines):
+        with open(defines, encoding='utf-8-sig') as f:
+            key = json.load(f).get('FIREBASE_API_KEY', '')
+    email, password = os.environ.get('ALOBOOKING_ADMIN_EMAIL'), os.environ.get('ALOBOOKING_ADMIN_PASSWORD')
+    if not (key and email and password):
+        raise SystemExit('Cần FIREBASE_API_KEY, ALOBOOKING_ADMIN_EMAIL và ALOBOOKING_ADMIN_PASSWORD để ghi tin.')
+    req = urllib.request.Request(f'https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key={key}',
+                                 data=json.dumps({'email': email, 'password': password, 'returnSecureToken': True}).encode(),
                                  headers={'Content-Type': 'application/json'})
+    with urllib.request.urlopen(req, timeout=60) as r:
+        _token = json.load(r)['idToken']
+    return _token
+
+
+def fs(method, path, body=None):
+    headers = {'Content-Type': 'application/json'}
+    if method != 'GET':
+        headers['Authorization'] = 'Bearer ' + admin_token()
+    req = urllib.request.Request(BASE + path, data=json.dumps(body).encode() if body is not None else None, method=method,
+                                 headers=headers)
     try:
         with urllib.request.urlopen(req, timeout=60) as r:
             return r.status, json.loads(r.read() or b'{}')

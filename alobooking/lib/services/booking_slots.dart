@@ -93,7 +93,7 @@ class BookingSlots {
 
   /// Các ô đã đặt của [venue] trong [date]: tập khoá "courtIdx-hour".
   static Future<Set<String>> bookedSlots(Venue venue, DateTime date, int courtCount) async {
-    final bookings = await FirestoreService.getBookings();
+    final bookings = await FirestoreService.getSlots();
     return slotsFromIndex(bookedIndex(bookings, date), venue, courtCount);
   }
 

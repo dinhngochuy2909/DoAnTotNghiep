@@ -8,6 +8,10 @@ class PaymentItem {
   String status; // 'Thành công' | 'Đang xử lý' | 'Đã hoàn tiền'
   final String bankRef;
 
+  /// uid khách đặt và uid chủ sân; luật bảo mật dựa vào hai trường này.
+  final String userId;
+  final String ownerId;
+
   PaymentItem({
     required this.id,
     required this.bookingId,
@@ -17,6 +21,8 @@ class PaymentItem {
     required this.time,
     required this.status,
     required this.bankRef,
+    this.userId = '',
+    this.ownerId = '',
   });
 
   PaymentItem copyWith({
@@ -38,6 +44,8 @@ class PaymentItem {
       time: time ?? this.time,
       status: status ?? this.status,
       bankRef: bankRef ?? this.bankRef,
+      userId: userId,
+      ownerId: ownerId,
     );
   }
 
@@ -51,6 +59,8 @@ class PaymentItem {
       time: fields['time']?['stringValue'] ?? '',
       status: fields['status']?['stringValue'] ?? 'Thành công',
       bankRef: fields['bankRef']?['stringValue'] ?? '',
+      userId: fields['userId']?['stringValue'] ?? '',
+      ownerId: fields['ownerId']?['stringValue'] ?? '',
     );
   }
 
@@ -64,6 +74,8 @@ class PaymentItem {
       'time': {'stringValue': time},
       'status': {'stringValue': status},
       'bankRef': {'stringValue': bankRef},
+      if (userId.isNotEmpty) 'userId': {'stringValue': userId},
+      if (ownerId.isNotEmpty) 'ownerId': {'stringValue': ownerId},
       'createdAt': {'stringValue': DateTime.now().toIso8601String()},
     };
   }

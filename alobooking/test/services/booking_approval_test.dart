@@ -95,6 +95,11 @@ class _Server {
   MockClient client({required List<Map<String, dynamic>> venues, required List<Map<String, dynamic>> bookings}) => MockClient((r) async {
         if (r.method == 'GET' && r.url.path.endsWith('/venues')) return http.Response(jsonEncode({'documents': venues}), 200, headers: _json);
         if (r.method == 'GET' && r.url.path.endsWith('/bookings')) return http.Response(jsonEncode({'documents': bookings}), 200, headers: _json);
+        // Chủ sân đọc đơn bằng truy vấn lọc (runQuery)
+        if (r.url.path.endsWith(':runQuery')) {
+          final from = jsonDecode(r.body)['structuredQuery']['from'][0]['collectionId'];
+          return http.Response(jsonEncode([if (from == 'bookings') for (final d in bookings) {'document': d}]), 200, headers: _json);
+        }
         if (r.method == 'PATCH' && r.url.path.contains('/bookings/')) {
           if (failPatch) return http.Response('{}', 500);
           final id = r.url.path.split('/').last;

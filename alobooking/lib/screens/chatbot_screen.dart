@@ -82,7 +82,7 @@ class _ChatbotScreenState extends State<ChatbotScreen> with TickerProviderStateM
   Future<void> _loadContext() async {
     try {
       final results = await Future.wait([
-        FirestoreService.getBookings(),
+        FirestoreService.getSlots(),
         WeatherService.getCurrentWeather(),
         RagService.ensureLoaded(force: true),
       ]);
@@ -182,12 +182,6 @@ class _ChatbotScreenState extends State<ChatbotScreen> with TickerProviderStateM
         'loai_san_pho_bien': popularSport,
         'phan_loai_theo_san': sortedTypes.take(4).map((e) => '${e.key}: ${e.value} lượt').toList(),
       },
-      'trang_thai_dat_san_hom_nay': todayBookings.take(5).map((b) => {
-        'khach': b.customer,
-        'san': b.venueName,
-        'gio': b.time,
-        'trang_thai': b.status,
-      }).toList(),
     };
   }
 

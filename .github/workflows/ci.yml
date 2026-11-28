@@ -43,3 +43,14 @@ jobs:
       - name: Kiểm thử máy nhận webhook SePay
         working-directory: sepay-webhook
         run: node --test test/worker.test.mjs
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Kiểm thử luật bảo mật và luồng đặt sân trên bộ mô phỏng Firebase
+        shell: bash
+        run: |
+          npm install -g firebase-tools@15.37.0
+          firebase emulators:exec --only firestore,auth --project demo-alobooking "node --test firestore-tests/rules.test.mjs && node --test firestore-tests/worker.emulator.test.mjs && flutter test test/integration/emulator_flow_test.dart --dart-define=FIREBASE_EMULATOR=127.0.0.1 --dart-define=FIREBASE_PROJECT=demo-alobooking"

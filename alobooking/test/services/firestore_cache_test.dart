@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:alobooking/services/auth_service.dart';
 import 'package:alobooking/models/venue.dart';
 import 'package:alobooking/services/firestore_service.dart';
 import 'package:alobooking/services/venue_cache.dart';
@@ -232,6 +233,8 @@ void main() {
   group('Phân loại lỗi các collection khác', () {
     test('tin tức, đánh giá, đơn đặt: 429 là hết hạn mức; mất mạng là lỗi mạng', () async {
       final s = _FakeServer();
+      AuthService.loginAsAdminDemo(); // đơn đặt chỉ đọc được khi đã đăng nhập
+      addTearDown(AuthService.logout);
       await http.runWithClient(() async {
         FirestoreService.lastLoadFailed = false;
         await FirestoreService.getNews();

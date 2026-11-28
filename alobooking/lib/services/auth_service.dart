@@ -1,17 +1,16 @@
 import 'dart:convert';
-import 'dart:math';
-import 'package:crypto/crypto.dart';
-import 'package:flutter/foundation.dart' show kDebugMode, visibleForTesting;
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:http/http.dart' as http;
 import '../models/user.dart';
+import 'firebase_config.dart';
+import 'session.dart';
 
-/// Service xác thực người dùng qua Firestore REST API
-/// Dữ liệu lưu trong collection "users" trên Firestore alobooking-b2484
-/// Mật khẩu được hash bằng SHA-256 trước khi lưu
+/// Đăng ký và đăng nhập qua Firebase Authentication (REST).
+///
+/// Mật khẩu do Firebase giữ; Firestore collection "users" (mã tài liệu = uid) chỉ lưu hồ sơ và vai trò.
 class AuthService {
-  static const String projectId = 'alobooking-b2484';
-  static const String baseUrl =
-      'https://firestore.googleapis.com/v1/projects/$projectId/databases/(default)/documents';
+  static const String projectId = FirebaseConfig.projectId;
+  static const String baseUrl = FirebaseConfig.firestoreUrl;
 
   // In-memory session — null nghĩa là chưa đăng nhập (mặc định là Khách xem sân)
   static AppUser? _currentUser;
@@ -28,8 +27,14 @@ class AuthService {
   /// Kiểm tra tài khoản có quyền đặt sân hay không (chỉ thành viên đã đăng nhập)
   static bool get canBook => isLoggedIn;
 
+  /// Kiểm tra có phải quản trị viên không
+  static bool get isAdmin => _currentUser?.isAdmin ?? false;
+
+  /// Kiểm tra có phải chủ sân không
+  static bool get isOwner => _currentUser?.isOwner ?? false;
+
   /// ============================================================
-  /// ĐĂNG KÝ - Tạo tài khoản mới lưu lên Firestore
+  /// ĐĂNG KÝ - tạo tài khoản Firebase Authentication rồi lưu hồ sơ khách hàng
   /// ============================================================
   static Future<({bool success, String message})> register({
     required String fullName,
@@ -38,62 +43,115 @@ class AuthService {
     required String password,
   }) async {
     try {
-      // 1. Kiểm tra email đã tồn tại chưa (query Firestore)
-      final existing = await _findUserByEmail(email);
-      if (existing != null) {
-        return (success: false, message: 'Email này đã được đăng ký!');
+      final auth = await _identity('accounts:signUp', email.trim().toLowerCase(), password);
+      if (auth.data == null) return (success: false, message: auth.error);
+      final uid = _startSession(auth.data!);
+      final user = AppUser(uid: uid, fullName: fullName, email: email.trim().toLowerCase(), phone: phone);
+      if (!await _createProfile(user)) {
+        Session.clear();
+        return (success: false, message: 'Đã tạo tài khoản nhưng chưa lưu được hồ sơ. Hãy đăng nhập lại.');
       }
-
-      // 2. Tạo document ID từ email (thay @ và . bằng _)
-      final docId = email.replaceAll('@', '_at_').replaceAll('.', '_dot_');
-
-      // 3. Hash mật khẩu (SHA-256 đơn giản, production nên dùng bcrypt)
-      final hashedPassword = _hashPassword(password);
-
-      // 4. Build payload
-      final payload = {
-        'fields': {
-          'fullName': {'stringValue': fullName},
-          'email': {'stringValue': email},
-          'phone': {'stringValue': phone},
-          'password': {'stringValue': hashedPassword},
-          'avatarUrl': {'stringValue': ''},
-          'role': {'stringValue': 'customer'},
-          'createdAt': {'stringValue': DateTime.now().toIso8601String()},
-        }
-      };
-
-      // 5. POST lên Firestore
-      final response = await http.post(
-        Uri.parse('$baseUrl/users?documentId=$docId'),
-        headers: {'Content-Type': 'application/json'},
-        body: json.encode(payload),
-      );
-
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        // Auto-login sau khi đăng ký thành công
-        _currentUser = AppUser(
-          uid: docId,
-          fullName: fullName,
-          email: email,
-          phone: phone,
-        );
-        return (success: true, message: 'Đăng ký thành công!');
-      } else {
-        return (success: false, message: 'Lỗi server. Vui lòng thử lại.');
-      }
+      _currentUser = user;
+      return (success: true, message: 'Đăng ký thành công!');
     } catch (e) {
       return (success: false, message: 'Lỗi kết nối: $e');
     }
   }
 
-  /// Kiểm tra có phải quản trị viên không
-  static bool get isAdmin => _currentUser?.isAdmin ?? false;
+  /// ============================================================
+  /// ĐĂNG NHẬP
+  /// ============================================================
+  static Future<({bool success, String message})> login({
+    required String email,
+    required String password,
+  }) async {
+    try {
+      final trimmedEmail = email.trim().toLowerCase();
+      final auth = await _identity('accounts:signInWithPassword', trimmedEmail, password);
+      if (auth.data == null) return (success: false, message: auth.error);
+      final uid = _startSession(auth.data!);
 
-  /// Kiểm tra có phải chủ sân không
-  static bool get isOwner => _currentUser?.isOwner ?? false;
+      final response = await http.get(Uri.parse('$baseUrl/users/${Uri.encodeComponent(uid)}'), headers: await Session.headers());
+      if (response.statusCode == 200) {
+        final fields = (json.decode(response.body) as Map<String, dynamic>)['fields'] as Map<String, dynamic>? ?? {};
+        _currentUser = AppUser.fromFirestoreFields(uid, fields);
+        return (success: true, message: 'Đăng nhập thành công!');
+      }
+      if (response.statusCode == 404) {
+        // Có tài khoản nhưng thiếu hồ sơ (đăng ký dở dang): tạo hồ sơ khách hàng.
+        final user = AppUser(uid: uid, fullName: trimmedEmail.split('@').first, email: trimmedEmail, phone: '');
+        if (await _createProfile(user)) {
+          _currentUser = user;
+          return (success: true, message: 'Đăng nhập thành công!');
+        }
+      }
+      Session.clear();
+      return (success: false, message: 'Lỗi server. Vui lòng thử lại.');
+    } catch (e) {
+      Session.clear();
+      return (success: false, message: 'Lỗi kết nối: $e');
+    }
+  }
 
-  /// Đăng nhập nhanh tài khoản Admin demo
+  /// ============================================================
+  /// ĐĂNG XUẤT
+  /// ============================================================
+  static void logout() {
+    _currentUser = null;
+    Session.clear();
+  }
+
+  static Future<({Map<String, dynamic>? data, String error})> _identity(String method, String email, String password) async {
+    final response = await http.post(
+      Uri.parse('${FirebaseConfig.authUrl}/$method?key=${FirebaseConfig.apiKey}'),
+      headers: {'Content-Type': 'application/json'},
+      body: json.encode({'email': email, 'password': password, 'returnSecureToken': true}),
+    );
+    final body = json.decode(response.body) as Map<String, dynamic>;
+    if (response.statusCode == 200) return (data: body, error: '');
+    return (data: null, error: _message('${(body['error'] as Map<String, dynamic>?)?['message'] ?? ''}'));
+  }
+
+  /// Mã lỗi của Firebase -> câu cho người dùng.
+  static String _message(String code) {
+    if (code.contains('API key') || code.contains('unregistered callers')) {
+      return 'Ứng dụng chưa được cấu hình khóa Firebase (FIREBASE_API_KEY).';
+    }
+    if (code.startsWith('EMAIL_EXISTS')) return 'Email này đã được đăng ký!';
+    if (code.startsWith('INVALID_LOGIN_CREDENTIALS') || code.startsWith('INVALID_PASSWORD') || code.startsWith('EMAIL_NOT_FOUND')) {
+      return 'Email hoặc mật khẩu không đúng!';
+    }
+    if (code.startsWith('INVALID_EMAIL')) return 'Địa chỉ email không hợp lệ!';
+    if (code.startsWith('WEAK_PASSWORD')) return 'Mật khẩu cần ít nhất 6 ký tự.';
+    if (code.startsWith('TOO_MANY_ATTEMPTS')) return 'Thử sai quá nhiều lần. Vui lòng đợi ít phút rồi thử lại.';
+    if (code.startsWith('USER_DISABLED')) return 'Tài khoản đã bị khóa.';
+    return 'Lỗi server. Vui lòng thử lại.';
+  }
+
+  static String _startSession(Map<String, dynamic> data) {
+    Session.set(
+      idToken: data['idToken'] as String,
+      refreshToken: data['refreshToken'] as String,
+      expiresInSeconds: int.tryParse('${data['expiresIn']}') ?? 3600,
+    );
+    return data['localId'] as String;
+  }
+
+  /// Hồ sơ mới luôn là khách hàng; luật Firestore không cho tự đặt vai trò khác.
+  static Future<bool> _createProfile(AppUser user) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/users?documentId=${Uri.encodeComponent(user.uid)}'),
+      headers: await Session.headers(json: true),
+      body: json.encode({'fields': user.toFirestoreFields()}),
+    );
+    return response.statusCode == 200 || response.statusCode == 201;
+  }
+
+  @visibleForTesting
+  static void setCurrentUserForTest(AppUser? user) => _currentUser = user;
+
+  /// Giả lập đã đăng nhập quản trị viên (không có token, chỉ dùng trong kiểm thử).
+  @visibleForTesting
   static void loginAsAdminDemo() {
     _currentUser = AppUser(
       uid: 'admin_super_01',
@@ -104,7 +162,8 @@ class AuthService {
     );
   }
 
-  /// Đăng nhập nhanh tài khoản Chủ Sân demo
+  /// Giả lập đã đăng nhập chủ sân (không có token, chỉ dùng trong kiểm thử).
+  @visibleForTesting
   static void loginAsOwnerDemo() {
     _currentUser = AppUser(
       uid: 'owner_chuan_01',
@@ -113,205 +172,5 @@ class AuthService {
       phone: '0977112233',
       role: 'owner',
     );
-  }
-
-  /// Đăng nhập nhanh tài khoản Khách Xem Sân (chỉ xem, không đặt sân)
-  static void loginAsGuestDemo() {
-    _currentUser = AppUser(
-      uid: 'guest_viewer_01',
-      fullName: 'Khách Xem Sân (Chỉ xem)',
-      email: 'guest@alobooking.com',
-      phone: '0900000000',
-      role: 'guest',
-    );
-  }
-
-  /// ============================================================
-  /// ĐĂNG NHẬP - Xác thực email + password từ Firestore
-  /// ============================================================
-  static Future<({bool success, String message})> login({
-    required String email,
-    required String password,
-  }) async {
-    try {
-      final trimmedEmail = email.trim().toLowerCase();
-
-      // Tài khoản demo chỉ hoạt động khi chạy debug (hoặc build với --dart-define=DEMO_ACCOUNTS=true)
-      if (_demoAccountsEnabled) {
-      // 1. Phân quyền: Kiểm tra tài khoản Quản Trị Viên (Admin)
-      if ((trimmedEmail == 'admin@alobooking.com' && password == 'admin123') ||
-          (trimmedEmail == 'admin@sportai.com' && password == 'password123') ||
-          (trimmedEmail == 'admin' && (password == 'admin' || password == '123456'))) {
-        _currentUser = AppUser(
-          uid: 'admin_super_01',
-          fullName: 'Đinh Ngọc Huy (Super Admin)',
-          email: 'admin@alobooking.com',
-          phone: '0988889999',
-          role: 'admin',
-        );
-        return (success: true, message: 'Đăng nhập Quản Trị Viên thành công!');
-      }
-
-      // 2. Phân quyền: Kiểm tra tài khoản Chủ Sân (Owner)
-      if ((trimmedEmail == 'chusan@alobooking.com' && (password == 'chusan123' || password == '123456')) ||
-          (trimmedEmail == 'owner@alobooking.com' && (password == 'owner123' || password == '123456')) ||
-          (trimmedEmail == 'chusan' && (password == 'chusan' || password == '123456')) ||
-          (trimmedEmail == 'owner' && (password == 'owner' || password == '123456'))) {
-        _currentUser = AppUser(
-          uid: 'owner_chuan_01',
-          fullName: 'Trần Văn Chủ Sân (Cụm Sân Đống Đa & Chùa Bộc)',
-          email: 'chusan@alobooking.com',
-          phone: '0977112233',
-          role: 'owner',
-        );
-        return (success: true, message: 'Đăng nhập Chủ Sân thành công!');
-      }
-
-      // 3. Phân quyền: Tài khoản Khách hàng đặt sân thông thường
-      if ((trimmedEmail == 'user@alobooking.com' && password == '123456') ||
-          (trimmedEmail == 'khach@alobooking.com' && password == '123456') ||
-          (trimmedEmail == 'customer@alobooking.com' && password == '123456') ||
-          (trimmedEmail == 'user' && (password == 'user' || password == '123456'))) {
-        _currentUser = AppUser(
-          uid: 'user_customer_01',
-          fullName: 'Nguyễn Văn Khách (Khách hàng)',
-          email: trimmedEmail.contains('@') ? trimmedEmail : 'user@alobooking.com',
-          phone: '0912345678',
-          role: 'customer',
-        );
-        return (success: true, message: 'Đăng nhập Khách Hàng thành công!');
-      }
-
-      // 4. Phân quyền: Tài khoản Khách Xem Sân (Guest - chỉ xem sân, không đặt sân được)
-      if ((trimmedEmail == 'guest@alobooking.com' && (password == '123456' || password == 'guest123')) ||
-          (trimmedEmail == 'khachxem@alobooking.com' && password == '123456') ||
-          (trimmedEmail == 'viewer@alobooking.com' && password == '123456') ||
-          (trimmedEmail == 'guest' && (password == 'guest' || password == '123456')) ||
-          (trimmedEmail == 'khachxem' && (password == 'khachxem' || password == '123456'))) {
-        _currentUser = AppUser(
-          uid: 'guest_viewer_01',
-          fullName: 'Khách Xem Sân (Chỉ xem)',
-          email: 'guest@alobooking.com',
-          phone: '0900000000',
-          role: 'guest',
-        );
-        return (success: true, message: 'Đăng nhập Khách Xem Sân (Chỉ xem) thành công!');
-      }
-      }
-
-      final docId = trimmedEmail.replaceAll('@', '_at_').replaceAll('.', '_dot_');
-      final response = await http.get(Uri.parse('$baseUrl/users/$docId'));
-
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        final fields = data['fields'] as Map<String, dynamic>?;
-
-        if (fields == null) {
-          return (success: false, message: 'Tài khoản không tồn tại!');
-        }
-
-        // So sánh mật khẩu đã hash
-        final storedPassword = fields['password']?['stringValue'] ?? '';
-
-        if (_verifyPassword(password, storedPassword)) {
-          // Tài khoản cũ lưu mật khẩu dạng base64: nâng cấp lên băm có salt ngay lần đăng nhập này
-          if (!storedPassword.startsWith(_hashPrefix)) {
-            _upgradePasswordHash(docId, password);
-          }
-          _currentUser = AppUser.fromFirestoreFields(docId, fields);
-          return (success: true, message: 'Đăng nhập thành công!');
-        } else {
-          return (success: false, message: 'Mật khẩu không chính xác!');
-        }
-      } else if (response.statusCode == 404) {
-        return (success: false, message: 'Email chưa được đăng ký!');
-      } else {
-        return (success: false, message: 'Lỗi server. Vui lòng thử lại.');
-      }
-    } catch (e) {
-      return (success: false, message: 'Lỗi kết nối: $e');
-    }
-  }
-
-  /// ============================================================
-  /// ĐĂNG XUẤT
-  /// ============================================================
-  static void logout() {
-    _currentUser = null;
-  }
-
-  /// ============================================================
-  /// HELPER: Tìm user theo email
-  /// ============================================================
-  static Future<Map<String, dynamic>?> _findUserByEmail(String email) async {
-    try {
-      final docId = email.replaceAll('@', '_at_').replaceAll('.', '_dot_');
-      final response = await http.get(Uri.parse('$baseUrl/users/$docId'));
-      if (response.statusCode == 200) {
-        return json.decode(response.body);
-      }
-    } catch (_) {}
-    return null;
-  }
-
-  /// ============================================================
-  /// BẢO MẬT
-  /// ============================================================
-  static const bool _demoAccountsEnabled =
-      kDebugMode || bool.fromEnvironment('DEMO_ACCOUNTS', defaultValue: false);
-
-  static const String _hashPrefix = r'sha256$';
-
-  /// Băm mật khẩu: SHA-256 với salt ngẫu nhiên 16 byte, định dạng `sha256$salt$hash`.
-  static String _hashPassword(String password) {
-    final rnd = Random.secure();
-    final salt = base64UrlEncode(List<int>.generate(16, (_) => rnd.nextInt(256)));
-    return '$_hashPrefix$salt\$${_digest(salt, password)}';
-  }
-
-  @visibleForTesting
-  static void setCurrentUserForTest(AppUser? user) => _currentUser = user;
-
-  @visibleForTesting
-  static String hashPasswordForTest(String password) => _hashPassword(password);
-
-  @visibleForTesting
-  static bool verifyPasswordForTest(String password, String stored) => _verifyPassword(password, stored);
-
-  static String _digest(String salt, String password) =>
-      sha256.convert(utf8.encode('$salt:$password')).toString();
-
-  static bool _verifyPassword(String password, String stored) {
-    if (stored.startsWith(_hashPrefix)) {
-      final parts = stored.split(r'$');
-      if (parts.length != 3) return false;
-      return _constantTimeEquals(_digest(parts[1], password), parts[2]);
-    }
-    // Định dạng cũ (base64 hai lần)
-    final legacy = base64Encode(utf8.encode(base64Encode(utf8.encode(password))));
-    return _constantTimeEquals(legacy, stored);
-  }
-
-  static bool _constantTimeEquals(String a, String b) {
-    if (a.length != b.length) return false;
-    var diff = 0;
-    for (var i = 0; i < a.length; i++) {
-      diff |= a.codeUnitAt(i) ^ b.codeUnitAt(i);
-    }
-    return diff == 0;
-  }
-
-  static Future<void> _upgradePasswordHash(String docId, String password) async {
-    try {
-      await http.patch(
-        Uri.parse('$baseUrl/users/$docId?updateMask.fieldPaths=password'),
-        headers: {'Content-Type': 'application/json'},
-        body: json.encode({
-          'fields': {
-            'password': {'stringValue': _hashPassword(password)},
-          }
-        }),
-      );
-    } catch (_) {}
   }
 }

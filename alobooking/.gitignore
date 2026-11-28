@@ -55,3 +55,7 @@ tool/pexels_key.txt
 
 # Bộ nhớ đệm của Firebase CLI khi deploy
 .firebase/
+
+# Sao lưu và mật khẩu sinh ra khi chuyển sang Firebase Authentication
+migration_backup/
+firestore-debug.log

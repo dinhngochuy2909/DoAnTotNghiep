@@ -7,7 +7,7 @@ Máy nhận (Cloudflare Worker, gói miễn phí, không cần thẻ) cho webhoo
 3. Đủ tiền thì đơn chuyển "Đã xác nhận", phiếu thu chuyển "Thành công".
 4. Ứng dụng đang mở hộp QR thấy đơn đã xác nhận thì hiện dấu tích xanh và chuyển sang lịch đã đặt.
 
-Chuyển thiếu tiền, sai mã hoặc đơn đã hủy thì không đổi gì; chủ sân xử lý thủ công như trước.
+Chuyển thiếu tiền, sai mã, đơn đã hủy, hoặc số tiền trên đơn thấp hơn bảng giá của sân thì không đổi gì; chủ sân xử lý thủ công.
 
 ## Cài đặt (làm một lần)
 
@@ -18,7 +18,12 @@ cd sepay-webhook
 wrangler deploy                     # in ra địa chỉ dạng https://alobooking-sepay.<tên>.workers.dev
 wrangler secret put ACCOUNT_NUMBER      # số tài khoản đã liên kết SePay
 wrangler secret put SEPAY_HMAC_SECRET   # khóa bí mật của webhook trên SePay
+wrangler secret put BOT_EMAIL           # tài khoản riêng của máy nhận (vai trò "webhook")
+wrangler secret put BOT_PASSWORD
+wrangler secret put FIREBASE_API_KEY    # khóa web của dự án Firebase
 ```
+
+Tài khoản máy nhận do `alobooking/tool/migrate_to_auth.py accounts` tạo. Luật Firestore chỉ cho tài khoản này chuyển đơn đang chờ sang đã xác nhận và phiếu thu sang thành công.
 
 Trên my.sepay.vn:
 
@@ -36,4 +41,4 @@ wrangler tail       # xem nhật ký khi có giao dịch
 
 ## Giới hạn
 
-Cơ sở dữ liệu Firestore đang mở, nên người rành kỹ thuật vẫn có thể tự đổi trạng thái đơn mà không trả tiền. Chủ sân nên đối chiếu với lịch sử giao dịch. Khi khóa luật Firestore, worker cần dùng tài khoản dịch vụ để ghi.
+Máy nhận tin vào webhook có chữ ký của SePay. Giá được đối chiếu theo bảng giá hiện tại của sân: chủ sân đổi giá giữa lúc đặt và lúc chuyển tiền thì đơn phải xác nhận tay.
