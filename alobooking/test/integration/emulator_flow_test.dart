@@ -62,6 +62,26 @@ void main() {
     final customerId = await _account('khach@thu.vn', 'customer');
     await _account('khac@thu.vn', 'customer');
 
+    // Quên mật khẩu: bộ mô phỏng giữ lại mã trong thư; đặt mật khẩu mới rồi đăng nhập được
+    expect((await AuthService.sendPasswordReset('khac@thu.vn')).success, isTrue);
+    final codes = jsonDecode((await http.get(Uri.parse('http://$host:9099/emulator/v1/projects/$project/oobCodes'))).body)['oobCodes'] as List;
+    final oob = codes.lastWhere((c) => c['email'] == 'khac@thu.vn' && c['requestType'] == 'PASSWORD_RESET')['oobCode'];
+    final reset = await http.post(Uri.parse('${FirebaseConfig.authUrl}/accounts:resetPassword?key=${FirebaseConfig.apiKey}'),
+        headers: {'Content-Type': 'application/json'}, body: jsonEncode({'oobCode': oob, 'newPassword': 'mat-khau-moi-456'}));
+    expect(reset.statusCode, 200);
+    expect((await AuthService.login(email: 'khac@thu.vn', password: _password)).success, isFalse, reason: 'mật khẩu cũ hết dùng');
+    expect((await AuthService.login(email: 'khac@thu.vn', password: 'mat-khau-moi-456')).success, isTrue);
+    AuthService.logout();
+    final back = await http.post(Uri.parse('${FirebaseConfig.authUrl}/accounts:resetPassword?key=${FirebaseConfig.apiKey}'),
+        headers: {'Content-Type': 'application/json'}, body: jsonEncode({'oobCode': oob, 'newPassword': 'lan-hai-789'}));
+    expect(back.statusCode, 400, reason: 'mã trong thư chỉ dùng được một lần');
+    // đặt lại mật khẩu chung của bài thử cho các bước sau
+    expect((await AuthService.sendPasswordReset('khac@thu.vn')).success, isTrue);
+    final codes2 = jsonDecode((await http.get(Uri.parse('http://$host:9099/emulator/v1/projects/$project/oobCodes'))).body)['oobCodes'] as List;
+    await http.post(Uri.parse('${FirebaseConfig.authUrl}/accounts:resetPassword?key=${FirebaseConfig.apiKey}'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'oobCode': codes2.lastWhere((c) => c['email'] == 'khac@thu.vn')['oobCode'], 'newPassword': _password}));
+
     // Chủ sân đăng sân (chờ duyệt), không tự duyệt được; quản trị viên duyệt
     final venue = _venue(7, ownerId, status: 'pending');
     await _login('chusan@thu.vn');

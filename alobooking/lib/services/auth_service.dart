@@ -94,6 +94,30 @@ class AuthService {
   }
 
   /// ============================================================
+  /// QUÊN MẬT KHẨU - Firebase gửi thư chứa đường dẫn đặt mật khẩu mới
+  /// ============================================================
+  /// Câu trả lời không cho biết email đã đăng ký hay chưa.
+  static Future<({bool success, String message})> sendPasswordReset(String email) async {
+    const sent = 'Nếu email này đã đăng ký, thư đặt lại mật khẩu sẽ được gửi tới đó. Hãy kiểm tra cả mục Thư rác.';
+    try {
+      final response = await http.post(
+        Uri.parse('${FirebaseConfig.authUrl}/accounts:sendOobCode?key=${FirebaseConfig.apiKey}'),
+        headers: {'Content-Type': 'application/json', 'X-Firebase-Locale': 'vi'},
+        body: json.encode({'requestType': 'PASSWORD_RESET', 'email': email.trim().toLowerCase()}),
+      );
+      if (response.statusCode == 200) return (success: true, message: sent);
+      final code = '${((json.decode(response.body) as Map<String, dynamic>)['error'] as Map<String, dynamic>?)?['message'] ?? ''}';
+      if (code.startsWith('EMAIL_NOT_FOUND')) return (success: true, message: sent);
+      if (code.startsWith('RESET_PASSWORD_EXCEED_LIMIT') || code.startsWith('TOO_MANY_ATTEMPTS')) {
+        return (success: false, message: 'Bạn yêu cầu quá nhiều lần. Vui lòng thử lại sau.');
+      }
+      return (success: false, message: _message(code));
+    } catch (e) {
+      return (success: false, message: 'Lỗi kết nối: $e');
+    }
+  }
+
+  /// ============================================================
   /// ĐĂNG XUẤT
   /// ============================================================
   static void logout() {

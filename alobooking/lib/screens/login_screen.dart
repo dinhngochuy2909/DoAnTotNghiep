@@ -71,6 +71,32 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
   }
 
 
+  /// Hỏi email (điền sẵn ô đang nhập) rồi nhờ Firebase gửi thư đặt lại mật khẩu.
+  Future<void> _handleForgotPassword() async {
+    final email = await showDialog<String>(
+      context: context,
+      builder: (_) => _ForgotPasswordDialog(initialEmail: _emailController.text.trim()),
+    );
+    if (email == null || !mounted) return;
+
+    final result = await AuthService.sendPasswordReset(email);
+    if (!mounted) return;
+    if (!result.success) {
+      _showErrorSnackBar(result.message);
+      return;
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(result.message),
+        backgroundColor: const Color(0xFF059669),
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 8),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        margin: const EdgeInsets.all(16),
+      ),
+    );
+  }
+
   void _showErrorSnackBar(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -317,16 +343,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
             Align(
               alignment: Alignment.centerRight,
               child: TextButton(
-                onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: const Text('Tính năng đang phát triển'),
-                      backgroundColor: const Color(0xFF64748B),
-                      behavior: SnackBarBehavior.floating,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    ),
-                  );
-                },
+                onPressed: _handleForgotPassword,
                 style: TextButton.styleFrom(
                   padding: EdgeInsets.zero,
                   minimumSize: Size.zero,
@@ -590,6 +607,64 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
         borderRadius: BorderRadius.circular(12),
         borderSide: const BorderSide(color: Color(0xFFEF4444), width: 1.5),
       ),
+    );
+  }
+}
+
+class _ForgotPasswordDialog extends StatefulWidget {
+  const _ForgotPasswordDialog({required this.initialEmail});
+
+  final String initialEmail;
+
+  @override
+  State<_ForgotPasswordDialog> createState() => _ForgotPasswordDialogState();
+}
+
+class _ForgotPasswordDialogState extends State<_ForgotPasswordDialog> {
+  final _formKey = GlobalKey<FormState>();
+  late final _controller = TextEditingController(text: widget.initialEmail);
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    if (_formKey.currentState!.validate()) Navigator.of(context).pop(_controller.text.trim());
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Đặt lại mật khẩu'),
+      content: Form(
+        key: _formKey,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Nhập email đã đăng ký. Chúng tôi gửi tới đó đường dẫn để bạn đặt mật khẩu mới.'),
+            const SizedBox(height: 14),
+            TextFormField(
+              key: const ValueKey('forgot-email'),
+              controller: _controller,
+              autofocus: true,
+              keyboardType: TextInputType.emailAddress,
+              decoration: const InputDecoration(labelText: 'Email', border: OutlineInputBorder()),
+              onFieldSubmitted: (_) => _submit(),
+              validator: (val) {
+                final v = (val ?? '').trim();
+                return v.contains('@') && v.contains('.') ? null : 'Email không hợp lệ';
+              },
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Đóng')),
+        FilledButton(key: const ValueKey('forgot-send'), onPressed: _submit, child: const Text('Gửi thư')),
+      ],
     );
   }
 }

@@ -85,6 +85,9 @@ Vai trò chỉ lấy từ trường `role` đã lưu, không suy ra từ email.
 - Đơn, dòng lịch bận và phiếu thu được ghi trong một lần (được cả hoặc không).
 - Ô giờ đã đặt công khai ở collection `slots`, không có tên, số điện thoại hay số tiền.
 
+**Tài khoản**
+- Quên mật khẩu: Firebase Authentication gửi thư chứa đường dẫn đặt mật khẩu mới tới email đã đăng ký; ứng dụng không cho biết email đó có tài khoản hay không.
+
 **Thanh toán**
 - Chỉ chuyển khoản qua mã VietQR đúng số tiền, nội dung là mã đơn.
 - Phiếu thu: Đang xử lý → Thành công hoặc Đã hoàn tiền.
@@ -137,7 +140,7 @@ Vai trò chỉ lấy từ trường `role` đã lưu, không suy ra từ email.
 
 - Luật chưa chặn được việc một người đã đăng nhập đặt giữ chỗ rồi không trả tiền, hoặc gửi thông báo rác.
 - Chưa kiểm tra trùng giờ ở máy chủ: hai người đặt gần như cùng lúc vẫn có thể cùng thành công.
-- Phiên đăng nhập chỉ giữ trong bộ nhớ, tải lại trang phải đăng nhập lại; chưa có chức năng quên mật khẩu trong ứng dụng.
+- Phiên đăng nhập chỉ giữ trong bộ nhớ, tải lại trang phải đăng nhập lại.
 - Lịch trống và khách quen vẫn đối chiếu sân theo tên.
 - Số đơn thật còn ít nên mô hình dự báo chưa chứng minh được hiệu quả trên dữ liệu thật.
 - Chưa có cổng thanh toán; việc đối soát tự động dựa vào webhook của SePay.
