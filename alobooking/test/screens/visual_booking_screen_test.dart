@@ -160,7 +160,7 @@ void main() {
 
   testWidgets('Ghi chú hủy lịch khớp chức năng: chỉ cách hủy, không còn nói là không hủy được', (tester) async {
     await _openBooking(tester, _venue());
-    expect(find.textContaining('có thể hủy trong mục "Sân đã đặt"'), findsOneWidget);
+    expect(find.textContaining('Hủy lịch trước giờ chơi ít nhất 2 tiếng'), findsOneWidget);
     expect(find.textContaining('KHÔNG hỗ trợ'), findsNothing);
   });
 

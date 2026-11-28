@@ -280,10 +280,10 @@ Chủ sân: ${v.ownerName}''',
           category: 'policy',
           title: 'Chính sách hủy sân, dời lịch, hoàn cọc',
           keywords: ['huy san', 'doi lich', 'hoan tien', 'hoan coc', 'bao luu', 'mua bao'],
-          content: '''- Khách tự hủy được trên ứng dụng khi chưa tới giờ chơi (đơn đang chờ xác nhận hoặc đã xác nhận): vào mục "Sân đã đặt" rồi bấm "Hủy đặt sân", đơn chuyển sang "Đã hủy".
+          content: '''- Khách tự hủy được trên ứng dụng khi còn cách giờ chơi từ 2 tiếng trở lên (đơn đang chờ xác nhận hoặc đã xác nhận): vào mục "Sân đã đặt" rồi bấm "Hủy đặt sân", đơn chuyển sang "Đã hủy".
+- Còn dưới 2 tiếng tới giờ chơi thì không hủy được nữa.
 - Nếu đã chuyển khoản, việc hoàn tiền (nếu có) do chủ sân xử lý theo chính sách của sân.
-- Bất khả kháng do thời tiết xấu (mưa bão, ngập sân ngoài trời): liên hệ Hotline 0364059999 trước giờ chơi ít nhất 2 tiếng để dời lịch hoặc bảo lưu 100% tiền cọc.
-- Đổi khung giờ: báo trước tối thiểu 12 tiếng qua Hotline 0364059999 hoặc nhắn chủ sân.''',
+- Muốn dời lịch hoặc đổi khung giờ: liên hệ chủ sân hoặc Hotline 0364059999.''',
         ),
         RagKnowledgeChunk(
           id: 'policy_fixed',

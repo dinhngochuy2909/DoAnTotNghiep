@@ -786,7 +786,7 @@ class _VenueDetailScreenState extends State<VenueDetailScreen> with SingleTicker
               ),
               SizedBox(height: 6),
               Text(
-                'Bạn có thể hủy lịch sắp diễn ra trong mục "Lịch sử đặt sân". Việc hoàn tiền (nếu đã thanh toán trước) '
+                'Bạn tự hủy được khi còn cách giờ chơi từ 2 tiếng trở lên, trong mục "Lịch sử đặt sân"; dưới 2 tiếng thì không hủy được. Việc hoàn tiền (nếu đã thanh toán trước) '
                 'do chủ sân xử lý theo chính sách riêng của từng sân. Nếu cần hỗ trợ, hãy liên hệ chủ sân hoặc Hotline/Zalo 0364059999.',
                 style: TextStyle(fontSize: 12, color: Color(0xFF64748B), height: 1.45),
               ),

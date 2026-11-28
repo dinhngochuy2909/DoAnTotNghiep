@@ -5,6 +5,7 @@ import '../models/venue.dart';
 import '../services/auth_service.dart';
 import '../services/firestore_service.dart';
 import '../services/booking_slots.dart';
+import '../services/cancel_policy.dart';
 import '../services/payment_config.dart';
 import '../widgets/booking_bottom_sheet.dart';
 import 'booked_screen.dart';
@@ -356,6 +357,10 @@ class _VisualBookingScreenState extends State<VisualBookingScreen> {
     final totalHours = parsedSlots.length;
     final totalPrice = _totalPrice(parsedSlots.map((s) => s['hour'] as int));
     final dateStr = _formatDateKey(_selectedDate);
+    // Ca sớm nhất cách hiện tại dưới 2 tiếng thì đặt xong sẽ không tự hủy được: phải báo trước khi khách trả tiền
+    final firstHour = parsedSlots.map((s) => s['hour'] as int).reduce((a, b) => a < b ? a : b);
+    final cancellable = CancelPolicy.canCustomerCancel(
+        DateTime(_selectedDate.year, _selectedDate.month, _selectedDate.day, firstHour), DateTime.now());
 
     showModalBottomSheet(
       context: context,
@@ -522,6 +527,18 @@ class _VisualBookingScreenState extends State<VisualBookingScreen> {
                         ),
                       ),
                     ],
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  cancellable
+                      ? CancelPolicy.ruleText
+                      : 'Lưu ý: ca này bắt đầu trong chưa đầy ${CancelPolicy.minNoticeHours} tiếng nên đặt xong sẽ không hủy được.',
+                  key: const ValueKey('cancel-notice'),
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: cancellable ? _Vb.textDim : const Color(0xFFFB923C),
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -1205,7 +1222,7 @@ class _VisualBookingScreenState extends State<VisualBookingScreen> {
             ),
             const SizedBox(height: 2),
             const Text(
-              'Lịch chưa tới giờ chơi có thể hủy trong mục "Sân đã đặt"',
+              'Hủy lịch trước giờ chơi ít nhất 2 tiếng, tại mục "Sân đã đặt"',
               style: TextStyle(fontSize: 12, color: _Vb.textDim, fontWeight: FontWeight.w500),
               textAlign: TextAlign.center,
             ),

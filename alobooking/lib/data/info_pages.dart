@@ -116,6 +116,7 @@ class InfoPages {
           'Đơn ở trạng thái "Chờ xác nhận" cho tới khi chủ sân (hoặc ban quản lý AloBooking với sân do AloBooking quản lý) nhận được tiền chuyển khoản đúng số tiền và nội dung. Bạn xem trạng thái trong mục "Sân đã đặt".'),
       FaqItem('Tôi muốn hủy lượt đặt thì làm thế nào?',
           'Vào "Sân đã đặt", chọn đơn đang chờ xác nhận hoặc sắp diễn ra rồi bấm "Hủy đặt sân". '
+              'Chỉ hủy được khi còn cách giờ chơi từ 2 tiếng trở lên. '
               'Việc hoàn tiền (nếu có) do chủ sân xử lý theo chính sách của sân.'),
       FaqItem('Vì sao tôi không đặt được một số sân?',
           'Có ba lý do thường gặp: bạn chưa đăng nhập (chế độ khách chỉ xem), sân chưa niêm yết giá nên chưa nhận đặt online, '
@@ -239,6 +240,7 @@ class InfoPages {
       ]),
       InfoSection('Hủy đặt sân', bullets: [
         'Vào "Sân đã đặt", chọn đơn đang chờ xác nhận hoặc sắp diễn ra và bấm "Hủy đặt sân". Đơn chuyển sang "Đã hủy".',
+        'Chỉ hủy được khi còn cách giờ chơi từ 2 tiếng trở lên; còn dưới 2 tiếng thì không hủy được.',
         'Việc hoàn tiền (nếu có) do chủ sân xử lý theo chính sách của sân. AloBooking chưa hoàn tiền tự động.',
       ]),
       InfoSection('Chuyển khoản sai', paragraphs: [

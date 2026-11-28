@@ -3,6 +3,7 @@ import '../models/user.dart';
 import '../models/venue.dart';
 import '../services/auth_service.dart';
 import '../services/booking_slots.dart';
+import '../services/cancel_policy.dart';
 import '../services/firestore_service.dart';
 import 'login_screen.dart';
 import 'visual_booking_screen.dart';
@@ -10,7 +11,11 @@ import 'visual_booking_screen.dart';
 /// Màn hình SÂN ĐÃ ĐẶT: lịch đặt thật của tài khoản đang đăng nhập (đọc từ Firestore).
 class BookedScreen extends StatefulWidget {
   final List<Venue> allVenues;
-  const BookedScreen({super.key, this.allVenues = const []});
+
+  /// Đồng hồ để biết đã quá hạn hủy chưa; kiểm thử truyền giờ cố định.
+  final DateTime Function() clock;
+
+  const BookedScreen({super.key, this.allVenues = const [], this.clock = DateTime.now});
 
   @override
   State<BookedScreen> createState() => _BookedScreenState();
@@ -82,7 +87,7 @@ class _BookedScreenState extends State<BookedScreen> with SingleTickerProviderSt
     final d = BookingSlots.parseDate(b.date);
     if (d == null) return null;
     final r = BookingSlots.parseRanges(b.time);
-    final m = r.isEmpty ? 0 : r.first.$1;
+    final m = r.isEmpty ? 0 : r.map((x) => x.$1).reduce((a, b) => a < b ? a : b); // ca sớm nhất của đơn
     return DateTime(d.year, d.month, d.day, m ~/ 60, m % 60);
   }
 
@@ -98,7 +103,7 @@ class _BookedScreenState extends State<BookedScreen> with SingleTickerProviderSt
     if (BookingSlots.isCancelled(b.status)) return _BookingState.cancelled;
     final st = b.status.toLowerCase();
     final end = _end(b);
-    if (st.contains('hoàn thành') || (end != null && end.isBefore(DateTime.now()))) return _BookingState.completed;
+    if (st.contains('hoàn thành') || (end != null && end.isBefore(widget.clock()))) return _BookingState.completed;
     if (st.contains('chờ')) return _BookingState.pending;
     return _BookingState.upcoming;
   }
@@ -317,8 +322,8 @@ class _BookedScreenState extends State<BookedScreen> with SingleTickerProviderSt
     final type = venue?.type ?? 'badminton';
     final color = _typeColor(type);
     final state = _stateOf(b);
-    final canCancel = (state == _BookingState.upcoming || state == _BookingState.pending) &&
-        (_start(b)?.isAfter(DateTime.now()) ?? false);
+    final active = state == _BookingState.upcoming || state == _BookingState.pending;
+    final canCancel = active && CancelPolicy.canCustomerCancel(_start(b), widget.clock());
 
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
@@ -372,6 +377,22 @@ class _BookedScreenState extends State<BookedScreen> with SingleTickerProviderSt
             ],
             const SizedBox(height: 8),
             _buildInfoItem(Icons.payments_outlined, 'Thanh toán', b.paymentMethod),
+            if (active && !canCancel) ...[
+              const SizedBox(height: 8),
+              Row(
+                key: ValueKey('cancel-closed-${b.id}'),
+                children: const [
+                  Icon(Icons.lock_clock_outlined, size: 14, color: Color(0xFFB45309)),
+                  SizedBox(width: 5),
+                  Expanded(
+                    child: Text(
+                      'Không hủy được: còn dưới ${CancelPolicy.minNoticeHours} tiếng tới giờ chơi.',
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFFB45309)),
+                    ),
+                  ),
+                ],
+              ),
+            ],
             const Padding(padding: EdgeInsets.symmetric(vertical: 12), child: Divider(height: 1, color: Color(0xFFF1F5F9))),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -442,7 +463,7 @@ class _BookedScreenState extends State<BookedScreen> with SingleTickerProviderSt
         title: const Text('Xác nhận hủy đặt sân', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 17)),
         content: Text(
           'Hủy lượt đặt tại "${b.venueName}" lúc ${b.time} ngày ${b.date}? '
-          'Đơn sẽ chuyển sang "Đã hủy". Việc hoàn tiền (nếu có) do chủ sân xử lý theo chính sách của sân.',
+          'Đơn sẽ chuyển sang "Đã hủy". Việc hoàn tiền (nếu có) do chủ sân xử lý theo chính sách của sân. ${CancelPolicy.ruleText}',
           style: const TextStyle(fontSize: 13, color: Color(0xFF475569), height: 1.4),
         ),
         actions: [
@@ -453,6 +474,14 @@ class _BookedScreenState extends State<BookedScreen> with SingleTickerProviderSt
           ElevatedButton(
             onPressed: () async {
               Navigator.pop(ctx);
+              // Kiểm tra lại: hộp thoại có thể đã mở lâu đến quá hạn hủy
+              if (!CancelPolicy.canCustomerCancel(_start(b), widget.clock())) {
+                setState(() {});
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Đã quá hạn hủy. ${CancelPolicy.ruleText}'), backgroundColor: Color(0xFFEF4444)),
+                );
+                return;
+              }
               final ok = await FirestoreService.updateBookingStatus(b.id, 'Đã hủy');
               if (!mounted) return;
               if (ok) setState(() => b.status = 'Đã hủy');

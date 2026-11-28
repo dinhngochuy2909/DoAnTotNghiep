@@ -10,7 +10,9 @@ void main() {
     final result = await http.runWithClient(() => RagService.retrieve('Tôi muốn hủy sân đã đặt thì làm sao?'), () => fake);
     final context = result.augmentedPromptText;
 
-    expect(context, contains('Khách tự hủy được trên ứng dụng khi chưa tới giờ chơi'));
+    expect(context, contains('khi còn cách giờ chơi từ 2 tiếng trở lên'));
+    expect(context, contains('Còn dưới 2 tiếng tới giờ chơi thì không hủy được nữa'));
+    expect(context, isNot(contains('bảo lưu 100% tiền cọc')));
     expect(context, contains('"Sân đã đặt"'));
     expect(context, contains('"Hủy đặt sân"'));
     expect(context, isNot(contains('KHÔNG tự hủy')));
