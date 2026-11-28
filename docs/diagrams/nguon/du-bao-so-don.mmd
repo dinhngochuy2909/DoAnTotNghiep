@@ -1,0 +1,11 @@
+flowchart TB
+  A["Đơn đặt sân<br/>trên Firestore"] --> B["Đếm số đơn không hủy<br/>theo từng ngày"]
+  W["Thời tiết thật<br/>Open-Meteo"] --> C
+  B --> C["Ghép ngày với thời tiết"]
+  C --> D["Đặc trưng: thứ trong tuần, ngày lễ, Tết,<br/>mùa, mưa, nóng, lạnh"]
+  D --> E["Hồi quy Poisson (IRLS)<br/>ridge kéo về giả định chuyên gia"]
+  E --> F["Kiểm định chéo leave-one-day-out"]
+  F --> G["So với hai cách đoán đơn giản:<br/>luôn đoán trung bình; chỉ dùng giả định"]
+  E --> H["Dự báo 7 ngày tới: số đơn kỳ vọng,<br/>khoảng 80%, mức nhu cầu, giải thích từng yếu tố"]
+  G --> I["Ghi chú trung thực<br/>hiển thị cùng dự báo"]
+  H --> I

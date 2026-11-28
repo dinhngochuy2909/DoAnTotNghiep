@@ -1,0 +1,26 @@
+flowchart LR
+  subgraph APP["Ứng dụng AloBooking<br/>(Flutter Web trong trình duyệt)"]
+    direction TB
+    SCR["Màn hình và giao diện<br/>(screens, widgets)"]
+    SVC["Dịch vụ nghiệp vụ<br/>(services)"]
+    MOD["Mô hình và dữ liệu<br/>(models, data, assets)"]
+    SCR --> SVC
+    SVC --> MOD
+  end
+  FS[("Cloud Firestore<br/>users, venues, bookings,<br/>payments, reviews,<br/>news, notifications")]
+  GM["Gemini API<br/>sinh câu trả lời"]
+  OM["Open-Meteo<br/>thời tiết, lịch sử"]
+  GMAP["OpenStreetMap + Leaflet<br/>bản đồ"]
+  SVC -- "REST, JSON" --> FS
+  SVC --> GM
+  SVC --> OM
+  SCR --> GMAP
+  subgraph TOOLS["Script Python ngoài ứng dụng"]
+    direction TB
+    T1["crawl_news.py<br/>tin thể thao từ RSS"]
+    T2["crawl_weather.py<br/>thời tiết nhiều năm"]
+    T3["simulate_bookings.py<br/>đơn mô phỏng"]
+    T2 --> T3
+  end
+  T1 -- "ghi vào news" --> FS
+  T3 -. "file JSON" .-> MOD

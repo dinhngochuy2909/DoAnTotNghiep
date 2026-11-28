@@ -12,6 +12,8 @@
 │   │   ├── models/             Kiểu dữ liệu: Venue, User, NewsPost, Payment…
 │   │   ├── data/               Dữ liệu tĩnh: danh sách sân mẫu, ảnh minh họa, trang thông tin
 │   │   ├── screens/            Các màn hình (đăng nhập, trang chủ, admin, chủ sân, chatbot…)
+│   │   │   ├── admin/ home/    Phần tách theo tab của trang quản trị và trang chủ
+│   │   ├── theme/              Màu, phông chữ, kiểu dùng chung
 │   │   ├── widgets/            Thành phần giao diện dùng chung
 │   │   └── services/           Xử lý nghiệp vụ và gọi dịch vụ ngoài
 │   │       ├── ai/             Chatbot: Gemini + tra cứu RAG
@@ -24,12 +26,13 @@
 │   ├── assets/demo/            Dữ liệu mô phỏng được đóng gói vào ứng dụng
 │   ├── web/ android/ ios/ windows/   Thư mục nền tảng do Flutter sinh ra
 │   ├── pubspec.yaml            Khai báo thư viện
-│   ├── firestore.rules         Luật truy cập Firestore
+│   ├── firestore.rules         Luật truy cập Firestore (đang mở, xem docs/dac-ta-yeu-cau.md mục 5)
+│   ├── firebase.json           Cấu hình Firebase Hosting
 │   └── dart_defines.example.json   Mẫu file khóa bí mật (xem bên dưới)
 └── docs/
     ├── report/                 Báo cáo đồ án (.docx và bản .md), slide, checklist
-    ├── diagrams/               Sơ đồ ERD, use case, kiến trúc hệ thống
-    ├── archive/                Bản sao lưu cũ (web admin viết bằng Vue)
+    ├── diagrams/               Sơ đồ use case, dữ liệu, kiến trúc, hoạt động…
+    ├── archive/                Bản cũ: web admin viết bằng Vue, sơ đồ phương án ban đầu
     └── dac-ta-yeu-cau.md       Đặc tả yêu cầu
 ```
 
@@ -47,6 +50,17 @@ flutter run -d web-server --web-port 8801 --web-hostname localhost --dart-define
 
 Mở http://localhost:8801/.
 
+## Đưa lên web (Firebase Hosting)
+
+Đang chạy tại https://alobooking-b2484.web.app. Trong thư mục `alobooking/`:
+
+```
+flutter build web --release --no-tree-shake-icons --dart-define-from-file=dart_defines.json --dart-define=GEMINI_API_KEY= --dart-define=DEMO_ACCOUNTS=false
+firebase deploy --only hosting
+```
+
+Hai tham số cuối của lệnh build giữ cho khóa Gemini và tài khoản demo không lọt vào bản web công khai.
+
 ## Kiểm thử
 
 ```
@@ -62,3 +76,4 @@ dart analyze
 | `crawl_weather.py` | Tải thời tiết nhiều năm của Hà Nội về `tool/data/` |
 | `simulate_bookings.py` | Sinh đơn đặt sân mô phỏng vào `assets/demo/` (luôn gắn nhãn mô phỏng) |
 | `check_auth_roles.dart` | Chạy tay kiểm tra đăng nhập theo vai trò (cần mạng) |
+| `build_training_dataset.py` | Dựng bảng dữ liệu huấn luyện theo ngày và theo giờ |

@@ -1,3 +1,7 @@
+> **BẢN ĐĂNG KÝ BAN ĐẦU, KHÔNG CÒN ĐÚNG VỚI SẢN PHẨM.** Giữ lại để đối chiếu.
+> Bản đề cương cập nhật theo dự án: `DeCuong_CapNhat_DinhNgocHuy_2251162033.docx` (cùng thư mục).
+> Đặc tả yêu cầu hiện hành: [../dac-ta-yeu-cau.md](../dac-ta-yeu-cau.md).
+
 
 
 | ![logo][image1] |  TRƯỜNG ĐẠI HỌC THUỶ LỢI  KHOA CÔNG NGHỆ THÔNG TIN  BẢN TÓM TẮT ĐỀ CƯƠNG ĐỒ ÁN TỐT NGHIỆP  |

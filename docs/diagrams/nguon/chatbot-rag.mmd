@@ -1,0 +1,25 @@
+flowchart TB
+  Q["Câu hỏi của khách và lịch sử hội thoại"] --> U1
+  subgraph S1["Bước 1: Hiểu câu hỏi"]
+    direction LR
+    U1["Gemini trích bộ lọc dạng JSON<br/>(môn, quận, giá, giờ, chủ đề)"]
+    U2["Luật cứng parseIntent<br/>(khi không gọi được Gemini)"]
+    U1 -. "lỗi hoặc không có khóa" .-> U2
+  end
+  U1 --> R1
+  U2 --> R1
+  subgraph S2["Bước 2: Truy xuất"]
+    direction LR
+    R1["Lọc có cấu trúc trên<br/>danh sách sân đã duyệt"]
+    R2["BM25 trên kho tri thức<br/>chính sách và hướng dẫn"]
+  end
+  R1 --> C1
+  R2 --> C1
+  subgraph S3["Bước 3: Dựng ngữ cảnh"]
+    C1["Thẻ sân, lịch trống theo giờ,<br/>thống kê giá, thời tiết, dự báo số đơn"]
+  end
+  C1 --> G1
+  subgraph S4["Bước 4: Sinh câu trả lời"]
+    G1["Gemini với system prompt:<br/>chỉ dựa trên dữ liệu đã cung cấp"]
+  end
+  G1 --> O["Câu trả lời và thẻ sân<br/>(nút Đặt sân, Chi tiết)"]

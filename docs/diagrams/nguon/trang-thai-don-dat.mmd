@@ -1,0 +1,13 @@
+stateDiagram-v2
+  direction TB
+  [*] --> ChoXacNhan : Khách đặt sân
+  ChoXacNhan : Chờ xác nhận
+  DaXacNhan : Đã xác nhận
+  HoanThanh : Hoàn thành
+  DaHuy : Đã hủy
+  ChoXacNhan --> DaXacNhan : Chủ sân xác nhận
+  ChoXacNhan --> DaHuy : Khách hoặc chủ sân hủy
+  DaXacNhan --> HoanThanh : Chủ sân đánh dấu đã chơi xong
+  DaXacNhan --> DaHuy : Khách hoặc chủ sân hủy
+  HoanThanh --> [*]
+  DaHuy --> [*]

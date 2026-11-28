@@ -1,0 +1,15 @@
+flowchart TD
+  S(("Bắt đầu")) --> A["Chọn cụm sân và ngày chơi"]
+  A --> B["Tải lịch đã đặt từ Firestore,<br/>dựng sơ đồ sân con theo giờ"]
+  B --> C["Chọn các ô giờ còn trống"]
+  C --> D{"Đã đăng nhập?"}
+  D -- "Chưa" --> D1["Yêu cầu đăng nhập"]
+  D -- "Rồi" --> E["Tính tiền: giá thường hoặc<br/>giá giờ vàng 16:00 - 22:00"]
+  E --> G["Tải lại lịch ngay trước khi lưu"]
+  G --> H{"Trùng giờ?"}
+  H -- "Có" --> H1["Báo trùng, chọn lại"]
+  H1 --> C
+  H -- "Không" --> I["Ghi đơn, phiếu thu<br/>và thông báo cho chủ sân"]
+  I --> J["Hiển thị mã VietQR<br/>đúng số tiền, nội dung"]
+  J --> F(("Kết thúc"))
+  D1 --> F

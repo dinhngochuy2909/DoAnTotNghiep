@@ -1,0 +1,23 @@
+sequenceDiagram
+  autonumber
+  actor KH as Khách hàng
+  participant APP as Ứng dụng
+  participant FS as Firestore
+  actor CS as Chủ sân
+  KH->>APP: Chọn sân, ngày, ô giờ
+  APP->>FS: Đọc đơn đặt (bookings)
+  FS-->>APP: Các đơn đã có
+  APP-->>KH: Sơ đồ ô trống, đã đặt
+  KH->>APP: Xác nhận đặt
+  APP->>FS: Đọc lại lịch, kiểm tra trùng
+  APP->>FS: Ghi đơn (Chờ xác nhận)
+  APP->>FS: Ghi phiếu thu (Đang xử lý)
+  APP->>FS: Ghi thông báo cho chủ sân
+  APP-->>KH: Mã VietQR, hướng dẫn
+  CS->>APP: Mở tab Đơn Đặt
+  APP->>FS: Đọc đơn của sân mình
+  FS-->>APP: Danh sách đơn
+  CS->>APP: Bấm Xác nhận đơn
+  APP->>FS: Đơn: Đã xác nhận
+  APP->>FS: Phiếu thu: Thành công
+  APP-->>CS: Cập nhật trạng thái

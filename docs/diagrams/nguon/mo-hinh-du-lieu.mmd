@@ -1,0 +1,62 @@
+erDiagram
+  USERS ||--o{ BOOKINGS : "đặt (userId)"
+  USERS ||--o{ VENUES : "sở hữu (ownerId)"
+  VENUES ||--o{ BOOKINGS : "được đặt (venueName)"
+  VENUES ||--o{ REVIEWS : "nhận (venueId)"
+  USERS ||--o{ REVIEWS : "viết (userId)"
+  BOOKINGS ||--o| PAYMENTS : "có phiếu thu (bookingId)"
+  USERS ||--o{ NOTIFICATIONS : "nhận (userId)"
+  VENUES ||--o{ NEWS : "được nhắc (venueId)"
+  USERS {
+    string uid PK
+    string fullName
+    string email
+    string role
+  }
+  VENUES {
+    int id PK
+    string name
+    string type
+    string district
+    string price
+    string ownerId FK
+    string approvalStatus
+    string source
+  }
+  BOOKINGS {
+    string id PK
+    string venueName
+    string field
+    string time
+    string date
+    string amount
+    string status
+    string userId FK
+  }
+  PAYMENTS {
+    string id PK
+    string bookingId FK
+    string amount
+    string method
+    string status
+  }
+  REVIEWS {
+    string id PK
+    int venueId FK
+    string userId FK
+    int stars
+  }
+  NOTIFICATIONS {
+    string id PK
+    string userId FK
+    string title
+    string type
+    bool isRead
+  }
+  NEWS {
+    string id PK
+    string title
+    string category
+    int venueId FK
+    string sourceName
+  }
