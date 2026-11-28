@@ -20,11 +20,11 @@ Giáo viên hướng dẫn: TS. Đỗ Oanh Cường Email: cuongdo@tlu.edu.vn
 
 Trong bối cảnh các hoạt động thể thao ngày càng phát triển, nhu cầu tìm kiếm và đặt sân thể thao trực tuyến ngày càng phổ biến. Tuy nhiên, người dùng vẫn gặp khó khăn trong việc tìm kiếm sân phù hợp với nhu cầu, lựa chọn thời gian, mức giá và loại sân, đặc biệt khi có nhiều sân và nhiều khung giờ khác nhau. Bên cạnh đó, các đơn vị kinh doanh sân thể thao cần một công cụ hiệu quả để quản lý sân, khách hàng, lịch đặt và doanh thu.
 
-Đề tài tập trung xây dựng “Ứng dụng đa nền tảng quản lý và đặt sân thể thao bằng Flutter tích hợp AI thông minh”, quản lý tập trung thông tin về cụm sân, người dùng, lịch đặt, giá và thanh toán. Ứng dụng phục vụ ba nhóm người dùng chính: khách hàng tìm sân, xem lịch trống theo từng sân con và từng giờ, đặt sân và thanh toán bằng mã VietQR; chủ sân quản lý cụm sân và tự duyệt đơn đặt của sân mình; quản trị viên duyệt cụm sân đăng mới và theo dõi toàn hệ thống. Người dùng chưa đăng nhập vẫn xem được sân, bản đồ và hỏi trợ lý ảo.
+Đề tài tập trung xây dựng “Ứng dụng đa nền tảng quản lý và đặt sân thể thao bằng Flutter tích hợp AI thông minh”, quản lý tập trung thông tin về cụm sân, người dùng, lịch đặt, giá và thanh toán. Ứng dụng phục vụ ba nhóm người dùng chính: khách hàng tìm sân, xem lịch trống theo từng sân con và từng giờ, đặt sân và thanh toán bằng mã VietQR, đơn được tự xác nhận khi tiền về; chủ sân quản lý cụm sân và tự duyệt đơn đặt của sân mình; quản trị viên duyệt cụm sân đăng mới và theo dõi toàn hệ thống. Người dùng chưa đăng nhập vẫn xem được sân, bản đồ và hỏi trợ lý ảo.
 
 Điểm nhấn kỹ thuật là hai thành phần trí tuệ nhân tạo. Thứ nhất, chatbot trợ lý theo kỹ thuật Retrieval-Augmented Generation (RAG) truy xuất dữ liệu của hệ thống (sân, giá, lịch trống, thời tiết) để mô hình ngôn ngữ Gemini trả lời câu hỏi bằng tiếng Việt. Thứ hai, mô hình hồi quy Poisson có điều chuẩn dự báo số đơn đặt sân theo ngày từ thứ trong tuần, ngày lễ và Tết, mùa, lượng mưa và nhiệt độ, kèm khoảng dự đoán và đánh giá mức tin cậy.
 
-Ứng dụng được phát triển bằng Flutter, lưu dữ liệu trên Cloud Firestore thông qua REST API và triển khai trên Firebase Hosting. Trong phạm vi đồ án, ứng dụng được kiểm thử trên nền web; việc đóng gói cho Android và iOS, gợi ý sân cá nhân hóa theo lịch sử người dùng và tích hợp cổng thanh toán là hướng phát triển.
+Ứng dụng được phát triển bằng Flutter, lưu dữ liệu trên Cloud Firestore thông qua REST API và triển khai trên Firebase Hosting; việc nhận biết tiền về dùng webhook của dịch vụ SePay. Trong phạm vi đồ án, ứng dụng được kiểm thử trên nền web; việc đóng gói cho Android và iOS, gợi ý sân cá nhân hóa theo lịch sử người dùng và tích hợp cổng thanh toán là hướng phát triển.
 
 ## CÁC MỤC TIÊU CHÍNH
 
@@ -49,7 +49,7 @@ Hệ thống theo dõi các trạng thái:
 - Đơn đặt: chờ xác nhận, đã xác nhận, hoàn thành, đã hủy.
 ### 3. Xây dựng hệ thống đặt sân trực tuyến:
 
-Cho phép khách hàng tìm kiếm, lọc sân theo môn và khu vực, xem trên bản đồ, chọn ngày, sân con và các giờ còn trống, đặt sân, hủy lịch và theo dõi trạng thái đơn.
+Cho phép khách hàng tìm kiếm, lọc sân theo môn và khu vực, xem trên bản đồ, chọn ngày, sân con và các giờ còn trống, đặt sân và theo dõi trạng thái đơn.
 
 Kiểm tra lại lịch ngay trước khi ghi đơn để hạn chế nhiều người đặt trùng một khung giờ.
 
@@ -60,7 +60,8 @@ Kiểm tra lại lịch ngay trước khi ghi đơn để hạn chế nhiều ng
 Phương thức thanh toán:
 
 - Chuyển khoản ngân hàng bằng mã VietQR đúng số tiền, nội dung chuyển khoản là mã đơn.
-Chủ sân (hoặc quản trị viên đối với sân do hệ thống quản lý) đối chiếu và xác nhận giao dịch.
+- Đơn được tự xác nhận khi nhận được thông báo tiền về hợp lệ từ SePay.
+Giao dịch không tự xác nhận được do chủ sân (hoặc quản trị viên đối với sân do hệ thống quản lý) đối chiếu và xác nhận.
 
 ### 5. Xây dựng chatbot trợ lý và mô hình dự báo số đơn đặt sân:
 
@@ -105,6 +106,7 @@ Nghiên cứu các công nghệ sử dụng:
 - Gemini API và xếp hạng BM25: truy xuất tri thức và sinh câu trả lời cho chatbot.
 - Open-Meteo: dự báo thời tiết và dữ liệu thời tiết lịch sử.
 - VietQR và OpenStreetMap (thư viện Leaflet): mã chuyển khoản và bản đồ.
+- SePay và Cloudflare Workers: báo tiền về bằng webhook và tự xác nhận đơn.
 - Python: thu thập tin tức, thời tiết và sinh dữ liệu mô phỏng.
 - Git/GitHub: quản lý mã nguồn.
 ### 2. Phân tích và thiết kế hệ thống
@@ -142,7 +144,6 @@ Xây dựng các sơ đồ:
 - Xem lịch theo sân con và giờ.
 - Kiểm tra trùng giờ trước khi lưu.
 - Đặt nhiều khung giờ trong một lần.
-- Hủy đặt sân.
 - Theo dõi trạng thái và lịch sử đặt sân.
 ### Module khách hàng
 
@@ -154,6 +155,7 @@ Xây dựng các sơ đồ:
 
 - Tạo mã VietQR theo từng đơn.
 - Quản lý phiếu thu và trạng thái thanh toán.
+- Tự xác nhận đơn khi tiền về (SePay).
 - Chủ sân hoặc quản trị viên xác nhận giao dịch.
 ### Module quản trị và thống kê
 
@@ -220,8 +222,9 @@ Thực hiện kiểm thử tự động (chạy trên GitHub Actions) và kiểm
 
 - Đăng nhập và phân quyền.
 - Quản lý sân.
-- Đặt sân, hủy sân.
+- Đặt sân.
 - Tính giá và mã VietQR.
+- Tự xác nhận thanh toán qua SePay.
 - Duyệt đơn đặt sân.
 - Mô hình và kết quả dự báo.
 - Giao diện người dùng.
@@ -240,7 +243,7 @@ Sửa lỗi, tối ưu số lượt đọc dữ liệu và hoàn thiện tài li
 ### 2. Thực nghiệm:
 
 - Ứng dụng web đặt sân hoạt động với ba vai trò khách hàng, chủ sân và quản trị viên.
-- Khách hàng tìm sân, xem lịch trống, đặt sân và thanh toán bằng mã VietQR.
+- Khách hàng tìm sân, xem lịch trống, đặt sân, thanh toán bằng mã VietQR và đơn được tự xác nhận khi nhận được tiền.
 - Chủ sân quản lý cụm sân, duyệt đơn đặt và xem doanh thu.
 - Quản trị viên duyệt sân, theo dõi đơn, thanh toán, khách hàng và đăng tin tức.
 - Chatbot trả lời câu hỏi dựa trên dữ liệu của hệ thống.
@@ -252,7 +255,7 @@ Sửa lỗi, tối ưu số lượt đọc dữ liệu và hoàn thiện tài li
 | TT | Thời gian | Nội dung công việc | Kết quả dự kiến đạt được |
 |---|---|---|---|
 | 1 | Tuần 1 - 3 | - Khảo sát, phân tích yêu cầu, xác định phạm vi đề tài. <br> - Nghiên cứu Flutter, Cloud Firestore, RAG và dự báo dữ liệu đếm. <br> - Thiết kế dữ liệu và kiến trúc tổng thể. | - Tài liệu đặc tả yêu cầu. <br> - Sơ đồ Use Case, mô hình dữ liệu. <br> - Kiến trúc tổng thể. |
-| 2 | Tuần 4 - 9 | - Dựng ứng dụng Flutter, kết nối Firestore qua REST. <br> - Danh sách sân, tìm kiếm, bản đồ. <br> - Đặt lịch theo sân con và giờ, thanh toán VietQR. <br> - Đăng nhập, phân quyền; trang chủ sân và quản trị. | - Các module nghiệp vụ chính hoạt động. <br> - Hoàn thành luồng đặt, thanh toán và duyệt đơn. |
+| 2 | Tuần 4 - 9 | - Dựng ứng dụng Flutter, kết nối Firestore qua REST. <br> - Danh sách sân, tìm kiếm, bản đồ. <br> - Đặt lịch theo sân con và giờ, thanh toán VietQR, tự xác nhận qua SePay. <br> - Đăng nhập, phân quyền; trang chủ sân và quản trị. | - Các module nghiệp vụ chính hoạt động. <br> - Hoàn thành luồng đặt, thanh toán và duyệt đơn. |
 | 3 | Tuần 10 - 12 | - Thu thập dữ liệu sân, tin tức, thời tiết; sinh dữ liệu mô phỏng. <br> - Xây dựng chatbot RAG. <br> - Xây dựng và đánh giá mô hình dự báo. | - Bộ dữ liệu huấn luyện. <br> - Chatbot trợ lý. <br> - Mô hình dự báo và kết quả đánh giá. |
 | 4 | Tuần 13 - 14 | - Tích hợp dự báo vào trang quản trị và chatbot. <br> - Xây dựng dashboard thống kê. <br> - Kiểm thử tự động, sửa lỗi, tối ưu. | - Dashboard hoàn chỉnh. <br> - Bộ kiểm thử đạt. |
 | 5 | Tuần 15 | - Triển khai trên Firebase Hosting. <br> - Hoàn thiện báo cáo, slide và hồ sơ bảo vệ. | - Ứng dụng chạy trên web. <br> - Báo cáo và slide hoàn chỉnh. |

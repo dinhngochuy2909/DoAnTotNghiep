@@ -3,6 +3,7 @@ sequenceDiagram
   actor KH as Khách hàng
   participant APP as Ứng dụng
   participant FS as Firestore
+  participant SP as SePay + máy nhận
   actor CS as Chủ sân
   KH->>APP: Chọn sân, ngày, ô giờ
   APP->>FS: Đọc đơn đặt (bookings)
@@ -13,7 +14,13 @@ sequenceDiagram
   APP->>FS: Ghi đơn (Chờ xác nhận)
   APP->>FS: Ghi phiếu thu (Đang xử lý)
   APP->>FS: Ghi thông báo cho chủ sân
-  APP-->>KH: Mã VietQR, hướng dẫn
+  APP-->>KH: Mã VietQR, chờ tiền về
+  KH->>SP: Chuyển khoản (qua ngân hàng)
+  SP->>FS: Đúng mã, đủ tiền: Đã xác nhận, Thành công
+  APP->>FS: Hỏi trạng thái đơn mỗi 4 giây
+  FS-->>APP: Đã xác nhận
+  APP-->>KH: Dấu tích, đặt sân thành công
+  Note over CS,APP: Khi chưa tự xác nhận được (chuyển thiếu, sai nội dung)
   CS->>APP: Mở tab Đơn Đặt
   APP->>FS: Đọc đơn của sân mình
   FS-->>APP: Danh sách đơn

@@ -15,8 +15,10 @@ Cập nhật theo sản phẩm thực tế. `[x]` đã xong, `[ ]` chưa làm.
 - [x] Quản lý sân: thêm, sửa, xóa, loại sân, giá, giờ mở cửa, duyệt sân mới.
 - [x] Khách hàng: đăng ký, đăng nhập, lịch sử đặt, đánh giá, thông báo.
 - [ ] Khách hàng cập nhật thông tin cá nhân.
-- [x] Đặt sân: tìm kiếm, xem lịch trống, đặt, hủy.
+- [x] Đặt sân: tìm kiếm, xem lịch trống, đặt; chủ sân và quản trị viên hủy đơn.
 - [x] Thanh toán VietQR và xác nhận giao dịch.
+- [x] Tự xác nhận đơn khi tiền về qua webhook SePay (đã thử bằng thông báo giả lập có chữ ký).
+- [ ] Đăng ký webhook trên SePay và thử bằng chuyển khoản thật.
 
 ### Giai đoạn 3: Dự báo nhu cầu (Tuần 10 - 12)
 - [x] Thu thập thời tiết nhiều năm, ngày lễ; sinh đơn mô phỏng có nhãn.
@@ -33,7 +35,8 @@ Cập nhật theo sản phẩm thực tế. `[x]` đã xong, `[ ]` chưa làm.
 
 ### Giai đoạn 5: Kiểm thử, triển khai, báo cáo (Tuần 15)
 - [x] Kiểm thử tự động và `dart analyze`.
-- [x] GitHub Actions chạy phân tích mã và kiểm thử (đã chạy thành công ngày 28/11/2026).
+- [x] GitHub Actions chạy `dart analyze --fatal-infos` và kiểm thử.
+- [x] Kiểm thử tích hợp gọi Gemini thật (`test/integration/gemini_live_test.dart`).
 - [x] Triển khai web trên Firebase Hosting: https://alobooking-b2484.web.app
 - [ ] Bảo mật phía máy chủ (Firebase Authentication + luật Firestore).
 - [ ] Hoàn thiện cuốn báo cáo với ảnh giao diện mới.

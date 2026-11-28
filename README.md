@@ -71,8 +71,15 @@ Hai tham số cuối của lệnh build giữ cho khóa Gemini và tài khoản 
 
 ```
 flutter test
-dart analyze
+dart analyze --fatal-infos
+flutter test test/integration/gemini_live_test.dart --dart-define-from-file=dart_defines.json   # gọi Gemini thật
 ```
+
+Test gọi Gemini tự bỏ qua khi không truyền khóa. Trên GitHub Actions, thêm secret `GEMINI_API_KEY` thì bước này mới chạy.
+
+## Tự xác nhận thanh toán qua SePay
+
+Máy nhận webhook ở [sepay-webhook/](sepay-webhook/README.md) (Cloudflare Worker). Kiểm thử: `node --test test/worker.test.mjs` trong thư mục đó.
 
 ## Script lấy dữ liệu (`alobooking/tool/`)
 

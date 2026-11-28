@@ -12,6 +12,10 @@ flowchart LR
   OM["Open-Meteo<br/>thời tiết, lịch sử"]
   GMAP["OpenStreetMap + Leaflet<br/>bản đồ"]
   SVC -- "REST, JSON" --> FS
+  BANK["Ngân hàng + SePay<br/>báo tiền về"]
+  HOOK["Máy nhận webhook<br/>(Cloudflare Worker)"]
+  BANK -- "webhook có chữ ký" --> HOOK
+  HOOK -- "xác nhận đơn" --> FS
   SVC --> GM
   SVC --> OM
   SCR --> GMAP

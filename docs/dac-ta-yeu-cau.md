@@ -13,7 +13,7 @@ Tài liệu mô tả đúng sản phẩm hiện có trong mã nguồn. Những p
 
 ### 1.1 Mô tả tổng quan
 Ứng dụng web đặt sân thể thao (cầu lông, pickleball, bóng đá, tennis, bóng rổ), dữ liệu sân tập trung ở Hà Nội:
-- **Khách hàng** tìm sân, xem lịch trống theo sân con và theo giờ, đặt sân và thanh toán bằng chuyển khoản VietQR.
+- **Khách hàng** tìm sân, xem lịch trống theo sân con và theo giờ, đặt sân và thanh toán bằng chuyển khoản VietQR; đơn tự xác nhận khi tiền về (qua SePay).
 - **Chủ sân** quản lý cụm sân của mình và tự duyệt đơn đặt.
 - **Quản trị viên** duyệt cụm sân đăng mới, theo dõi đơn, thanh toán, khách hàng, tin tức, thống kê và dự báo.
 - **Khách vãng lai** xem sân, bản đồ, trang Khám phá và hỏi trợ lý ảo.
@@ -30,6 +30,7 @@ Tài liệu mô tả đúng sản phẩm hiện có trong mã nguồn. Những p
 | Thời tiết | Hiện tại, dự báo và lịch sử | Open-Meteo |
 | Bản đồ | Vị trí cụm sân | OpenStreetMap qua thư viện Leaflet (không cần khóa API) |
 | Triển khai | Trang web tĩnh | Firebase Hosting |
+| Đối soát thanh toán | Nhận thông báo tiền về, xác nhận đơn | Webhook SePay + Cloudflare Worker (`sepay-webhook/`) |
 | Script dữ liệu | Tin RSS, thời tiết, đơn mô phỏng, bảng huấn luyện | Python (`alobooking/tool/`) |
 
 Sơ đồ: [kiến trúc](diagrams/kien-truc-he-thong.png), [use case](diagrams/use-case.png), [dữ liệu](diagrams/mo-hinh-du-lieu.png).
@@ -39,7 +40,7 @@ Sơ đồ: [kiến trúc](diagrams/kien-truc-he-thong.png), [use case](diagrams/
 | Vai trò | Cách xác định | Quyền chính |
 |---|---|---|
 | Khách vãng lai | Chưa đăng nhập hoặc vai trò `guest` | Xem, hỏi chatbot; không đặt sân |
-| Khách hàng | `role = customer` | Đặt, thanh toán, hủy, đánh giá |
+| Khách hàng | `role = customer` | Đặt, thanh toán, đánh giá |
 | Chủ sân | `role = owner`, sở hữu sân qua `ownerId` | Quản lý sân và đơn của sân mình |
 | Quản trị viên | `role = admin` | Duyệt sân, theo dõi toàn hệ thống |
 
@@ -59,7 +60,7 @@ Vai trò chỉ lấy từ trường `role` đã lưu, không suy ra từ email.
 | UC04 | Đăng ký, đăng nhập | Khách vãng lai |
 | UC05 | Đặt sân theo giờ | Khách hàng |
 | UC06 | Thanh toán chuyển khoản VietQR | Khách hàng |
-| UC07 | Xem và hủy lịch đã đặt | Khách hàng |
+| UC07 | Xem lịch đã đặt | Khách hàng |
 | UC08 | Đánh giá sân đã chơi | Khách hàng |
 | UC09 | Đánh dấu yêu thích, nhận thông báo | Khách hàng |
 | UC10 | Đăng ký, sửa, xóa cụm sân | Chủ sân |
@@ -79,11 +80,13 @@ Vai trò chỉ lấy từ trường `role` đã lưu, không suy ra từ email.
 - Ca giờ vàng 16:00 – 22:00 tính giá cao, giờ còn lại tính giá thấp trong khoảng giá chủ sân khai báo.
 - Lịch được tải lại ngay trước khi ghi đơn để phát hiện trùng giờ.
 - Trạng thái đơn: Chờ xác nhận → Đã xác nhận → Hoàn thành, hoặc Đã hủy ([sơ đồ](diagrams/trang-thai-don-dat.png)).
-- Khách tự hủy được đơn chờ xác nhận hoặc đã xác nhận khi còn cách giờ chơi (ca sớm nhất của đơn) từ 2 tiếng trở lên; còn dưới 2 tiếng thì không hủy được. Chủ sân và quản trị viên không bị giới hạn này.
+- Khách **không tự hủy** được đơn. Chỉ đơn đang chờ xác nhận mới hủy được trên ứng dụng, do chủ sân (hoặc quản trị viên với sân do hệ thống quản lý) thực hiện; đơn đã xác nhận không có nút hủy, sự cố và hoàn tiền xử lý ngoài ứng dụng.
 
 **Thanh toán**
 - Chỉ chuyển khoản qua mã VietQR đúng số tiền, nội dung là mã đơn.
-- Phiếu thu: Đang xử lý → Thành công hoặc Đã hoàn tiền; chuyển sang Thành công khi người duyệt xác nhận đơn.
+- Phiếu thu: Đang xử lý → Thành công hoặc Đã hoàn tiền.
+- Tự xác nhận: SePay gửi webhook có chữ ký HMAC khi tiền về; máy nhận kiểm tra đúng tài khoản, đúng mã đơn trong nội dung và đủ số tiền rồi mới xác nhận đơn. Chuyển thiếu, sai nội dung thì chủ sân xử lý thủ công.
+- Màn thanh toán hỏi trạng thái đơn mỗi 4 giây (tối đa 10 phút), được xác nhận thì báo thành công và chuyển sang lịch đã đặt.
 - Hoàn tiền do chủ sân xử lý ngoài ứng dụng.
 
 **Quản lý sân và duyệt**
@@ -106,7 +109,8 @@ Vai trò chỉ lấy từ trường `role` đã lưu, không suy ra từ email.
 - **Bảo mật hiện tại:** mật khẩu băm SHA-256 kèm salt 16 byte; khóa API và tài khoản nhận tiền nằm ngoài mã nguồn; bản web công khai không chứa khóa Gemini và tài khoản demo.
 - **Khả dụng:** giao diện tiếng Việt, dùng được từ màn hình điện thoại đến máy tính.
 - **Tương thích:** trình duyệt hiện đại, đã kiểm thử trên Chrome.
-- **Kiểm thử:** kiểm thử tự động bằng `flutter test`, phân tích mã bằng `dart analyze`, chạy trên GitHub Actions (`.github/workflows/ci.yml`).
+- **Kiểm thử:** `flutter test`, `dart analyze --fatal-infos` (không còn vấn đề nào) và kiểm thử máy nhận webhook, chạy trên GitHub Actions (`.github/workflows/ci.yml`).
+- **Kiểm thử tích hợp AI:** `test/integration/gemini_live_test.dart` gọi Gemini thật, tự bỏ qua khi không có khóa. Ngày 28/11/2026: ba model ưu tiên trả lời HTTP 200, model dự phòng cuối `gemini-flash-latest` quá 40 giây không trả lời.
 
 ---
 
@@ -116,7 +120,6 @@ Vai trò chỉ lấy từ trường `role` đã lưu, không suy ra từ email.
 |---|:---:|:---:|:---:|:---:|
 | Xem sân, bản đồ, Khám phá, chatbot | Có | Có | Có | Có |
 | Đặt sân và thanh toán | Không | Có | Có | Có |
-| Hủy lịch do mình đặt | Không | Có | Có | Có |
 | Đánh giá sân đã chơi xong | Không | Có | Có | Có |
 | Đăng ký, sửa, xóa sân | Không | Không | Sân của mình | Mọi sân |
 | Duyệt cụm sân đăng mới | Không | Không | Không | Có |
@@ -134,7 +137,8 @@ Vai trò chỉ lấy từ trường `role` đã lưu, không suy ra từ email.
 - Ghi đơn chưa dùng giao dịch, hai người đặt gần như cùng lúc vẫn có thể cùng thành công.
 - Đơn liên kết với sân bằng tên sân.
 - Số đơn thật còn ít nên mô hình dự báo chưa chứng minh được hiệu quả trên dữ liệu thật.
-- Chưa có cổng thanh toán.
+- Chưa có cổng thanh toán; việc đối soát tự động dựa vào webhook của SePay.
+- Vì cơ sở dữ liệu đang mở, trạng thái đơn có thể bị sửa mà không qua máy nhận; chủ sân nên đối chiếu lịch sử giao dịch.
 
 ## 6. CHƯA THỰC HIỆN (hướng phát triển)
 
