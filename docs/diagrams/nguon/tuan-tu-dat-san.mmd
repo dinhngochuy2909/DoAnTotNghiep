@@ -6,13 +6,12 @@ sequenceDiagram
   participant SP as SePay + máy nhận
   actor CS as Chủ sân
   KH->>APP: Chọn sân, ngày, ô giờ
-  APP->>FS: Đọc đơn đặt (bookings)
-  FS-->>APP: Các đơn đã có
+  APP->>FS: Đọc lịch bận công khai (slots)
+  FS-->>APP: Các ô đã đặt
   APP-->>KH: Sơ đồ ô trống, đã đặt
   KH->>APP: Xác nhận đặt
   APP->>FS: Đọc lại lịch, kiểm tra trùng
-  APP->>FS: Ghi đơn (Chờ xác nhận)
-  APP->>FS: Ghi phiếu thu (Đang xử lý)
+  APP->>FS: Ghi một lần: đơn (Chờ xác nhận), lịch bận, phiếu thu
   APP->>FS: Ghi thông báo cho chủ sân
   APP-->>KH: Mã VietQR, chờ tiền về
   KH->>SP: Chuyển khoản (qua ngân hàng)

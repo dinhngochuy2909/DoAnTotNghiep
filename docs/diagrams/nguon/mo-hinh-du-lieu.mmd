@@ -1,7 +1,8 @@
 erDiagram
   USERS ||--o{ BOOKINGS : "đặt (userId)"
   USERS ||--o{ VENUES : "sở hữu (ownerId)"
-  VENUES ||--o{ BOOKINGS : "được đặt (venueName)"
+  VENUES ||--o{ BOOKINGS : "được đặt (venueId)"
+  BOOKINGS ||--|| SLOTS : "lịch bận công khai (cùng mã)"
   VENUES ||--o{ REVIEWS : "nhận (venueId)"
   USERS ||--o{ REVIEWS : "viết (userId)"
   BOOKINGS ||--o| PAYMENTS : "có phiếu thu (bookingId)"
@@ -32,6 +33,16 @@ erDiagram
     string amount
     string status
     string userId FK
+    string ownerId FK
+    int venueId FK
+  }
+  SLOTS {
+    string id PK
+    string venueName
+    string field
+    string date
+    string time
+    string status
   }
   PAYMENTS {
     string id PK
@@ -39,6 +50,8 @@ erDiagram
     string amount
     string method
     string status
+    string userId FK
+    string ownerId FK
   }
   REVIEWS {
     string id PK

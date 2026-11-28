@@ -30,7 +30,7 @@ Trong bối cảnh các hoạt động thể thao ngày càng phát triển, nhu
 
 ### 1. Phân tích và thiết kế hệ thống:
 
-Xác định các yêu cầu chức năng và phi chức năng; phân tích quy trình đặt và duyệt đơn đặt sân; thiết kế dữ liệu trên Cloud Firestore gồm người dùng, cụm sân, đơn đặt, phiếu thu, đánh giá, tin tức và thông báo; thiết kế kiến trúc tổng thể và phân quyền người dùng.
+Xác định các yêu cầu chức năng và phi chức năng; phân tích quy trình đặt và duyệt đơn đặt sân; thiết kế dữ liệu trên Cloud Firestore gồm người dùng, cụm sân, đơn đặt, phiếu thu, đánh giá, tin tức và thông báo; thiết kế kiến trúc tổng thể, phân quyền người dùng và luật bảo mật phía máy chủ.
 
 Hệ thống có các nhóm người dùng:
 
@@ -55,7 +55,7 @@ Kiểm tra lại lịch ngay trước khi ghi đơn để hạn chế nhiều ng
 
 ### 4. Xây dựng module quản lý khách hàng và thanh toán:
 
-Đăng ký, đăng nhập (mật khẩu được băm kèm salt), xem lịch sử đặt sân, đánh giá sân đã chơi, đánh dấu sân yêu thích và nhận thông báo.
+Đăng ký, đăng nhập bằng Firebase Authentication, xem lịch sử đặt sân, đánh giá sân đã chơi, đánh dấu sân yêu thích và nhận thông báo.
 
 Phương thức thanh toán:
 
@@ -102,6 +102,7 @@ Nghiên cứu các công nghệ sử dụng:
 - Flutter, Dart: xây dựng giao diện, nghiệp vụ và mô hình dự báo.
 - Material Design: thiết kế giao diện và các thành phần tương tác.
 - Cloud Firestore (REST API): lưu trữ và truy xuất dữ liệu.
+- Firebase Authentication và Firestore Security Rules: đăng nhập và phân quyền phía máy chủ.
 - Firebase Hosting: triển khai ứng dụng web.
 - Gemini API và xếp hạng BM25: truy xuất tri thức và sinh câu trả lời cho chatbot.
 - Open-Meteo: dự báo thời tiết và dữ liệu thời tiết lịch sử.
@@ -220,7 +221,7 @@ Triển khai ứng dụng web trên Firebase Hosting; dữ liệu lưu trên Clo
 
 Thực hiện kiểm thử tự động (chạy trên GitHub Actions) và kiểm thử trên trình duyệt đối với:
 
-- Đăng nhập và phân quyền.
+- Đăng nhập, phân quyền và luật bảo mật.
 - Quản lý sân.
 - Đặt sân.
 - Tính giá và mã VietQR.
@@ -249,7 +250,7 @@ Sửa lỗi, tối ưu số lượt đọc dữ liệu và hoàn thiện tài li
 - Chatbot trả lời câu hỏi dựa trên dữ liệu của hệ thống.
 - Mô hình dự báo số đơn 7 ngày tới, công bố trung thực sai số và mức tin cậy.
 - Ứng dụng được triển khai thử nghiệm trên Firebase Hosting.
-- Vượt qua bộ kiểm thử tự động cho các chức năng cốt lõi; phân quyền theo vai trò trong ứng dụng.
+- Vượt qua bộ kiểm thử tự động cho các chức năng cốt lõi; phân quyền theo vai trò ở ứng dụng và bằng luật bảo mật Firestore.
 ## KẾ HOẠCH THỰC HIỆN
 
 | TT | Thời gian | Nội dung công việc | Kết quả dự kiến đạt được |

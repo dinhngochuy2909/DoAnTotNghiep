@@ -38,7 +38,7 @@ Cập nhật theo sản phẩm thực tế. `[x]` đã xong, `[ ]` chưa làm.
 - [x] GitHub Actions chạy `dart analyze --fatal-infos` và kiểm thử.
 - [x] Kiểm thử tích hợp gọi Gemini thật (`test/integration/gemini_live_test.dart`).
 - [x] Triển khai web trên Firebase Hosting: https://alobooking-b2484.web.app
-- [ ] Bảo mật phía máy chủ (Firebase Authentication + luật Firestore).
+- [x] Bảo mật phía máy chủ (Firebase Authentication + luật Firestore).
 - [ ] Hoàn thiện cuốn báo cáo với ảnh giao diện mới.
 - [ ] Chuẩn bị slide thuyết trình.
 - [ ] Hồ sơ bảo vệ.

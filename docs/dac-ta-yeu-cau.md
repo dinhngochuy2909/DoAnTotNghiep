@@ -23,8 +23,8 @@ Tài liệu mô tả đúng sản phẩm hiện có trong mã nguồn. Những p
 | Thành phần | Mô tả | Công nghệ |
 |---|---|---|
 | Ứng dụng | Toàn bộ giao diện và nghiệp vụ, chạy trong trình duyệt | Flutter Web / Dart |
-| Cơ sở dữ liệu | Cloud Firestore, ứng dụng gọi trực tiếp REST API | Firestore REST |
-| Xác thực | Tài khoản lưu trong collection `users`, mật khẩu băm SHA-256 kèm salt | Tự xây trong Dart |
+| Cơ sở dữ liệu | Cloud Firestore, ứng dụng gọi REST API kèm ID token; luật bảo mật theo vai trò | Firestore REST, Security Rules |
+| Xác thực | Firebase Authentication (email, mật khẩu); `users/{uid}` lưu hồ sơ và vai trò | Identity Toolkit REST |
 | Chatbot | Truy xuất dữ liệu (lọc + BM25) rồi sinh câu trả lời | RAG + Gemini API |
 | Dự báo | Số đơn theo ngày và tỷ lệ hủy | Hồi quy Poisson (IRLS, điều chuẩn L2) và logistic (L2) viết bằng Dart thuần |
 | Thời tiết | Hiện tại, dự báo và lịch sử | Open-Meteo |
@@ -82,10 +82,13 @@ Vai trò chỉ lấy từ trường `role` đã lưu, không suy ra từ email.
 - Trạng thái đơn: Chờ xác nhận → Đã xác nhận → Hoàn thành, hoặc Đã hủy ([sơ đồ](diagrams/trang-thai-don-dat.png)).
 - Khách **không tự hủy** được đơn. Chỉ đơn đang chờ xác nhận mới hủy được trên ứng dụng, do chủ sân (hoặc quản trị viên với sân do hệ thống quản lý) thực hiện; đơn đã xác nhận không có nút hủy, sự cố và hoàn tiền xử lý ngoài ứng dụng.
 
+- Đơn, dòng lịch bận và phiếu thu được ghi trong một lần (được cả hoặc không).
+- Ô giờ đã đặt công khai ở collection `slots`, không có tên, số điện thoại hay số tiền.
+
 **Thanh toán**
 - Chỉ chuyển khoản qua mã VietQR đúng số tiền, nội dung là mã đơn.
 - Phiếu thu: Đang xử lý → Thành công hoặc Đã hoàn tiền.
-- Tự xác nhận: SePay gửi webhook có chữ ký HMAC khi tiền về; máy nhận kiểm tra đúng tài khoản, đúng mã đơn trong nội dung và đủ số tiền rồi mới xác nhận đơn. Chuyển thiếu, sai nội dung thì chủ sân xử lý thủ công.
+- Tự xác nhận: SePay gửi webhook có chữ ký HMAC khi tiền về; máy nhận kiểm tra đúng tài khoản, đúng mã đơn trong nội dung, đủ số tiền, và số tiền trên đơn không thấp hơn bảng giá của sân rồi mới xác nhận. Máy nhận đăng nhập bằng tài khoản riêng chỉ được xác nhận đơn. Không đạt thì chủ sân xử lý thủ công.
 - Màn thanh toán hỏi trạng thái đơn mỗi 4 giây (tối đa 10 phút), được xác nhận thì báo thành công và chuyển sang lịch đã đặt.
 - Hoàn tiền do chủ sân xử lý ngoài ứng dụng.
 
@@ -106,15 +109,15 @@ Vai trò chỉ lấy từ trường `role` đã lưu, không suy ra từ email.
 ## 3. YÊU CẦU PHI CHỨC NĂNG
 
 - **Hiệu năng:** danh sách sân được lưu đệm 30 phút để giảm lượt đọc Firestore (gói miễn phí có hạn mức đọc mỗi ngày).
-- **Bảo mật hiện tại:** mật khẩu băm SHA-256 kèm salt 16 byte; khóa API và tài khoản nhận tiền nằm ngoài mã nguồn; bản web công khai không chứa khóa Gemini và tài khoản demo.
+- **Bảo mật:** Firebase Authentication giữ mật khẩu; luật Firestore (`alobooking/firestore.rules`) phân quyền theo vai trò ở phía máy chủ, mặc định từ chối; khóa Gemini, khóa SePay và tài khoản nhận tiền nằm ngoài mã nguồn; bản web công khai không chứa khóa Gemini.
 - **Khả dụng:** giao diện tiếng Việt, dùng được từ màn hình điện thoại đến máy tính.
 - **Tương thích:** trình duyệt hiện đại, đã kiểm thử trên Chrome.
-- **Kiểm thử:** `flutter test`, `dart analyze --fatal-infos` (không còn vấn đề nào) và kiểm thử máy nhận webhook, chạy trên GitHub Actions (`.github/workflows/ci.yml`).
+- **Kiểm thử:** `flutter test`, `dart analyze --fatal-infos` (không còn vấn đề nào), kiểm thử máy nhận webhook, và trên bộ mô phỏng Firebase: kiểm thử luật bảo mật cùng luồng đăng ký, đặt, duyệt, hủy. Tất cả chạy trên GitHub Actions (`.github/workflows/ci.yml`).
 - **Kiểm thử tích hợp AI:** `test/integration/gemini_live_test.dart` gọi Gemini thật, tự bỏ qua khi không có khóa. Ngày 28/11/2026: ba model ưu tiên trả lời HTTP 200, model dự phòng cuối `gemini-flash-latest` quá 40 giây không trả lời.
 
 ---
 
-## 4. MA TRẬN PHÂN QUYỀN (trên giao diện)
+## 4. MA TRẬN PHÂN QUYỀN (giao diện và luật Firestore)
 
 | Chức năng | Khách vãng lai | Khách hàng | Chủ sân | Quản trị viên |
 |---|:---:|:---:|:---:|:---:|
@@ -132,13 +135,12 @@ Vai trò chỉ lấy từ trường `role` đã lưu, không suy ra từ email.
 
 ## 5. HẠN CHẾ ĐÃ BIẾT
 
-- **Phân quyền chưa được bảo vệ phía máy chủ.** Ứng dụng gọi Firestore REST không kèm token xác thực, luật Firestore đang mở (`allow read, write: if true`). Bảng ở mục 4 chỉ có hiệu lực trên giao diện. Hướng khắc phục: chuyển sang Firebase Authentication và viết luật theo `request.auth`.
-- Mật khẩu băm một vòng SHA-256 ở máy khách, chưa dùng hàm băm chậm.
-- Ghi đơn chưa dùng giao dịch, hai người đặt gần như cùng lúc vẫn có thể cùng thành công.
-- Đơn liên kết với sân bằng tên sân.
+- Luật chưa chặn được việc một người đã đăng nhập đặt giữ chỗ rồi không trả tiền, hoặc gửi thông báo rác.
+- Chưa kiểm tra trùng giờ ở máy chủ: hai người đặt gần như cùng lúc vẫn có thể cùng thành công.
+- Phiên đăng nhập chỉ giữ trong bộ nhớ, tải lại trang phải đăng nhập lại; chưa có chức năng quên mật khẩu trong ứng dụng.
+- Lịch trống và khách quen vẫn đối chiếu sân theo tên.
 - Số đơn thật còn ít nên mô hình dự báo chưa chứng minh được hiệu quả trên dữ liệu thật.
 - Chưa có cổng thanh toán; việc đối soát tự động dựa vào webhook của SePay.
-- Vì cơ sở dữ liệu đang mở, trạng thái đơn có thể bị sửa mà không qua máy nhận; chủ sân nên đối chiếu lịch sử giao dịch.
 
 ## 6. CHƯA THỰC HIỆN (hướng phát triển)
 
