@@ -8,6 +8,14 @@ enum FeaturedKind { rated, cheapest, mostCourts }
 
 enum GoldenPhase { before, during, after }
 
+/// Một khu vực (quận/huyện) có nhiều sân công khai, kèm môn chiếm nhiều nhất để chọn ảnh minh họa cho thẻ khu vực.
+class DistrictHighlight {
+  final String name;
+  final int count;
+  final String topSport;
+  const DistrictHighlight(this.name, this.count, this.topSport);
+}
+
 /// Trạng thái ca giờ vàng so với bây giờ.
 class GoldenStatus {
   final GoldenPhase phase;
@@ -157,6 +165,36 @@ class ExploreHighlights {
       out[v.type] = out[v.type]! + 1;
     }
     return out;
+  }
+
+  /// Các khu vực có nhiều sân công khai nhất (đã duyệt, không tính sân minh họa), nhiều trước. Bằng nhau thì xếp theo tên.
+  /// [topSport] là môn có nhiều sân nhất trong khu vực; bằng nhau thì theo thứ tự [sportOrder].
+  static List<DistrictHighlight> topDistricts(List<Venue> venues, {int max = 8}) {
+    final bySport = <String, Map<String, int>>{};
+    for (final v in venues) {
+      final d = v.district.trim();
+      if (d.isEmpty || !NewsFeed.isPublic(v) || !sportOrder.contains(v.type)) continue;
+      final m = bySport.putIfAbsent(d, () => {});
+      m[v.type] = (m[v.type] ?? 0) + 1;
+    }
+    final out = <DistrictHighlight>[];
+    for (final e in bySport.entries) {
+      var best = sportOrder.first;
+      var bestN = -1;
+      for (final s in sportOrder) {
+        final n = e.value[s] ?? 0;
+        if (n > bestN) {
+          best = s;
+          bestN = n;
+        }
+      }
+      out.add(DistrictHighlight(e.key, e.value.values.fold<int>(0, (a, b) => a + b), best));
+    }
+    out.sort((a, b) {
+      final c = b.count.compareTo(a.count);
+      return c != 0 ? c : a.name.compareTo(b.name);
+    });
+    return out.take(max).toList();
   }
 
   /// "T2".."T7", "CN".

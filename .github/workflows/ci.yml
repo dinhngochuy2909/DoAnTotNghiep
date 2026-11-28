@@ -1,0 +1,34 @@
+name: Kiểm tra mã
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  analyze-and-test:
+    # Chạy trên Windows vì một số bài kiểm thử giao diện nạp phông Segoe UI để đo bề rộng chữ
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: alobooking
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Đặt múi giờ Việt Nam
+        run: tzutil /s "SE Asia Standard Time"
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.1'
+          channel: stable
+          cache: true
+
+      - name: Tải thư viện
+        run: flutter pub get
+
+      - name: Phân tích mã
+        run: dart analyze
+
+      - name: Kiểm thử tự động
+        run: flutter test

@@ -88,6 +88,7 @@ Future<void> _open(
   NewsLoader? loader,
   WeatherLoader? weather,
   DateTime? now,
+  Duration? heroInterval,
   Size size = const Size(1280, 5200), // đủ cao để mọi thẻ đều được dựng (danh sách dựng lười)
 }) async {
   tester.view.physicalSize = size;
@@ -102,6 +103,7 @@ Future<void> _open(
       newsLoader: loader ?? () async => _bundle(),
       weatherLoader: weather ?? () async => WeatherData.defaultHanoi(),
       now: now ?? _now,
+      heroInterval: heroInterval,
     ),
   ));
   await tester.pump();
@@ -905,4 +907,133 @@ void main() {
     expect(tester.getSize(_k('news-card-post-km')).width, lessThanOrEqualTo(760));
     if (realFont) expect(tester.takeException(), isNull);
   });
+
+  group('Banner ảnh xoay vòng', () {
+    testWidgets('Mặc định hiện ảnh đầu tiên cùng 5 chấm chỉ báo; giờ cố định (kiểm thử) thì không tự chuyển', (tester) async {
+      await _open(tester);
+      expect(_k('news-hero-photo-0'), findsOneWidget);
+      for (var i = 0; i < 5; i++) {
+        expect(_k('news-hero-dot-$i'), findsOneWidget);
+      }
+      expect(_k('news-hero-dot-5'), findsNothing);
+      await tester.pump(const Duration(seconds: 30));
+      expect(_k('news-hero-photo-0'), findsOneWidget, reason: 'không đặt heroInterval và đã cố định giờ thì không có bộ đếm giờ');
+      expect(find.descendant(of: _k('news-hero'), matching: find.text('Ảnh minh họa')), findsOneWidget);
+    });
+
+    testWidgets('Có heroInterval thì ảnh tự chuyển lần lượt và quay vòng về ảnh đầu', (tester) async {
+      await _open(tester, heroInterval: const Duration(seconds: 3));
+      expect(_k('news-hero-photo-0'), findsOneWidget);
+      await tester.pump(const Duration(seconds: 3));
+      await tester.pump(const Duration(milliseconds: 1000));
+      expect(_k('news-hero-photo-1'), findsOneWidget);
+      expect(_k('news-hero-photo-0'), findsNothing, reason: 'ảnh cũ phải được gỡ sau khi chuyển mờ xong');
+      for (var i = 0; i < 4; i++) {
+        await tester.pump(const Duration(seconds: 3)); // mỗi 3 giây một lần chuyển
+      }
+      await tester.pump(const Duration(milliseconds: 1000)); // chờ lần chuyển cuối mờ xong
+      expect(_k('news-hero-photo-0'), findsOneWidget, reason: '5 ảnh, chuyển 5 lần thì quay về ảnh đầu');
+    });
+
+    testWidgets('Bấm một chấm thì chuyển thẳng tới ảnh đó', (tester) async {
+      await _open(tester);
+      await tester.tap(_k('news-hero-dot-3'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 1000));
+      expect(_k('news-hero-photo-3'), findsOneWidget);
+      expect(_k('news-hero-photo-0'), findsNothing);
+    });
+
+    testWidgets('Bật "giảm chuyển động" thì ảnh không tự chuyển', (tester) async {
+      tester.view.physicalSize = const Size(1280, 5200);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(MaterialApp(
+        theme: ThemeData(fontFamily: 'TestSans'),
+        builder: (context, child) => MediaQuery(data: MediaQuery.of(context).copyWith(disableAnimations: true), child: child!),
+        home: ExploreScreen(
+          venues: _venues(),
+          newsLoader: () async => _bundle(),
+          weatherLoader: () async => WeatherData.defaultHanoi(),
+          now: _now,
+          heroInterval: const Duration(seconds: 3),
+        ),
+      ));
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 10));
+      expect(_k('news-hero-photo-0'), findsOneWidget);
+    });
+  });
+
+  group('Khám phá theo khu vực', () {
+    List<Venue> areaVenues() => [
+          _v(1, 'A1', district: 'Cầu Giấy'),
+          _v(2, 'A2', district: 'Cầu Giấy', type: 'tennis'),
+          _v(3, 'A3', district: 'Cầu Giấy'),
+          _v(4, 'B1', district: 'Đống Đa'),
+          _v(5, 'B2', district: 'Đống Đa'),
+          _v(6, 'C1', district: 'Ba Đình', type: 'pickleball'),
+          _v(7, 'Demo', district: 'Ba Đình', source: 'demo'),
+          _v(8, 'Chờ duyệt', district: 'Đống Đa', status: 'pending'),
+        ];
+
+    testWidgets('Mỗi khu vực một thẻ có ảnh minh họa, số địa điểm thật và môn nhiều nhất; không đếm sân minh họa hay chưa duyệt', (tester) async {
+      await _open(tester, venues: areaVenues());
+      expect(_k('news-districts'), findsOneWidget);
+      expect(find.text('Khám phá theo khu vực'), findsOneWidget);
+      expect(find.descendant(of: _k('news-district-Cầu Giấy'), matching: find.text('3 địa điểm')), findsOneWidget);
+      expect(find.descendant(of: _k('news-district-Cầu Giấy'), matching: find.text('Nhiều nhất: Cầu lông')), findsOneWidget);
+      expect(find.descendant(of: _k('news-district-Đống Đa'), matching: find.text('2 địa điểm')), findsOneWidget);
+      expect(find.descendant(of: _k('news-district-Ba Đình'), matching: find.text('1 địa điểm')), findsOneWidget);
+      expect(find.descendant(of: _k('news-district-Ba Đình'), matching: find.text('Nhiều nhất: Pickleball')), findsOneWidget);
+      for (final d in ['Cầu Giấy', 'Đống Đa', 'Ba Đình']) {
+        expect(find.descendant(of: _k('news-district-$d'), matching: find.text('Ảnh minh họa')), findsOneWidget, reason: '$d dùng ảnh kho nên phải có nhãn');
+      }
+      final xs = [for (final d in ['Cầu Giấy', 'Đống Đa', 'Ba Đình']) tester.getTopLeft(_k('news-district-$d')).dx];
+      expect(xs[0] < xs[1] && xs[1] < xs[2], isTrue, reason: 'khu vực nhiều sân đứng trước');
+      if (realFont) expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('Bấm một khu vực mở màn tìm sân đã lọc sẵn theo quận đó', (tester) async {
+      await _open(tester, venues: areaVenues());
+      await tester.ensureVisible(_k('news-district-Đống Đa'));
+      await tester.tap(_k('news-district-Đống Đa'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 600));
+      final finder = tester.widget<VenueFinderScreen>(find.byType(VenueFinderScreen));
+      expect(finder.initialDistrict, 'Đống Đa');
+      expect(finder.initialSport, 'all');
+    });
+
+    testWidgets('Chưa có sân thì ẩn dải khu vực', (tester) async {
+      await _open(tester, venues: const []);
+      expect(_k('news-districts'), findsNothing);
+    });
+  });
+
+  group('Tin thể thao từ báo: ảnh bìa theo chủ đề', () {
+    NewsPost rss(String id, String title) => NewsPost(
+          id: id,
+          title: title,
+          body: '',
+          category: 'sport',
+          author: 'VnExpress',
+          createdAt: _now.subtract(const Duration(hours: 2)),
+          sourceName: 'VnExpress',
+          sourceUrl: 'https://vnexpress.net/$id.html',
+        );
+
+    testWidgets('Tin rõ môn có ảnh minh họa đúng môn kèm nhãn; tin không rõ môn dùng bìa mỏng bằng nền chuyển sắc', (tester) async {
+      await _open(tester, loader: () async => _bundle(posts: [
+            rss('rss_tennis', 'Quần vợt TP.HCM lập cú đúp HCV'),
+            rss('rss_cua_ro', 'Cua-rơ dừng trước vạch đích để nhường đồng đội'),
+          ]));
+      expect(find.descendant(of: _k('news-card-post-rss_tennis'), matching: find.text('Ảnh minh họa')), findsOneWidget);
+      expect(find.descendant(of: _k('news-card-post-rss_cua_ro'), matching: find.text('Ảnh minh họa')), findsNothing);
+      final photoH = tester.getSize(_k('news-cover-post-rss_tennis')).height;
+      final slimH = tester.getSize(_k('news-cover-post-rss_cua_ro')).height;
+      expect(slimH, lessThan(photoH), reason: 'bìa không ảnh phải mỏng hơn bìa có ảnh');
+    });
+  });
+
 }

@@ -48,12 +48,17 @@ class ExploreScreen extends StatefulWidget {
   final WeatherLoader? weatherLoader;
   final DateTime? now;
 
+  /// Chỉ dùng khi kiểm thử: bật tự chuyển ảnh banner theo chu kỳ này. Bình thường ảnh tự chuyển mỗi 6 giây
+  /// và tắt khi đã cố định giờ (kiểm thử) hoặc khi người dùng bật "giảm chuyển động".
+  final Duration? heroInterval;
+
   const ExploreScreen({
     super.key,
     required this.venues,
     this.newsLoader,
     this.weatherLoader,
     this.now,
+    this.heroInterval,
   });
 
   @override
@@ -66,11 +71,17 @@ class _ExploreScreenState extends State<ExploreScreen> {
   static const _grey = Color(0xFF64748B);
   static const _line = Color(0xFFE2E8F0);
 
-  /// Ảnh nền banner đầu trang: một ảnh minh họa trong kho (sân bóng đá buổi tối).
-  static final String _heroPhoto = VenuePhotos.pick(
-    'football',
-    23,
-  ).replaceFirst('w=800&h=450', 'w=1200&h=520');
+  /// Các ảnh nền xoay vòng ở banner đầu trang, mỗi môn một ảnh (đều lấy từ kho ảnh minh họa).
+  static final List<String> _heroPhotos = [
+    for (final (sport, rank) in const [
+      ('football', 23),
+      ('badminton', 21),
+      ('tennis', 33),
+      ('pickleball', 7),
+      ('basketball', 24),
+    ])
+      VenuePhotos.pick(sport, rank).replaceFirst('w=800&h=450', 'w=1200&h=520'),
+  ];
 
   /// Thứ tự các nhãn lọc.
   static const _filterOrder = [
@@ -91,6 +102,8 @@ class _ExploreScreenState extends State<ExploreScreen> {
   /// Đồng hồ cập nhật mỗi 30 giây cho thẻ giờ vàng và lời chào (không dùng cho nhãn "x giờ trước" của tin).
   late DateTime _clock;
   Timer? _tick;
+  Timer? _heroTimer;
+  int _heroIndex = 0;
   bool _loading = true;
   bool _failed = false;
   List<NewsEntry> _entries = const [];
@@ -115,12 +128,23 @@ class _ExploreScreenState extends State<ExploreScreen> {
         if (mounted) setState(() => _clock = DateTime.now());
       });
     }
+    final slide =
+        widget.heroInterval ??
+        (widget.now == null ? const Duration(seconds: 6) : null);
+    if (slide != null) {
+      _heroTimer = Timer.periodic(slide, (_) {
+        if (!mounted) return;
+        if (MediaQuery.maybeOf(context)?.disableAnimations ?? false) return;
+        setState(() => _heroIndex = (_heroIndex + 1) % _heroPhotos.length);
+      });
+    }
     _load();
   }
 
   @override
   void dispose() {
     _tick?.cancel();
+    _heroTimer?.cancel();
     super.dispose();
   }
 
@@ -231,6 +255,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
       if (!_loading && _kind == null) ...[
         _narrow(_planSection()),
         _narrow(_sportTiles()),
+        _narrow(_districtTiles()),
         if (_featured.isNotEmpty) _narrow(_featuredSection()),
       ],
       _narrow(_filters()),
@@ -332,7 +357,16 @@ class _ExploreScreenState extends State<ExploreScreen> {
       child: Stack(
         children: [
           Positioned.fill(
-            child: VenueImageView(imageUrl: _heroPhoto, errorWidget: fallback),
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 900),
+              child: SizedBox.expand(
+                key: ValueKey('news-hero-photo-$_heroIndex'),
+                child: VenueImageView(
+                  imageUrl: _heroPhotos[_heroIndex],
+                  errorWidget: fallback,
+                ),
+              ),
+            ),
           ),
           const Positioned.fill(
             child: DecoratedBox(
@@ -475,7 +509,47 @@ class _ExploreScreenState extends State<ExploreScreen> {
               ),
             ),
           ),
-          const Positioned(right: 8, top: 8, child: StockPhotoLabel()),
+          Positioned(
+            right: 8,
+            top: 8,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const StockPhotoLabel(),
+                const SizedBox(height: 6),
+                Row(
+                  key: const ValueKey('news-hero-dots'),
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    for (var i = 0; i < _heroPhotos.length; i++)
+                      GestureDetector(
+                        key: ValueKey('news-hero-dot-$i'),
+                        behavior: HitTestBehavior.opaque,
+                        onTap: () => setState(() => _heroIndex = i),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 3,
+                            vertical: 4,
+                          ),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 300),
+                            width: i == _heroIndex ? 18 : 7,
+                            height: 7,
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(
+                                alpha: i == _heroIndex ? 0.95 : 0.5,
+                              ),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -980,6 +1054,129 @@ class _ExploreScreenState extends State<ExploreScreen> {
                               style: const TextStyle(
                                 color: Color(0xFFE2E8F0),
                                 fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+        const SizedBox(height: 6),
+      ],
+    );
+  }
+
+  /// Dải "Khám phá theo khu vực": các quận/huyện nhiều sân nhất. Mỗi thẻ dùng ảnh minh họa của môn chiếm nhiều nhất
+  /// trong khu vực đó (không phải ảnh thật của khu vực nên có nhãn "Ảnh minh họa"); bấm vào để xem các sân ở đó.
+  Widget _districtTiles() {
+    final list = ExploreHighlights.topDistricts(widget.venues);
+    if (list.isEmpty) return const SizedBox.shrink();
+    const sportNames = {
+      'badminton': 'Cầu lông',
+      'pickleball': 'Pickleball',
+      'football': 'Bóng đá',
+      'tennis': 'Tennis',
+      'basketball': 'Bóng rổ',
+    };
+    return Column(
+      key: const ValueKey('news-districts'),
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _heading('Khám phá theo khu vực', icon: Icons.location_city_outlined),
+        SizedBox(
+          height: 132,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: list.length,
+            separatorBuilder: (_, _) => const SizedBox(width: 10),
+            itemBuilder: (_, i) {
+              final d = list[i];
+              final rank = d.name.codeUnits.fold<int>(
+                0,
+                (h, c) => (h * 31 + c) & 0x3fffffff,
+              );
+              return InkWell(
+                key: ValueKey('news-district-${d.name}'),
+                borderRadius: BorderRadius.circular(16),
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => VenueFinderScreen(
+                      venues: widget.venues,
+                      initialDistrict: d.name,
+                    ),
+                  ),
+                ),
+                child: Container(
+                  width: 170,
+                  clipBehavior: Clip.antiAlias,
+                  decoration: _cardDecoration().copyWith(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      _HoverZoom(
+                        child: VenueImageView(
+                          imageUrl: VenuePhotos.pick(d.topSport, rank),
+                        ),
+                      ),
+                      const DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              Color(0x00000000),
+                              Color(0x00000000),
+                              Color(0xD9000000),
+                            ],
+                            stops: [0, 0.35, 1],
+                          ),
+                        ),
+                      ),
+                      const Positioned(
+                        right: 6,
+                        top: 6,
+                        child: StockPhotoLabel(),
+                      ),
+                      Positioned(
+                        left: 12,
+                        right: 8,
+                        bottom: 11,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              d.name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                            Text(
+                              '${d.count} địa điểm',
+                              style: const TextStyle(
+                                color: Color(0xFFE2E8F0),
+                                fontSize: 12,
+                              ),
+                            ),
+                            Text(
+                              'Nhiều nhất: ${sportNames[d.topSport] ?? ''}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: Color(0xFFBAE6FD),
+                                fontSize: 11.5,
                               ),
                             ),
                           ],
@@ -1567,6 +1764,8 @@ class _ExploreScreenState extends State<ExploreScreen> {
     // Ảnh bìa: ảnh của tin; không có thì dùng ảnh của sân gắn kèm; không có nữa thì nền chuyển sắc theo loại tin.
     // Đánh giá của khách không dùng ảnh bìa lớn, chỉ có ảnh nhỏ của sân ở dải bên dưới.
     final coverUrl = newsCoverUrl(e, venue);
+    // Tin thể thao không có ảnh và không rõ môn nào: bìa mỏng hơn cho đỡ trống.
+    final slimCover = e.kind == NewsKind.sport && coverUrl.isEmpty;
 
     return Container(
       key: ValueKey('news-card-${e.id}'),
@@ -1584,7 +1783,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                 child: NewsCover(
                   kind: e.kind,
                   imageUrl: coverUrl,
-                  aspectRatio: featured ? 16 / 8 : 16 / 7,
+                  aspectRatio: featured ? 16 / 8 : (slimCover ? 16 / 5 : 16 / 7),
                   timeLabel: NewsFeed.ago(e.time, _now),
                   pinned: e.pinned,
                 ),

@@ -9,7 +9,6 @@
   <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
-  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body, html { width: 100%; height: 100%; overflow: hidden; font-family: 'Be Vietnam Pro', -apple-system, sans-serif; background: #e2e8f0; }
@@ -175,19 +174,21 @@
       100% { transform: scale(0.95); opacity: 0.8; }
     }
     
+    /* Nút phóng to, thu nhỏ nằm dưới thanh lọc, không che nút chọn thành phố */
+    .leaflet-top.leaflet-right { top: 48px; }
+
     /* Card popup styles */
-    .gm-style-iw { padding: 0 !important; border-radius: 14px !important; overflow: hidden; box-shadow: 0 8px 24px rgba(0,0,0,0.16) !important; }
-    .gm-style-iw-d { padding: 0 !important; overflow: hidden !important; max-height: none !important; }
-    .gm-ui-hover-effect { top: 4px !important; right: 4px !important; background: rgba(255,255,255,0.9) !important; border-radius: 50% !important; }
-    
     .leaflet-popup-content-wrapper { padding: 0 !important; border-radius: 14px !important; overflow: hidden; }
     .leaflet-popup-content { margin: 0 !important; line-height: normal !important; }
     
+    /* Nút đóng thẻ sân nằm trên ảnh nên cần nền riêng để nhìn thấy */
+    .leaflet-popup a.leaflet-popup-close-button { top: 5px; right: 5px; width: 22px; height: 22px; line-height: 21px; z-index: 2; background: rgba(255,255,255,0.95); border-radius: 50%; color: #0f172a; }
+
     .iw-card { width: 260px; font-family: 'Be Vietnam Pro', sans-serif; background: #ffffff; }
     .iw-img-wrapper { position: relative; width: 100%; height: 110px; background: #cbd5e1; overflow: hidden; }
     .iw-img { width: 100%; height: 100%; object-fit: cover; }
     .iw-badge { position: absolute; top: 6px; left: 6px; padding: 3px 8px; border-radius: 6px; font-size: 10px; font-weight: 700; color: #fff; text-transform: uppercase; }
-    .iw-rating { position: absolute; top: 6px; right: 6px; background: rgba(15, 23, 42, 0.85); color: #fbbf24; font-size: 11px; font-weight: 700; padding: 2px 6px; border-radius: 6px; }
+    .iw-rating { position: absolute; top: 6px; right: 34px; background: rgba(15, 23, 42, 0.85); color: #fbbf24; font-size: 11px; font-weight: 700; padding: 2px 6px; border-radius: 6px; }
     .iw-content { padding: 10px 12px 12px 12px; }
     .iw-title { font-size: 13px; font-weight: 700; color: #0f172a; line-height: 1.3; margin-bottom: 4px; }
     .iw-addr { font-size: 11px; color: #64748b; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -229,15 +230,9 @@
     <span id="venueCountText">Đang tải danh sách sân…</span>
   </div>
 
-  <!-- Leaflet JS Backup -->
+  <!-- Bản đồ nền OpenStreetMap qua Leaflet: không cần khóa API -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
-
-  <!-- Gom nhóm ghim cho Google Maps -->
-  <script src="https://unpkg.com/@googlemaps/markerclusterer@2.5.3/dist/index.min.js"></script>
-
-  <!-- Google Maps JS SDK with Alobo Key -->
-  <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAVQaPl9AQLUrqb8OryDjJqXGUjakkdaT8&libraries=places,geometry&callback=initGoogleMap" async defer></script>
 
   <script>
     // Danh sách sân do ứng dụng gửi sang (tin nhắn SET_VENUES) hoặc đọc từ localStorage khi mở bản đồ ở tab riêng.
@@ -266,14 +261,11 @@
     function hasCoords(v) {
       return isFinite(Number(v.lat)) && isFinite(Number(v.lng)) && Number(v.lat) !== 0 && Number(v.lng) !== 0;
     }
-    var isGoogleMapLoaded = false;
-    var googleMap = null;
-    var leafletMap = null;
-    var googleMarkers = [];
-    var leafletMarkers = [];
+    var map = null;
+    var markers = [];
+    var cluster = null;
     var currentFilter = 'all';
     var currentCity = 'hn';
-    var currentInfoWindow = null;
     var currentUserPos = null;
 
     var CITIES = {
@@ -317,67 +309,20 @@
       return R * c;
     }
 
-    function initGoogleMap() {
-      if (isGoogleMapLoaded) return;
-      try {
-        if (!window.google || !window.google.maps) {
-          throw new Error('Google Maps SDK not ready');
-        }
-
-        var mapDiv = document.getElementById('map');
-        mapDiv.innerHTML = '';
-
-        var initial = CITIES.hn;
-        googleMap = new google.maps.Map(mapDiv, {
-          center: { lat: initial.lat, lng: initial.lng },
-          zoom: initial.zoom,
-          mapTypeControl: false,
-          zoomControl: true,
-          zoomControlOptions: { position: google.maps.ControlPosition.RIGHT_CENTER },
-          streetViewControl: false,
-          fullscreenControl: false,
-          styles: [
-            { featureType: 'poi.business', stylers: [{ visibility: 'off' }] },
-            { featureType: 'transit', elementType: 'labels.icon', stylers: [{ visibility: 'off' }] },
-            { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#c7e3f4' }] },
-            { featureType: 'landscape.natural', elementType: 'geometry', stylers: [{ color: '#f8fafc' }] }
-          ]
-        });
-
-        isGoogleMapLoaded = true;
-        googleMap.addListener('zoom_changed', applyPinSize);
-        renderGoogleMarkers();
-        console.log('Google Maps initialized successfully with', venuesData.length, 'venues');
-      } catch (err) {
-        console.warn('Google Maps initialization failed, switching to backup map:', err);
-        initLeafletMap();
-      }
-    }
-
-    function initLeafletMap() {
-      if (isGoogleMapLoaded) return;
-      if (leafletMap) return;
-
-      var mapDiv = document.getElementById('map');
-      mapDiv.innerHTML = '';
-
+    function initMap() {
+      if (map) return;
       var initial = CITIES.hn;
-      leafletMap = L.map('map', { zoomControl: false }).setView([initial.lat, initial.lng], initial.zoom);
-
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; OpenStreetMap contributors'
-      }).addTo(leafletMap);
-
-      L.control.zoom({ position: 'topright' }).addTo(leafletMap);
-      renderLeafletMarkers();
-      console.log('Backup map initialized successfully with', venuesData.length, 'venues');
+      map = L.map('map', { zoomControl: false, attributionControl: false }).setView([initial.lat, initial.lng], initial.zoom);
+      // Điều kiện dùng ảnh nền OpenStreetMap: luôn ghi nguồn
+      L.control.attribution({ position: 'bottomleft', prefix: false }).addTo(map);
+      L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>'
+      }).addTo(map);
+      L.control.zoom({ position: 'topright' }).addTo(map);
+      map.on('zoomend', applyPinSize);
+      renderMarkers();
     }
-
-    setTimeout(function() {
-      if (!isGoogleMapLoaded) {
-        initLeafletMap();
-      }
-    }, 3000);
 
     // Creates high-definition SVG pin with the sport logo inside
     function createMarkerIconSvg(type) {
@@ -472,158 +417,63 @@
       var key = type + '|' + w;
       if (!pinIconCache[key]) {
         var h = Math.round(w * PIN_RATIO);
-        pinIconCache[key] = {
-          url: markerIconUrl(type),
-          scaledSize: new google.maps.Size(w, h),
-          anchor: new google.maps.Point(w / 2, h)
-        };
+        pinIconCache[key] = L.icon({
+          iconUrl: markerIconUrl(type),
+          iconSize: [w, h],
+          iconAnchor: [w / 2, h],
+          popupAnchor: [0, -Math.round(h * 0.72)]
+        });
       }
       return pinIconCache[key];
     }
 
-    // Thẻ thông tin phải nằm ngay trên đỉnh ghim, nên độ lệch cũng đổi theo kích thước ghim
-    function infoOffsetY(zoom) {
-      return Math.round(pinWidth(zoom) * PIN_RATIO * 0.72);
-    }
-
     function applyPinSize() {
-      if (!googleMap) return;
-      var w = pinWidth(googleMap.getZoom() || 13);
+      var w = pinWidth(map.getZoom());
       if (w === currentPinWidth) return;
       currentPinWidth = w;
-      for (var i = 0; i < googleMarkers.length; i++) {
-        googleMarkers[i].setIcon(pinIcon(googleMarkers[i].venueData.type, w));
+      for (var i = 0; i < markers.length; i++) {
+        markers[i].setIcon(pinIcon(markers[i].venueData.type, w));
       }
     }
 
-    var googleClusterer = null;
     // Chỉ gom ghim thành cụm khi thu nhỏ bản đồ ra xa (zoom <= 12); từ mức mặc định (13) trở vào hiện từng ghim riêng
     var CLUSTER_MAX_ZOOM = 12;
 
-    function renderGoogleMarkers() {
-      if (googleClusterer) {
-        googleClusterer.clearMarkers();
-        googleClusterer.setMap(null);
-        googleClusterer = null;
-      }
-      for (var i = 0; i < googleMarkers.length; i++) {
-        googleMarkers[i].setMap(null);
-      }
-      googleMarkers = [];
-      currentPinWidth = pinWidth(googleMap.getZoom() || 13);
-
-      for (var j = 0; j < venuesData.length; j++) {
-        var v = venuesData[j];
-        if (currentFilter !== 'all' && v.type !== currentFilter) continue;
-        if (!hasCoords(v)) continue;
-
-        var marker = new google.maps.Marker({
-          position: { lat: Number(v.lat), lng: Number(v.lng) },
-          title: v.name,
-          icon: pinIcon(v.type, currentPinWidth)
-        });
-
-        marker.venueId = v.id;
-        marker.venueData = v;
-
-        (function(m, venue) {
-          m.addListener('click', function() {
-            if (currentInfoWindow) currentInfoWindow.close();
-            currentInfoWindow = new google.maps.InfoWindow({
-              content: buildCardHtml(venue),
-              pixelOffset: new google.maps.Size(0, -infoOffsetY(googleMap.getZoom() || 13))
-            });
-            currentInfoWindow.open(googleMap, m);
-            notifyParent('VENUE_SELECTED', { venueId: venue.id });
-          });
-        })(marker, v);
-
-        googleMarkers.push(marker);
-      }
-
-      if (window.markerClusterer && markerClusterer.MarkerClusterer) {
-        googleClusterer = new markerClusterer.MarkerClusterer({
-          map: googleMap,
-          markers: googleMarkers,
-          algorithm: markerClusterer.SuperClusterAlgorithm
-            ? new markerClusterer.SuperClusterAlgorithm({ radius: 60, maxZoom: CLUSTER_MAX_ZOOM })
-            : undefined,
-          renderer: {
-            render: function(cluster) {
-              var ic = clusterIcon(cluster.count);
-              return new google.maps.Marker({
-                position: cluster.position,
-                icon: {
-                  url: ic.url,
-                  scaledSize: new google.maps.Size(ic.size, ic.size),
-                  anchor: new google.maps.Point(ic.size / 2, ic.size / 2)
-                },
-                zIndex: Number(google.maps.Marker.MAX_ZINDEX) + cluster.count
-              });
-            }
-          }
-        });
-      } else {
-        for (var k = 0; k < googleMarkers.length; k++) {
-          googleMarkers[k].setMap(googleMap);
+    function renderMarkers() {
+      if (!map) return;
+      if (cluster) map.removeLayer(cluster);
+      markers = [];
+      currentPinWidth = pinWidth(map.getZoom());
+      cluster = L.markerClusterGroup({
+        showCoverageOnHover: false,
+        maxClusterRadius: 60,
+        disableClusteringAtZoom: CLUSTER_MAX_ZOOM + 1,
+        iconCreateFunction: function(c) {
+          var ic = clusterIcon(c.getChildCount());
+          return L.icon({ iconUrl: ic.url, iconSize: [ic.size, ic.size] });
         }
-      }
-
-      document.getElementById('venueCountText').textContent = googleMarkers.length + ' sân thể thao khả dụng';
-    }
-
-    var leafletCluster = null;
-    var leafletSvgCache = {};
-
-    function renderLeafletMarkers() {
-      if (leafletCluster) {
-        leafletMap.removeLayer(leafletCluster);
-        leafletCluster = null;
-      }
-      for (var i = 0; i < leafletMarkers.length; i++) {
-        leafletMap.removeLayer(leafletMarkers[i]);
-      }
-      leafletMarkers = [];
-
-      var group = (typeof L.markerClusterGroup === 'function')
-        ? L.markerClusterGroup({ showCoverageOnHover: false, maxClusterRadius: 50, disableClusteringAtZoom: CLUSTER_MAX_ZOOM + 1 })
-        : null;
+      });
 
       for (var j = 0; j < venuesData.length; j++) {
         var v = venuesData[j];
         if (currentFilter !== 'all' && v.type !== currentFilter) continue;
         if (!hasCoords(v)) continue;
-
-        if (!leafletSvgCache[v.type]) leafletSvgCache[v.type] = createMarkerIconSvg(v.type);
-        var icon = L.divIcon({
-          html: leafletSvgCache[v.type],
-          className: '',
-          iconSize: [48, 58],
-          iconAnchor: [24, 58],
-          popupAnchor: [0, -48]
-        });
-
-        var marker = L.marker([Number(v.lat), Number(v.lng)], { icon: icon });
+        var marker = L.marker([Number(v.lat), Number(v.lng)], { icon: pinIcon(v.type, currentPinWidth), title: v.name });
         marker.venueId = v.id;
         marker.venueData = v;
-
         (function(venue, m) {
-          m.bindPopup(function() { return buildCardHtml(venue); });
+          // Chừa chỗ cho thanh lọc phía trên để thẻ sân không bị che
+          m.bindPopup(function() { return buildCardHtml(venue); }, { minWidth: 260, maxWidth: 260, autoPanPaddingTopLeft: [12, 64] });
           m.on('click', function() {
             notifyParent('VENUE_SELECTED', { venueId: venue.id });
           });
         })(v, marker);
-
-        if (group) group.addLayer(marker); else marker.addTo(leafletMap);
-        leafletMarkers.push(marker);
+        markers.push(marker);
       }
 
-      if (group) {
-        leafletMap.addLayer(group);
-        leafletCluster = group;
-      }
-
-      document.getElementById('venueCountText').textContent = leafletMarkers.length + ' sân thể thao khả dụng';
+      cluster.addLayers(markers);
+      map.addLayer(cluster);
+      document.getElementById('venueCountText').textContent = markers.length + ' sân thể thao khả dụng';
     }
 
     function bookVenue(venueId) {
@@ -639,11 +489,7 @@
       var target = document.getElementById('chip_' + sport);
       if (target) target.classList.add('active');
 
-      if (isGoogleMapLoaded && googleMap) {
-        renderGoogleMarkers();
-      } else if (leafletMap) {
-        renderLeafletMarkers();
-      }
+      renderMarkers();
       notifyParent('FILTER_CHANGED', { sport: sport });
     }
 
@@ -654,13 +500,8 @@
       if (btnHn) btnHn.classList.toggle('active', city === 'hn');
       if (btnHcm) btnHcm.classList.toggle('active', city === 'hcm');
       var target = CITIES[city];
-      if (target) {
-        if (isGoogleMapLoaded && googleMap) {
-          googleMap.panTo({ lat: target.lat, lng: target.lng });
-          googleMap.setZoom(target.zoom);
-        } else if (leafletMap) {
-          leafletMap.setView([target.lat, target.lng], target.zoom);
-        }
+      if (target && map) {
+        map.setView([target.lat, target.lng], target.zoom);
       }
     }
 
@@ -682,49 +523,13 @@
           var accuracy = pos.coords.accuracy || 20;
           currentUserPos = { lat: lat, lng: lng };
 
-          if (isGoogleMapLoaded && googleMap) {
-            googleMap.panTo({ lat: lat, lng: lng });
-            googleMap.setZoom(15);
-
-            if (window.userMarker) window.userMarker.setMap(null);
-            if (window.userCircle) window.userCircle.setMap(null);
-
-            window.userCircle = new google.maps.Circle({
-              strokeColor: '#2563eb',
-              strokeOpacity: 0.5,
-              strokeWeight: 1.5,
-              fillColor: '#3b82f6',
-              fillOpacity: 0.15,
-              map: googleMap,
-              center: { lat: lat, lng: lng },
-              radius: Math.min(accuracy, 250)
-            });
-
-            window.userMarker = new google.maps.Marker({
-              position: { lat: lat, lng: lng },
-              map: googleMap,
-              title: 'Vị trí hiện tại của bạn',
-              zIndex: 9999,
-              icon: {
-                path: google.maps.SymbolPath.CIRCLE,
-                scale: 9,
-                fillColor: '#2563eb',
-                fillOpacity: 1,
-                strokeColor: '#ffffff',
-                strokeWeight: 3.5
-              }
-            });
-
-            var userIw = new google.maps.InfoWindow({
-              content: '<div style="padding: 8px 12px; font-family: inherit; font-size: 12px; font-weight: 700; color: #1e293b;">📍 Vị trí hiện tại của bạn</div>'
-            });
-            userIw.open(googleMap, window.userMarker);
-          } else if (leafletMap) {
-            leafletMap.setView([lat, lng], 15);
-            if (window.leafletUserMarker) leafletMap.removeLayer(window.leafletUserMarker);
-            if (window.leafletUserCircle) leafletMap.removeLayer(window.leafletUserCircle);
-            window.leafletUserCircle = L.circle([lat, lng], { radius: Math.min(accuracy, 250), color: '#3b82f6', fillColor: '#3b82f6', fillOpacity: 0.15 }).addTo(leafletMap);
-            window.leafletUserMarker = L.circleMarker([lat, lng], { radius: 9, fillColor: '#2563eb', color: '#fff', weight: 3.5, fillOpacity: 1 }).addTo(leafletMap);
+          if (map) {
+            map.setView([lat, lng], 15);
+            if (window.userMarker) map.removeLayer(window.userMarker);
+            if (window.userCircle) map.removeLayer(window.userCircle);
+            window.userCircle = L.circle([lat, lng], { radius: Math.min(accuracy, 250), color: '#3b82f6', fillColor: '#3b82f6', fillOpacity: 0.15, weight: 1.5 }).addTo(map);
+            window.userMarker = L.circleMarker([lat, lng], { radius: 9, fillColor: '#2563eb', color: '#fff', weight: 3.5, fillOpacity: 1 }).addTo(map);
+            window.userMarker.bindPopup('<div style="padding: 8px 12px; font-size: 12px; font-weight: 700; color: #1e293b;">📍 Vị trí hiện tại của bạn</div>').openPopup();
           }
 
           // Calculate closest venue
@@ -758,29 +563,14 @@
     }
 
     function focusVenueById(venueId) {
-      if (isGoogleMapLoaded && googleMap) {
-        for (var i = 0; i < googleMarkers.length; i++) {
-          var m = googleMarkers[i];
-          if (m.venueId === venueId) {
-            googleMap.panTo(m.getPosition());
-            googleMap.setZoom(16);
-            if (currentInfoWindow) currentInfoWindow.close();
-            currentInfoWindow = new google.maps.InfoWindow({
-              content: buildCardHtml(m.venueData),
-              pixelOffset: new google.maps.Size(0, -infoOffsetY(16))
-            });
-            currentInfoWindow.open(googleMap, m);
-            break;
-          }
-        }
-      } else if (leafletMap) {
-        for (var i = 0; i < leafletMarkers.length; i++) {
-          var lm = leafletMarkers[i];
-          if (lm.venueId === venueId) {
-            leafletMap.setView(lm.getLatLng(), 16);
-            lm.openPopup();
-            break;
-          }
+      for (var i = 0; i < markers.length; i++) {
+        var m = markers[i];
+        if (m.venueId === venueId) {
+          map.setView(m.getLatLng(), 16, { animate: false });
+          (function(target) {
+            cluster.zoomToShowLayer(target, function() { target.openPopup(); });
+          })(m);
+          break;
         }
       }
     }
@@ -796,6 +586,7 @@
     function requestVenues() {
       notifyParent('REQUEST_VENUES', {});
     }
+    initMap();
     window.addEventListener('load', function() {
       requestVenues();
       setTimeout(function() { if (venuesData.length === 0) requestVenues(); }, 1200);
@@ -811,8 +602,7 @@
         filterSport(data.sport);
       } else if (data.type === 'SET_VENUES') {
         venuesData = Array.isArray(data.venues) ? data.venues : venuesData;
-        if (isGoogleMapLoaded) renderGoogleMarkers();
-        else if (leafletMap) renderLeafletMarkers();
+        renderMarkers();
       } else if (data.type === 'LOCATE_USER') {
         locateUser();
       }

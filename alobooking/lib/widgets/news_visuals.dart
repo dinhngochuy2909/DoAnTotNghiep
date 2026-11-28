@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../data/venue_photos.dart';
 import '../models/venue.dart';
 import '../services/news_feed.dart';
+import '../services/news_topic.dart';
 import '../services/weather/weather_service.dart';
 import 'venue_image_view.dart';
 
@@ -11,8 +12,19 @@ import 'venue_image_view.dart';
 String newsCoverUrl(NewsEntry e, Venue? venue) {
   if (e.kind == NewsKind.review) return '';
   if (e.imageUrl.trim().isNotEmpty) return e.imageUrl;
-  return venue?.displayImage ?? '';
+  final own = venue?.displayImage ?? '';
+  if (own.isNotEmpty) return own;
+  // Tin thể thao lấy từ báo không kèm ảnh: dùng ảnh minh họa đúng môn (có nhãn "Ảnh minh họa").
+  // Không rõ môn nào thì giữ nền chuyển sắc, không gán đại ảnh môn khác.
+  if (e.kind == NewsKind.sport) {
+    final sport = NewsTopic.sportOf('${e.title} ${e.body}');
+    if (sport != null) return VenuePhotos.pick(sport, _stableHash(e.id));
+  }
+  return '';
 }
+
+/// Số băm ổn định theo nội dung chuỗi (String.hashCode có thể đổi giữa các lần chạy), để cùng một tin luôn ra cùng một ảnh.
+int _stableHash(String s) => s.codeUnits.fold<int>(7, (h, c) => (h * 31 + c) & 0x3fffffff);
 
 /// Ảnh nhỏ vuông của một tin (dùng ở danh sách tin liên quan): ảnh bìa nếu có, không thì ô màu theo loại tin.
 class NewsThumb extends StatelessWidget {

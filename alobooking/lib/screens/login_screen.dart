@@ -1,6 +1,5 @@
 import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import '../services/auth_service.dart';
 import 'register_screen.dart';
 import 'home_screen.dart';
@@ -199,7 +198,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
         const SizedBox(height: 16),
         Text(
           'ALOBOOKING',
-          style: GoogleFonts.inter(
+          style: TextStyle(
             fontSize: 28,
             fontWeight: FontWeight.w800,
             color: Colors.white,
@@ -209,7 +208,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
         const SizedBox(height: 6),
         Text(
           'Đặt sân thể thao thông minh',
-          style: GoogleFonts.inter(
+          style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w400,
             color: Colors.white.withOpacity(0.75),
@@ -241,7 +240,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
             // Title
             Text(
               'Đăng nhập',
-              style: GoogleFonts.inter(
+              style: TextStyle(
                 fontSize: 22,
                 fontWeight: FontWeight.w700,
                 color: const Color(0xFF0F172A),
@@ -250,7 +249,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
             const SizedBox(height: 4),
             Text(
               'Chào mừng bạn quay trở lại!',
-              style: GoogleFonts.inter(
+              style: TextStyle(
                 fontSize: 14,
                 color: const Color(0xFF64748B),
               ),
@@ -263,7 +262,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
             TextFormField(
               controller: _emailController,
               keyboardType: TextInputType.emailAddress,
-              style: GoogleFonts.inter(fontSize: 14, color: const Color(0xFF1E293B)),
+              style: TextStyle(fontSize: 14, color: const Color(0xFF1E293B)),
               decoration: _inputDecoration(
                 hint: 'example@email.com',
                 icon: Icons.email_outlined,
@@ -282,7 +281,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
             TextFormField(
               controller: _passwordController,
               obscureText: _obscurePassword,
-              style: GoogleFonts.inter(fontSize: 14, color: const Color(0xFF1E293B)),
+              style: TextStyle(fontSize: 14, color: const Color(0xFF1E293B)),
               decoration: _inputDecoration(
                 hint: '••••••••',
                 icon: Icons.lock_outline,
@@ -325,7 +324,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                 ),
                 child: Text(
                   'Quên mật khẩu?',
-                  style: GoogleFonts.inter(
+                  style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w500,
                     color: const Color(0xFF0284C7),
@@ -359,7 +358,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                       )
                     : Text(
                         'ĐĂNG NHẬP',
-                        style: GoogleFonts.inter(
+                        style: TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.w700,
                           letterSpacing: 0.8,
@@ -466,7 +465,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   child: Text(
                     'hoặc',
-                    style: GoogleFonts.inter(
+                    style: TextStyle(
                       fontSize: 12,
                       color: const Color(0xFF94A3B8),
                     ),
@@ -510,7 +509,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
       children: [
         Text(
           'Chưa có tài khoản? ',
-          style: GoogleFonts.inter(
+          style: TextStyle(
             fontSize: 14,
             color: Colors.white.withOpacity(0.8),
           ),
@@ -535,7 +534,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
           },
           child: Text(
             'Đăng ký ngay',
-            style: GoogleFonts.inter(
+            style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w700,
               color: const Color(0xFF7DD3FC),
@@ -551,7 +550,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
   Widget _buildLabel(String text) {
     return Text(
       text,
-      style: GoogleFonts.inter(
+      style: TextStyle(
         fontSize: 13,
         fontWeight: FontWeight.w600,
         color: const Color(0xFF334155),
@@ -578,7 +577,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
       icon: Icon(icon, color: color, size: 22),
       label: Text(
         label,
-        style: GoogleFonts.inter(
+        style: TextStyle(
           fontSize: 13,
           fontWeight: FontWeight.w500,
           color: const Color(0xFF475569),
@@ -595,7 +594,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
   InputDecoration _inputDecoration({required String hint, required IconData icon}) {
     return InputDecoration(
       hintText: hint,
-      hintStyle: GoogleFonts.inter(color: const Color(0xFFCBD5E1), fontSize: 14),
+      hintStyle: TextStyle(color: const Color(0xFFCBD5E1), fontSize: 14),
       prefixIcon: Icon(icon, color: const Color(0xFF94A3B8), size: 20),
       filled: true,
       fillColor: const Color(0xFFF8FAFC),

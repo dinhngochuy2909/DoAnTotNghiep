@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/venue.dart';
 
-class GoogleMapViewWidget extends StatelessWidget {
+class VenueMapViewWidget extends StatelessWidget {
   final List<Venue> venues;
   final String selectedType;
   final Function(int venueId)? onVenueSelected;
@@ -9,7 +9,7 @@ class GoogleMapViewWidget extends StatelessWidget {
   final Function(String sport)? onFilterChanged;
   final Function(double lat, double lng)? onUserLocated;
 
-  const GoogleMapViewWidget({
+  const VenueMapViewWidget({
     super.key,
     required this.venues,
     this.selectedType = 'all',
@@ -25,7 +25,7 @@ class GoogleMapViewWidget extends StatelessWidget {
       color: const Color(0xFFF1F5F9),
       child: const Center(
         child: Text(
-          'Bản đồ Google Maps chỉ hỗ trợ trên nền tảng Web',
+          'Bản đồ chỉ hỗ trợ trên nền tảng Web',
           style: TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.w600),
         ),
       ),

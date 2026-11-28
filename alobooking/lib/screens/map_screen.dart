@@ -5,7 +5,7 @@ import '../models/venue.dart';
 import '../widgets/web_map_view.dart';
 import 'visual_booking_screen.dart';
 
-/// Màn hình BẢN ĐỒ — hiển thị sân trên Google Maps & định vị GPS người dùng
+/// Màn hình BẢN ĐỒ — hiển thị sân trên bản đồ OpenStreetMap & định vị GPS người dùng
 class MapScreen extends StatefulWidget {
   final List<Venue> venues;
   const MapScreen({super.key, required this.venues});
@@ -156,7 +156,7 @@ class _MapScreenState extends State<MapScreen> {
             Text(
               _userLat != null
                   ? '📍 Đã định vị vị trí của bạn'
-                  : 'Google Maps API • ${widget.venues.length} điểm sân sẵn sàng',
+                  : 'OpenStreetMap • ${widget.venues.length} điểm sân sẵn sàng',
               style: TextStyle(
                 fontSize: 11,
                 color: Colors.white.withOpacity(0.85),
@@ -296,7 +296,7 @@ class _MapScreenState extends State<MapScreen> {
       width: double.infinity,
       height: double.infinity,
       color: const Color(0xFFE2E8F0),
-      child: GoogleMapViewWidget(
+      child: VenueMapViewWidget(
         venues: widget.venues,
         selectedType: _selectedType,
         onVenueSelected: _onVenueSelected,

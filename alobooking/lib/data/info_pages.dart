@@ -212,7 +212,7 @@ class InfoPages {
       ]),
       InfoSection('Dịch vụ của bên thứ ba', bullets: [
         'Trợ lý AI: câu hỏi của bạn cùng dữ liệu sân liên quan được gửi tới Google Gemini để tạo câu trả lời.',
-        'Bản đồ dùng Google Maps. Nếu bạn dùng chức năng định vị trên bản đồ, trình duyệt sẽ hỏi quyền vị trí và bạn có thể từ chối.',
+        'Bản đồ dùng ảnh nền OpenStreetMap, tải từ máy chủ của OpenStreetMap. Nếu bạn dùng chức năng định vị trên bản đồ, trình duyệt sẽ hỏi quyền vị trí và bạn có thể từ chối.',
         'Ảnh minh họa được tải từ Pexels và Unsplash.',
       ]),
       InfoSection('Quyền của bạn', paragraphs: [

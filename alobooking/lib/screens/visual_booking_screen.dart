@@ -1205,7 +1205,7 @@ class _VisualBookingScreenState extends State<VisualBookingScreen> {
             ),
             const SizedBox(height: 2),
             const Text(
-              'Lịch đã đặt KHÔNG hỗ trợ Huỷ',
+              'Lịch chưa tới giờ chơi có thể hủy trong mục "Sân đã đặt"',
               style: TextStyle(fontSize: 12, color: _Vb.textDim, fontWeight: FontWeight.w500),
               textAlign: TextAlign.center,
             ),

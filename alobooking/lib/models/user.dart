@@ -75,14 +75,8 @@ class AppUser {
       email: email,
       phone: json['phone'] ?? '',
       avatarUrl: json['avatarUrl'] ?? '',
-      role: json['role'] ??
-          (email.toLowerCase().contains('admin')
-              ? 'admin'
-              : (email.toLowerCase().contains('chusan')
-                  ? 'owner'
-                  : (email.toLowerCase().contains('guest') || email.toLowerCase().contains('khachxem')
-                      ? 'guest'
-                      : 'customer'))),
+      // Giống fromFirestoreFields: thiếu vai trò thì là khách hàng thường, không đoán từ email.
+      role: (json['role'] as String?)?.isNotEmpty == true ? json['role'] as String : 'customer',
       createdAt: DateTime.tryParse(json['createdAt'] ?? '') ?? DateTime.now(),
     );
   }

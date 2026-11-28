@@ -158,6 +158,12 @@ void main() {
     expect(find.text('Cầu lông 12'), findsOneWidget);
   });
 
+  testWidgets('Ghi chú hủy lịch khớp chức năng: chỉ cách hủy, không còn nói là không hủy được', (tester) async {
+    await _openBooking(tester, _venue());
+    expect(find.textContaining('có thể hủy trong mục "Sân đã đặt"'), findsOneWidget);
+    expect(find.textContaining('KHÔNG hỗ trợ'), findsNothing);
+  });
+
   testWidgets('Xác nhận đặt sân chỉ có chuyển khoản, không có tiền mặt', (tester) async {
     AuthService.setCurrentUserForTest(AppUser(
       uid: 'u1',

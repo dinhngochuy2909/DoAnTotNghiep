@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import '../services/auth_service.dart';
 import 'login_screen.dart';
 import 'home_screen.dart';
@@ -206,7 +205,7 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
         const SizedBox(height: 12),
         Text(
           'ALOBOOKING',
-          style: GoogleFonts.inter(
+          style: TextStyle(
             fontSize: 24,
             fontWeight: FontWeight.w800,
             color: Colors.white,
@@ -239,7 +238,7 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
             // Title
             Text(
               'Tạo tài khoản',
-              style: GoogleFonts.inter(
+              style: TextStyle(
                 fontSize: 22,
                 fontWeight: FontWeight.w700,
                 color: const Color(0xFF0F172A),
@@ -248,7 +247,7 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
             const SizedBox(height: 4),
             Text(
               'Đăng ký để đặt sân nhanh chóng',
-              style: GoogleFonts.inter(
+              style: TextStyle(
                 fontSize: 14,
                 color: const Color(0xFF64748B),
               ),
@@ -260,7 +259,7 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
             const SizedBox(height: 6),
             TextFormField(
               controller: _fullNameController,
-              style: GoogleFonts.inter(fontSize: 14, color: const Color(0xFF1E293B)),
+              style: TextStyle(fontSize: 14, color: const Color(0xFF1E293B)),
               decoration: _inputDecoration(
                 hint: 'Nguyễn Văn A',
                 icon: Icons.person_outline,
@@ -279,7 +278,7 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
             TextFormField(
               controller: _emailController,
               keyboardType: TextInputType.emailAddress,
-              style: GoogleFonts.inter(fontSize: 14, color: const Color(0xFF1E293B)),
+              style: TextStyle(fontSize: 14, color: const Color(0xFF1E293B)),
               decoration: _inputDecoration(
                 hint: 'example@email.com',
                 icon: Icons.email_outlined,
@@ -298,7 +297,7 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
             TextFormField(
               controller: _phoneController,
               keyboardType: TextInputType.phone,
-              style: GoogleFonts.inter(fontSize: 14, color: const Color(0xFF1E293B)),
+              style: TextStyle(fontSize: 14, color: const Color(0xFF1E293B)),
               decoration: _inputDecoration(
                 hint: '0987 654 321',
                 icon: Icons.phone_outlined,
@@ -317,7 +316,7 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
             TextFormField(
               controller: _passwordController,
               obscureText: _obscurePassword,
-              style: GoogleFonts.inter(fontSize: 14, color: const Color(0xFF1E293B)),
+              style: TextStyle(fontSize: 14, color: const Color(0xFF1E293B)),
               decoration: _inputDecoration(
                 hint: '••••••••',
                 icon: Icons.lock_outline,
@@ -345,7 +344,7 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
             TextFormField(
               controller: _confirmPasswordController,
               obscureText: _obscureConfirm,
-              style: GoogleFonts.inter(fontSize: 14, color: const Color(0xFF1E293B)),
+              style: TextStyle(fontSize: 14, color: const Color(0xFF1E293B)),
               decoration: _inputDecoration(
                 hint: '••••••••',
                 icon: Icons.lock_outline,
@@ -388,12 +387,12 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
                     onTap: () => setState(() => _agreeTerms = !_agreeTerms),
                     child: RichText(
                       text: TextSpan(
-                        style: GoogleFonts.inter(fontSize: 12.5, color: const Color(0xFF64748B)),
+                        style: TextStyle(fontSize: 12.5, color: const Color(0xFF64748B)),
                         children: [
                           const TextSpan(text: 'Tôi đồng ý với '),
                           TextSpan(
                             text: 'Điều khoản sử dụng',
-                            style: GoogleFonts.inter(
+                            style: TextStyle(
                               color: const Color(0xFF0284C7),
                               fontWeight: FontWeight.w600,
                               decoration: TextDecoration.underline,
@@ -402,7 +401,7 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
                           const TextSpan(text: ' và '),
                           TextSpan(
                             text: 'Chính sách bảo mật',
-                            style: GoogleFonts.inter(
+                            style: TextStyle(
                               color: const Color(0xFF0284C7),
                               fontWeight: FontWeight.w600,
                               decoration: TextDecoration.underline,
@@ -441,7 +440,7 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
                       )
                     : Text(
                         'ĐĂNG KÝ',
-                        style: GoogleFonts.inter(
+                        style: TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.w700,
                           letterSpacing: 0.8,
@@ -461,7 +460,7 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
       children: [
         Text(
           'Đã có tài khoản? ',
-          style: GoogleFonts.inter(
+          style: TextStyle(
             fontSize: 14,
             color: Colors.white.withOpacity(0.8),
           ),
@@ -486,7 +485,7 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
           },
           child: Text(
             'Đăng nhập',
-            style: GoogleFonts.inter(
+            style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w700,
               color: const Color(0xFF7DD3FC),
@@ -502,7 +501,7 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
   Widget _buildLabel(String text) {
     return Text(
       text,
-      style: GoogleFonts.inter(
+      style: TextStyle(
         fontSize: 13,
         fontWeight: FontWeight.w600,
         color: const Color(0xFF334155),
@@ -513,7 +512,7 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
   InputDecoration _inputDecoration({required String hint, required IconData icon}) {
     return InputDecoration(
       hintText: hint,
-      hintStyle: GoogleFonts.inter(color: const Color(0xFFCBD5E1), fontSize: 14),
+      hintStyle: TextStyle(color: const Color(0xFFCBD5E1), fontSize: 14),
       prefixIcon: Icon(icon, color: const Color(0xFF94A3B8), size: 20),
       filled: true,
       fillColor: const Color(0xFFF8FAFC),

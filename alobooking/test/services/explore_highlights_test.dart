@@ -285,6 +285,57 @@ void main() {
     });
   });
 
+  group('topDistricts', () {
+    test('đếm sân công khai theo quận, nhiều nhất trước; bằng nhau thì theo tên', () {
+      final venues = [
+        _v(1, 'A1', district: 'Cầu Giấy'),
+        _v(2, 'A2', district: 'Cầu Giấy', type: 'tennis'),
+        _v(3, 'A3', district: 'Cầu Giấy'),
+        _v(4, 'B1', district: 'Đống Đa'),
+        _v(5, 'B2', district: 'Đống Đa'),
+        _v(6, 'C1', district: 'Ba Đình'),
+        _v(7, 'D1', district: 'Hai Bà Trưng'),
+      ];
+      final out = ExploreHighlights.topDistricts(venues);
+      expect(out.map((d) => d.name).toList(), ['Cầu Giấy', 'Đống Đa', 'Ba Đình', 'Hai Bà Trưng']);
+      expect(out.map((d) => d.count).toList(), [3, 2, 1, 1]);
+    });
+
+    test('không tính sân minh họa, sân chưa duyệt, sân thiếu quận hoặc môn lạ', () {
+      final venues = [
+        _v(1, 'Thật', district: 'Tây Hồ'),
+        _v(2, 'Demo', district: 'Tây Hồ', source: 'demo'),
+        _v(3, 'Chờ duyệt', district: 'Tây Hồ', status: 'pending'),
+        _v(4, 'Không quận', district: '  '),
+        _v(5, 'Môn lạ', district: 'Tây Hồ', type: 'golf'),
+      ];
+      final out = ExploreHighlights.topDistricts(venues);
+      expect(out.length, 1);
+      expect(out.single.name, 'Tây Hồ');
+      expect(out.single.count, 1);
+    });
+
+    test('môn nhiều nhất của quận; bằng nhau thì theo thứ tự cầu lông, pickleball, bóng đá, tennis, bóng rổ', () {
+      final venues = [
+        _v(1, 'P1', district: 'Hà Đông', type: 'pickleball'),
+        _v(2, 'P2', district: 'Hà Đông', type: 'pickleball'),
+        _v(3, 'T1', district: 'Hà Đông', type: 'tennis'),
+        _v(4, 'T1', district: 'Long Biên', type: 'tennis'),
+        _v(5, 'F1', district: 'Long Biên', type: 'football'),
+      ];
+      final out = {for (final d in ExploreHighlights.topDistricts(venues)) d.name: d.topSport};
+      expect(out['Hà Đông'], 'pickleball');
+      expect(out['Long Biên'], 'football');
+    });
+
+    test('giới hạn số quận trả về', () {
+      final venues = [for (var i = 0; i < 12; i++) _v(i, 'S$i', district: 'Quận $i')];
+      expect(ExploreHighlights.topDistricts(venues).length, 8);
+      expect(ExploreHighlights.topDistricts(venues, max: 3).length, 3);
+      expect(ExploreHighlights.topDistricts(const []), isEmpty);
+    });
+  });
+
   group('countBySport / dayShort', () {
     test('chỉ đếm sân công khai (đã duyệt, không demo); môn lạ bị bỏ; môn không có sân là 0', () {
       final venues = [

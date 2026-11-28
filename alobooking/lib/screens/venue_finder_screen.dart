@@ -45,10 +45,14 @@ class VenueFinderScreen extends StatefulWidget {
   /// Môn chọn sẵn khi mở ('all' hoặc 'badminton', 'pickleball', 'football', 'tennis', 'basketball').
   final String initialSport;
 
+  /// Mở sẵn bộ lọc theo quận/huyện này (ví dụ khi bấm thẻ khu vực ở trang Khám phá).
+  final String? initialDistrict;
+
   const VenueFinderScreen({
     super.key,
     required this.venues,
     this.initialSport = 'all',
+    this.initialDistrict,
     this.bookingsLoader,
     this.locationLoader,
     this.now,
@@ -130,6 +134,10 @@ class _VenueFinderScreenState extends State<VenueFinderScreen> {
     _today = DateTime(_now.year, _now.month, _now.day);
     _selected = _today;
     _stripStart = _today;
+    if (widget.initialDistrict != null) {
+      _district = widget.initialDistrict;
+      _areaMode = 'district';
+    }
     _loadBookings();
   }
 

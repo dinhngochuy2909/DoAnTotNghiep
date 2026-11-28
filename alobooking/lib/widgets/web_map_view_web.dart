@@ -28,7 +28,7 @@ Map<String, dynamic> _mapJson(Venue v) => {
       'image': v.displayImage.startsWith('http') ? v.displayImage : '',
     };
 
-class GoogleMapViewWidget extends StatefulWidget {
+class VenueMapViewWidget extends StatefulWidget {
   final List<Venue> venues;
   final String selectedType;
   final Function(int venueId)? onVenueSelected;
@@ -36,7 +36,7 @@ class GoogleMapViewWidget extends StatefulWidget {
   final Function(String sport)? onFilterChanged;
   final Function(double lat, double lng)? onUserLocated;
 
-  const GoogleMapViewWidget({
+  const VenueMapViewWidget({
     super.key,
     required this.venues,
     this.selectedType = 'all',
@@ -47,12 +47,12 @@ class GoogleMapViewWidget extends StatefulWidget {
   });
 
   @override
-  State<GoogleMapViewWidget> createState() => _GoogleMapViewWidgetState();
+  State<VenueMapViewWidget> createState() => _VenueMapViewWidgetState();
 }
 
-class _GoogleMapViewWidgetState extends State<GoogleMapViewWidget> {
+class _VenueMapViewWidgetState extends State<VenueMapViewWidget> {
   StreamSubscription? _messageSub;
-  final String _viewId = 'alobooking-google-map';
+  final String _viewId = 'alobooking-venue-map';
 
   @override
   void initState() {
@@ -69,8 +69,8 @@ class _GoogleMapViewWidgetState extends State<GoogleMapViewWidget> {
         _viewId,
         (int id) {
           final iframe = html.IFrameElement()
-            ..src = 'google_map.html'
-            ..id = 'google-maps-frame'
+            ..src = 'map.html'
+            ..id = 'venue-map-frame'
             ..style.border = 'none'
             ..style.width = '100%'
             ..style.height = '100%'
@@ -132,7 +132,7 @@ class _GoogleMapViewWidgetState extends State<GoogleMapViewWidget> {
 
   void _sendVenuesToIframe() {
     try {
-      final iframe = html.document.getElementById('google-maps-frame') as html.IFrameElement?;
+      final iframe = html.document.getElementById('venue-map-frame') as html.IFrameElement?;
       if (iframe != null && iframe.contentWindow != null) {
         final list = widget.venues.map(_mapJson).toList();
         iframe.contentWindow!.postMessage({'type': 'SET_VENUES', 'venues': list}, '*');
@@ -143,7 +143,7 @@ class _GoogleMapViewWidgetState extends State<GoogleMapViewWidget> {
   }
 
   @override
-  void didUpdateWidget(covariant GoogleMapViewWidget oldWidget) {
+  void didUpdateWidget(covariant VenueMapViewWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (!identical(oldWidget.venues, widget.venues) || oldWidget.venues.length != widget.venues.length) {
       // Danh sách sân thay đổi (vừa tải xong, thêm/sửa sân): cập nhật lại ghim trên bản đồ
@@ -157,7 +157,7 @@ class _GoogleMapViewWidgetState extends State<GoogleMapViewWidget> {
 
   void _sendFilterToIframe(String sport) {
     try {
-      final iframe = html.document.getElementById('google-maps-frame') as html.IFrameElement?;
+      final iframe = html.document.getElementById('venue-map-frame') as html.IFrameElement?;
       if (iframe != null && iframe.contentWindow != null) {
         iframe.contentWindow!.postMessage({'type': 'FILTER_SPORT', 'sport': sport}, '*');
       }
@@ -178,12 +178,12 @@ class _GoogleMapViewWidgetState extends State<GoogleMapViewWidget> {
 }
 
 void openMapInNewTab() {
-  html.window.open('google_map.html', '_blank');
+  html.window.open('map.html', '_blank');
 }
 
 void triggerLocateUser() {
   try {
-    final iframe = html.document.getElementById('google-maps-frame') as html.IFrameElement?;
+    final iframe = html.document.getElementById('venue-map-frame') as html.IFrameElement?;
     if (iframe != null && iframe.contentWindow != null) {
       iframe.contentWindow!.postMessage({'type': 'LOCATE_USER'}, '*');
     }
