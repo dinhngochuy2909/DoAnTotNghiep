@@ -207,6 +207,7 @@ def accounts():
 
 def data():
     venues = docs('venues')
+    by_id = {doc_id(v): v for v in venues}
     by_name = {}
     for v in venues:
         by_name.setdefault(get(v, 'name').strip().lower(), []).append(v)
@@ -214,10 +215,13 @@ def data():
     phones = {digits(get(u, 'phone')): doc_id(u) for u in docs('users') if get(u, 'password') and digits(get(u, 'phone'))}
     writes, links, unmatched = [], {}, 0
     for b in docs('bookings'):
-        matches = by_name.get(get(b, 'venueName').strip().lower(), [])
-        venue = matches[0] if len(matches) == 1 else None
+        # đơn do bản mới tạo đã có mã sân và mã chủ sân: giữ nguyên, chạy lại bước này không làm sai
+        venue = by_id.get(str(get(b, 'venueId'))) if get(b, 'venueId') not in ('', '0') else None
+        if venue is None:
+            matches = by_name.get(get(b, 'venueName').strip().lower(), [])
+            venue = matches[0] if len(matches) == 1 else None
         unmatched += venue is None
-        owner = (get(venue, 'ownerId') if venue else '') or 'admin_super_01'
+        owner = get(b, 'ownerId') or (get(venue, 'ownerId') if venue else '') or 'admin_super_01'
         venue_id = int(get(venue, 'id')) if venue else 0
         user = get(b, 'userId') or phones.get(digits(get(b, 'phone')), '')
         links[doc_id(b)] = (user, owner)
