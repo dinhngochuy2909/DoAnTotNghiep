@@ -26,7 +26,7 @@ Tài liệu mô tả đúng sản phẩm hiện có trong mã nguồn. Những p
 | Cơ sở dữ liệu | Cloud Firestore, ứng dụng gọi trực tiếp REST API | Firestore REST |
 | Xác thực | Tài khoản lưu trong collection `users`, mật khẩu băm SHA-256 kèm salt | Tự xây trong Dart |
 | Chatbot | Truy xuất dữ liệu (lọc + BM25) rồi sinh câu trả lời | RAG + Gemini API |
-| Dự báo | Số đơn theo ngày và tỷ lệ hủy | Hồi quy Poisson và logistic viết bằng Dart |
+| Dự báo | Số đơn theo ngày và tỷ lệ hủy | Hồi quy Poisson (IRLS, điều chuẩn L2) và logistic (L2) viết bằng Dart thuần |
 | Thời tiết | Hiện tại, dự báo và lịch sử | Open-Meteo |
 | Bản đồ | Vị trí cụm sân | OpenStreetMap qua thư viện Leaflet (không cần khóa API) |
 | Triển khai | Trang web tĩnh | Firebase Hosting |
@@ -79,7 +79,7 @@ Vai trò chỉ lấy từ trường `role` đã lưu, không suy ra từ email.
 - Ca giờ vàng 16:00 – 22:00 tính giá cao, giờ còn lại tính giá thấp trong khoảng giá chủ sân khai báo.
 - Lịch được tải lại ngay trước khi ghi đơn để phát hiện trùng giờ.
 - Trạng thái đơn: Chờ xác nhận → Đã xác nhận → Hoàn thành, hoặc Đã hủy ([sơ đồ](diagrams/trang-thai-don-dat.png)).
-- Khách tự hủy được đơn chờ xác nhận hoặc đã xác nhận khi chưa tới giờ chơi.
+- Khách tự hủy được đơn chờ xác nhận hoặc đã xác nhận khi còn cách giờ chơi (ca sớm nhất của đơn) từ 2 tiếng trở lên; còn dưới 2 tiếng thì không hủy được. Chủ sân và quản trị viên không bị giới hạn này.
 
 **Thanh toán**
 - Chỉ chuyển khoản qua mã VietQR đúng số tiền, nội dung là mã đơn.
@@ -140,7 +140,7 @@ Vai trò chỉ lấy từ trường `role` đã lưu, không suy ra từ email.
 
 - Ứng dụng Android, iOS (mã Flutter có thể đóng gói nhưng chưa kiểm thử).
 - Gợi ý sân và khung giờ cá nhân hóa theo lịch sử người dùng.
-- Dự báo theo khung giờ và loại sân; so sánh nhiều thuật toán (Random Forest, Gradient Boosting, XGBoost), R².
+- Dự báo theo khung giờ và loại sân; so sánh thêm các thuật toán dự báo khác.
 - Cập nhật thông tin cá nhân, thanh toán tại sân, đặt cố định theo tháng.
 - Thống kê tỷ lệ sử dụng từng sân, khung giờ thấp điểm.
 - Thông báo đẩy, lưu trữ ảnh thật của từng sân.

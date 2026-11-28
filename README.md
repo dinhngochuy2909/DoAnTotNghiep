@@ -36,6 +36,12 @@
     └── dac-ta-yeu-cau.md       Đặc tả yêu cầu
 ```
 
+## Yêu cầu môi trường
+
+- **Dart 3.13.1 trở lên** (`sdk: ^3.13.1` trong `alobooking/pubspec.yaml`), đi kèm Flutter 3.47.
+- Dự án được phát triển và kiểm thử với Flutter 3.47.1 (kênh stable), Dart 3.13.1; GitHub Actions dùng đúng phiên bản này.
+- Trình duyệt Chrome để chạy bản web; Python 3 nếu muốn chạy các script trong `alobooking/tool/`.
+
 ## Chạy ứng dụng
 
 Chạy trong thư mục `alobooking/`.

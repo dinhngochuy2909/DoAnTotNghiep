@@ -22,7 +22,7 @@ Cập nhật theo sản phẩm thực tế. `[x]` đã xong, `[ ]` chưa làm.
 - [x] Thu thập thời tiết nhiều năm, ngày lễ; sinh đơn mô phỏng có nhãn.
 - [x] Bảng dữ liệu huấn luyện theo ngày và theo giờ (`alobooking/tool/data/`).
 - [x] Hồi quy Poisson có điều chuẩn, kiểm định chéo (MAE, RMSE, độ phủ).
-- [ ] So sánh Linear Regression, Random Forest, Gradient Boosting, XGBoost; R².
+- [ ] So sánh thêm các thuật toán dự báo khác.
 
 ### Giai đoạn 4: Tích hợp AI và Dashboard (Tuần 13 - 14)
 - [x] Chatbot RAG với Gemini.
@@ -33,7 +33,7 @@ Cập nhật theo sản phẩm thực tế. `[x]` đã xong, `[ ]` chưa làm.
 
 ### Giai đoạn 5: Kiểm thử, triển khai, báo cáo (Tuần 15)
 - [x] Kiểm thử tự động và `dart analyze`.
-- [x] Cấu hình GitHub Actions (cần đẩy mã lên GitHub để chạy).
+- [x] GitHub Actions chạy phân tích mã và kiểm thử (đã chạy thành công ngày 28/11/2026).
 - [x] Triển khai web trên Firebase Hosting: https://alobooking-b2484.web.app
 - [ ] Bảo mật phía máy chủ (Firebase Authentication + luật Firestore).
 - [ ] Hoàn thiện cuốn báo cáo với ảnh giao diện mới.
